@@ -1,0 +1,28 @@
+.title {
+    font-size: 16px;
+    -unity-font-style: bold;
+    margin-bottom: 8px;
+}
+
+.project-settings-title-container {
+    flex-direction: row;
+    justify-content: space-between;
+}
+
+.manage-environments-container {
+    padding: 0;
+}
+
+.label-container {
+    padding-bottom: 5px;
+}
+
+.section-container {
+    padding-left: 8px;
+    padding-bottom: 5px;
+    padding-right: 8px;
+}
+
+.no-margin {
+    margin: 0;
+}

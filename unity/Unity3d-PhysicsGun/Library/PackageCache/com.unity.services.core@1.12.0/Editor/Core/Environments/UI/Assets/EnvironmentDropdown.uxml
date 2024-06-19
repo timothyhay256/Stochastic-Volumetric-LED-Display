@@ -1,0 +1,4 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" xmlns="UnityEngine.UIElements" editor-extension-mode="True">
+    <ui:DropdownField label="Editor Environment" name="Dropdown Control" index="-1" class="no-margin" />
+    <!--This dropdown is only for 2021.3+. In prior versions, setup is done in EnvironmentSelector.cs-->
+</ui:UXML>

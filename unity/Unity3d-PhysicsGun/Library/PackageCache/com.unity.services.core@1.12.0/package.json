@@ -1,0 +1,27 @@
+{
+  "name": "com.unity.services.core",
+  "displayName": "Services Core",
+  "version": "1.12.0",
+  "unity": "2019.4",
+  "description": "This package defines common components used by multiple Game Service packages.\nThese are standardized and aim to unify the overall experience of working with Game Services SDK.",
+  "dependencies": {
+    "com.unity.modules.unitywebrequest": "1.0.0",
+    "com.unity.nuget.newtonsoft-json": "3.2.1",
+    "com.unity.modules.androidjni": "1.0.0"
+  },
+  "relatedPackages": {
+    "com.unity.services.core.tests": "1.12.0"
+  },
+  "_upm": {
+    "changelog": "### Added\n- Added service registry and new package initialization interface for enabling instances and editor-time services.\n\n### Fixed\n- Resolved issue with `IAccessTokens` reaching rate limit."
+  },
+  "upmCi": {
+    "footprint": "1593004266b7cc13c5704e34380331e8afaf0fce"
+  },
+  "documentationUrl": "https://docs.unity3d.com/Packages/com.unity.services.core@1.12/manual/index.html",
+  "repository": {
+    "url": "https://github.cds.internal.unity3d.com/unity/operate-services-sdk.git",
+    "type": "git",
+    "revision": "bb79575fc5daa804c44378ca264da0927e0d89da"
+  }
+}

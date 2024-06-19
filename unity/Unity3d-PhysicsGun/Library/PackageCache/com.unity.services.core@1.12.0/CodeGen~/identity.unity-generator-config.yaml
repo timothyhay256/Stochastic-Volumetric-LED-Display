@@ -1,0 +1,32 @@
+generatorName: csharp-unity
+inputSpec: ./com.unity.services.core/Editor/Core/Environments/Client/routes/unity/v1/routes.yaml
+outputDir: .
+packageName: com.unity.services.core.identity-api
+additionalProperties:
+    unityVersion: "2021.2"
+    packageVersion: "0.0.1-preview"
+    unityPackageNamespace: "Unity.Services.Core.Environments.Client"
+    unityServiceName: "Identity"
+    unityPackageDescription: Identity API.
+    useUnityAuthentication: false
+    usePhpStyleQueryParams: false
+    internalAccessOnly: [services, apis, http, jsonobject, models]
+    releaseDate: 2021-11-12
+    generateMarkdownDocumentation: false
+    createClientInstances: false
+    outputFormat: code-only
+x-recipeEngine:
+    trackedDir: "./Packages/Public/com.unity.services.core/Editor/Core/Environments/Client"
+    externalSpecSource:
+        repository: https://github.com/Unity-Technologies/unity-services-gateway
+        branch: master
+        sourcePath: "config/internal/docs"
+        outputPath: "com.unity.services.core/Editor/Core/Environments/Client"
+    moveGeneratorFiles: false
+    preProcessCommands:
+        - /bin/bash -c "pushd ../Editor/Core/Environments/Client/ ; find . -type f ! -name '*.meta' -delete ; popd"
+    postProcessCommands:
+        - cp -r ./com.unity.services.core.identity-api/Runtime/* ../Editor/Core/Environments/Client
+        - rm -r ./com.unity.services.core.identity-api || true
+        - rm -r ./com.unity.services.core || true
+        - echo "Done generating package, nothing else to do here."

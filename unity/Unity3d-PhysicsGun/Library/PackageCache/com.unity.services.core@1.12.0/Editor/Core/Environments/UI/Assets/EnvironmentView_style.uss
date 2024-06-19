@@ -1,0 +1,5 @@
+﻿.warning .environment-icon {
+    background-image: var(--unity-icons-console_entry_warn);
+    width: 15px;
+    height: 15px;
+}

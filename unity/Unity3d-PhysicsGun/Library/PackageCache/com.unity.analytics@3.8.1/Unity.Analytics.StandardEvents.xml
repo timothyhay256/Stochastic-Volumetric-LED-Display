@@ -1,0 +1,2137 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Unity.Analytics.StandardEvents</name>
+    </assembly>
+    <members>
+        <member name="T:UnityEngine.Analytics.AnalyticsEvent">
+             <summary>
+             The main class of the Unity Analytics Standard Event SDK.
+             <remarks>
+             The event methods in this class provide "fire and forget" ease of use,
+             allowing you to send a standard event with a single line of code.
+             </remarks>
+             </summary>
+             <remarks>
+             If you expect to be sending the same standard event with some amount of frequency,
+             you may want to create an event payload and invoke the <c>Send</c> method when the event occurs.
+             </remarks>
+             <summary>
+             The main class of the Unity Analytics Standard Event SDK.
+             <remarks>
+             The event methods in this class provide 'fire and forget' ease of use,
+             allowing you to send a standard event with a single line of code.
+             </remarks>
+             </summary>
+             <remarks>
+             If you expect to be sending the same standard event with some amount of frequency,
+             you may want to create an event payload and invoke the <c>Send</c> method when the event occurs.
+             </remarks>
+            </member>
+        <member name="F:UnityEngine.Analytics.AnalyticsEvent.s_StandardEventCallback">
+             <summary>
+             Actions for all events
+             </summary>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.Register(System.Action{System.Collections.Generic.IDictionary{System.String,System.Object}})">
+             <summary>
+             Add a callback for all standard events.
+             <remarks>
+             Callback will be called, passing the outgoing event data dictionary,
+             allowing for inspection and mutation of every Standard Event.
+             </remarks>
+             </summary>
+             <param name="action"></param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.Unregister(System.Action{System.Collections.Generic.IDictionary{System.String,System.Object}})">
+             <summary>
+             Add a callback for all standard events.
+             <remarks>
+             Callback will be called, passing the outgoing event data dictionary,
+             allowing for inspection and mutation of every Standard Event.
+             </remarks>
+             </summary>
+             <param name="action"></param>
+            </member>
+        <member name="P:UnityEngine.Analytics.AnalyticsEvent.sdkVersion">
+             <summary>
+             Gets the Unity Analytics Standard Event SDK version.
+             </summary>
+             <value>The SDK version in semantic versioning format.</value>
+            </member>
+        <member name="P:UnityEngine.Analytics.AnalyticsEvent.debugMode">
+             <summary>
+             Gets or sets a value indicating whether debug mode is enabled.
+             <remarks>
+             When debug mode is enabled, a debug log is generated for each event sent. If an error occurs when
+             sending an event, an error log is generated regardless of whether debug mode is enabled.
+             </remarks>
+             </summary>
+             <remarks>
+             To view the event name and a listing of event data parameters within the debug log messages for each event,
+             set debugMode to true.
+             </remarks>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.Custom(System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a custom event (eventName) with data (eventData)
+             </summary>
+             <returns>The result of the analytics event sent</returns>
+             <param name="eventName">The name of the event.</param>
+             <param name="eventData">Custom event data.</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.AchievementStep(System.Int32,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>achievement_step</c> event.
+             <remarks>
+             Send this event when a requirement or step toward completing a multi-part achievement is complete.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="stepIndex">The order of the step (required).</param>
+             <param name="achievementId">A unique id for this achievement (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.AchievementUnlocked(System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>achievement_unlocked</c> event.
+             <remarks>
+             Send this event when all requirements to unlock an achievement have been met.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="achievementId">A unique id for this achievement (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.AdComplete(System.Boolean,UnityEngine.Analytics.AdvertisingNetwork,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>ad_complete</c> event.
+             <remarks>
+             Send this event when an ad is successfully viewed and not skipped.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="rewarded">Set to true if a reward is offered for this ad (required).</param>
+             <param name="network">The ad or mediation network provider (optional).</param>
+             <param name="placementId">An ad placement or configuration ID (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.AdComplete(System.Boolean,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>ad_complete</c> event.
+             <remarks>
+             Send this event when an ad is successfully viewed and not skipped.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="rewarded">Set to true if a reward is offered for this ad (required).</param>
+             <param name="network">The ad or mediation network provider (optional).</param>
+             <param name="placementId">An ad placement or configuration ID (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.AdOffer(System.Boolean,UnityEngine.Analytics.AdvertisingNetwork,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>ad_offer</c> event.
+             <remarks>
+             Send this event when the player is offered the opportunity to view an ad.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="rewarded">Set to true if a reward is offered for this ad (required).</param>
+             <param name="network">The ad or mediation network provider (optional).</param>
+             <param name="placementId">An ad placement or configuration ID (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.AdOffer(System.Boolean,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>ad_offer</c> event.
+             <remarks>
+             Send this event when the player is offered the opportunity to view an ad.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="rewarded">Set to true if a reward is offered for this ad (required).</param>
+             <param name="network">The ad or mediation network provider (optional).</param>
+             <param name="placementId">An ad placement or configuration ID (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.AdSkip(System.Boolean,UnityEngine.Analytics.AdvertisingNetwork,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>ad_skip</c> event.
+             <remarks>
+             Send this event when the player opts to skip a video ad during video playback.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="rewarded">Set to true if a reward is offered for this ad (required).</param>
+             <param name="network">The ad or mediation network provider (optional).</param>
+             <param name="placementId">An ad placement or configuration ID (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.AdSkip(System.Boolean,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>ad_skip</c> event.
+             <remarks>
+             Send this event when the player opts to skip a video ad during video playback.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="rewarded">Set to true if a reward is offered for this ad (required).</param>
+             <param name="network">The ad or mediation network provider (optional).</param>
+             <param name="placementId">An ad placement or configuration ID (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.AdStart(System.Boolean,UnityEngine.Analytics.AdvertisingNetwork,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>ad_start</c> event.
+             <remarks>
+             Send this event when playback of an ad begins.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="rewarded">Set to true if a reward is offered for this ad (required).</param>
+             <param name="network">The ad or mediation network provider (optional).</param>
+             <param name="placementId">An ad placement or configuration ID (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.AdStart(System.Boolean,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>ad_start</c> event.
+             <remarks>
+             Send this event when playback of an ad begins.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="rewarded">Set to true if a reward is offered for this ad (required).</param>
+             <param name="network">The ad or mediation network provider (optional).</param>
+             <param name="placementId">An ad placement or configuration ID (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.ChatMessageSent(System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>chat_message_sent</c> event.
+             <remarks>
+             Send this event when the player sends a chat message in game.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.CustomEvent(System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c></c> event.
+             <remarks>
+             An event you define yourself.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.CutsceneSkip(System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>cutscene_skip</c> event.
+             <remarks>
+             Send this event when the player opts to skip a cutscene or cinematic screen.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="name">The name of the cutscene skipped (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.CutsceneStart(System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>cutscene_start</c> event.
+             <remarks>
+             Send this event when the player begins to watch a cutscene or cinematic screen.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="name">The name of the cutscene being viewed (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.FirstInteraction(System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>first_interaction</c> event.
+             <remarks>
+             Send this event with the first voluntary action the user takes after install.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="actionId">The action ID or name. For example, a unique identifier for the button clicked (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.GameOver(System.Int32,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>game_over</c> event.
+             <remarks>
+             Send this event when gameplay ends (in a game with an identifiable conclusion).
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="index">The order of this level within the game (optional).</param>
+             <param name="name">The level name (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.GameOver(System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>game_over</c> event.
+             <remarks>
+             Send this event when gameplay ends (in a game with an identifiable conclusion).
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="name">The level name (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.GameStart(System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>game_start</c> event.
+             <remarks>
+             Send this event when gameplay starts. Usually used only in games with an identifiable conclusion.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.IAPTransaction(System.String,System.Single,System.String,System.String,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>iap_transaction</c> event.
+             <remarks>
+             Send this event when the player spends real-world money to make an In-App Purchase.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="transactionContext">In what context (store, gift, reward) was the item acquired? (required).</param>
+             <param name="price">How much did the item cost? (required).</param>
+             <param name="itemId">A name or unique identifier for the acquired item (required).</param>
+             <param name="itemType">The category of the item that was acquired (optional).</param>
+             <param name="level">The name or id of the level where the item was acquired (optional).</param>
+             <param name="transactionId">A unique identifier for the specific transaction that occurred. You can use this to group multiple events into a single transaction (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.ItemAcquired(UnityEngine.Analytics.AcquisitionType,System.String,System.Single,System.String,System.Single,System.String,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>item_acquired</c> event.
+             <remarks>
+             Send this event when the player acquires an item within the game.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="currencyType">Set to AcquisitionType.Premium if the item was purchased with real money; otherwise, AcqusitionType.Soft (required).</param>
+             <param name="transactionContext">In what context(store, gift, reward, crafting) was the item acquired? (required).</param>
+             <param name="amount">The unit quantity of the item that was acquired (required).</param>
+             <param name="itemId">A name or unique identifier for the acquired item (required).</param>
+             <param name="balance">The balance of the acquired item (optional).</param>
+             <param name="itemType">The category of the item that was acquired (optional).</param>
+             <param name="level">The name or id of the level where the item was acquired (optional).</param>
+             <param name="transactionId">A unique identifier for the specific transaction that occurred. You can use this to group multiple events into a single transaction (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.ItemAcquired(UnityEngine.Analytics.AcquisitionType,System.String,System.Single,System.String,System.String,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>item_acquired</c> event.
+             <remarks>
+             Send this event when the player acquires an item within the game.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="currencyType">Set to AcquisitionType.Premium if the item was purchased with real money; otherwise, AcqusitionType.Soft (required).</param>
+             <param name="transactionContext">In what context(store, gift, reward, crafting) was the item acquired? (required).</param>
+             <param name="amount">The unit quantity of the item that was acquired (required).</param>
+             <param name="itemId">A name or unique identifier for the acquired item (required).</param>
+             <param name="itemType">The category of the item that was acquired (optional).</param>
+             <param name="level">The name or id of the level where the item was acquired (optional).</param>
+             <param name="transactionId">A unique identifier for the specific transaction that occurred. You can use this to group multiple events into a single transaction (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.ItemSpent(UnityEngine.Analytics.AcquisitionType,System.String,System.Single,System.String,System.Single,System.String,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>item_spent</c> event.
+             <remarks>
+             Send this event when the player spends an item.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="currencyType">Set to AcquisitionType.Premium if the item was purchased with real money; otherwise, AcqusitionType.Soft (required).</param>
+             <param name="transactionContext">In what context(store, gift, reward, crafting) was the item spent? (required).</param>
+             <param name="amount">The unit quantity of the item that was spent (required).</param>
+             <param name="itemId">A name or unique identifier for the spent item (required).</param>
+             <param name="balance">The balance of the spent item (optional).</param>
+             <param name="itemType">The category of the item that was spent (optional).</param>
+             <param name="level">The name or id of the level where the item was spent (optional).</param>
+             <param name="transactionId">A unique identifier for the specific transaction that occurred. You can use this to group multiple events into a single transaction (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.ItemSpent(UnityEngine.Analytics.AcquisitionType,System.String,System.Single,System.String,System.String,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>item_spent</c> event.
+             <remarks>
+             Send this event when the player spends an item.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="currencyType">Set to AcquisitionType.Premium if the item was purchased with real money; otherwise, AcqusitionType.Soft (required).</param>
+             <param name="transactionContext">In what context(store, gift, reward, crafting) was the item spent? (required).</param>
+             <param name="amount">The unit quantity of the item that was spent (required).</param>
+             <param name="itemId">A name or unique identifier for the spent item (required).</param>
+             <param name="itemType">The category of the item that was spent (optional).</param>
+             <param name="level">The name or id of the level where the item was spent (optional).</param>
+             <param name="transactionId">A unique identifier for the specific transaction that occurred. You can use this to group multiple events into a single transaction (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.LevelComplete(System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>level_complete</c> event.
+             <remarks>
+             Send this event when the player has successfully completed a level.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="name">The level name. Either level_name or level_index is required (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.LevelComplete(System.Int32,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>level_complete</c> event.
+             <remarks>
+             Send this event when the player has successfully completed a level.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="index">The order of this level within the game. Either level_name or level_index is required (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.LevelComplete(System.String,System.Int32,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>level_complete</c> event.
+             <remarks>
+             Send this event when the player has successfully completed a level.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="name">The level name. Either level_name or level_index is required (required).</param>
+             <param name="index">The order of this level within the game. Either level_name or level_index is required (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.LevelFail(System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>level_fail</c> event.
+             <remarks>
+             Send this event when the player fails a level.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="name">The level name. Either level_name or level_index is required (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.LevelFail(System.Int32,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>level_fail</c> event.
+             <remarks>
+             Send this event when the player fails a level.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="index">The order of this level within the game. Either level_name or level_index is required (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.LevelFail(System.String,System.Int32,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>level_fail</c> event.
+             <remarks>
+             Send this event when the player fails a level.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="name">The level name. Either level_name or level_index is required (required).</param>
+             <param name="index">The order of this level within the game. Either level_name or level_index is required (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.LevelQuit(System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>level_quit</c> event.
+             <remarks>
+             Send this event when the player opts to quit from a level before completing it.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="name">The level name. Either level_name or level_index is required (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.LevelQuit(System.Int32,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>level_quit</c> event.
+             <remarks>
+             Send this event when the player opts to quit from a level before completing it.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="index">The order of this level within the game. Either level_name or level_index is required (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.LevelQuit(System.String,System.Int32,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>level_quit</c> event.
+             <remarks>
+             Send this event when the player opts to quit from a level before completing it.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="name">The level name. Either level_name or level_index is required (required).</param>
+             <param name="index">The order of this level within the game. Either level_name or level_index is required (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.LevelSkip(System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>level_skip</c> event.
+             <remarks>
+             Send this event when the player opts to skip past a level.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="name">The level name. Either level_name or level_index is required (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.LevelSkip(System.Int32,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>level_skip</c> event.
+             <remarks>
+             Send this event when the player opts to skip past a level.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="index">The order of this level within the game. Either level_name or level_index is required (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.LevelSkip(System.String,System.Int32,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>level_skip</c> event.
+             <remarks>
+             Send this event when the player opts to skip past a level.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="name">The level name. Either level_name or level_index is required (required).</param>
+             <param name="index">The order of this level within the game. Either level_name or level_index is required (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.LevelStart(System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>level_start</c> event.
+             <remarks>
+             Send this event when the player enters into or begins a level.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="name">The level name. Either level_name or level_index is required (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.LevelStart(System.Int32,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>level_start</c> event.
+             <remarks>
+             Send this event when the player enters into or begins a level.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="index">The order of this level within the game. Either level_name or level_index is required (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.LevelStart(System.String,System.Int32,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>level_start</c> event.
+             <remarks>
+             Send this event when the player enters into or begins a level.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="name">The level name. Either level_name or level_index is required (required).</param>
+             <param name="index">The order of this level within the game. Either level_name or level_index is required (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.LevelUp(System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>level_up</c> event.
+             <remarks>
+             Send this event when the player rank or level increases.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="name">The new rank or level name (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.LevelUp(System.Int32,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>level_up</c> event.
+             <remarks>
+             Send this event when the player rank or level increases.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="index">The new rank or level index (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.LevelUp(System.String,System.Int32,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>level_up</c> event.
+             <remarks>
+             Send this event when the player rank or level increases.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="name">The new rank or level name (required).</param>
+             <param name="index">The new rank or level index (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.PostAdAction(System.Boolean,UnityEngine.Analytics.AdvertisingNetwork,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>post_ad_action</c> event.
+             <remarks>
+             Send this event with the first action a player takes after an ad is shown, or after an ad is offered but not shown.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="rewarded">Set to true if a reward is offered for this ad (required).</param>
+             <param name="network">The ad or mediation network provider (optional).</param>
+             <param name="placementId">An ad placement or configuration ID (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.PostAdAction(System.Boolean,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>post_ad_action</c> event.
+             <remarks>
+             Send this event with the first action a player takes after an ad is shown, or after an ad is offered but not shown.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="rewarded">Set to true if a reward is offered for this ad (required).</param>
+             <param name="network">The ad or mediation network provider (optional).</param>
+             <param name="placementId">An ad placement or configuration ID (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.PushNotificationClick(System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>push_notification_click</c> event.
+             <remarks>
+             Send this event when the player responds to a push notification.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="message_id">The message name or ID (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.PushNotificationEnable(System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>push_notification_enable</c> event.
+             <remarks>
+             Send this event when the player enables or grants permission for the game to use push notifications.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.ScreenVisit(UnityEngine.Analytics.ScreenName,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>screen_visit</c> event.
+             <remarks>
+             Send this event when the player opens a menu or visits a screen in the game.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="screenName">The name of the screen or type of screen visited (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.ScreenVisit(System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>screen_visit</c> event.
+             <remarks>
+             Send this event when the player opens a menu or visits a screen in the game.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="screenName">The name of the screen or type of screen visited (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.SocialShare(UnityEngine.Analytics.ShareType,UnityEngine.Analytics.SocialNetwork,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>social_share</c> event.
+             <remarks>
+             Send this event when the player posts a message, gift, or invitation through social media.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="shareType">The mode of sharing, or media type used in the social engagement (required).</param>
+             <param name="socialNetwork">The network through which the message is shared (required).</param>
+             <param name="senderId">A unique identifier for the sender (optional).</param>
+             <param name="recipientId">A unique identifier for the recipient (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.SocialShare(UnityEngine.Analytics.ShareType,System.String,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>social_share</c> event.
+             <remarks>
+             Send this event when the player posts a message, gift, or invitation through social media.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="shareType">The mode of sharing, or media type used in the social engagement (required).</param>
+             <param name="socialNetwork">The network through which the message is shared (required).</param>
+             <param name="senderId">A unique identifier for the sender (optional).</param>
+             <param name="recipientId">A unique identifier for the recipient (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.SocialShare(System.String,UnityEngine.Analytics.SocialNetwork,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>social_share</c> event.
+             <remarks>
+             Send this event when the player posts a message, gift, or invitation through social media.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="shareType">The mode of sharing, or media type used in the social engagement (required).</param>
+             <param name="socialNetwork">The network through which the message is shared (required).</param>
+             <param name="senderId">A unique identifier for the sender (optional).</param>
+             <param name="recipientId">A unique identifier for the recipient (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.SocialShare(System.String,System.String,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>social_share</c> event.
+             <remarks>
+             Send this event when the player posts a message, gift, or invitation through social media.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="shareType">The mode of sharing, or media type used in the social engagement (required).</param>
+             <param name="socialNetwork">The network through which the message is shared (required).</param>
+             <param name="senderId">A unique identifier for the sender (optional).</param>
+             <param name="recipientId">A unique identifier for the recipient (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.SocialShareAccept(UnityEngine.Analytics.ShareType,UnityEngine.Analytics.SocialNetwork,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>social_share_accept</c> event.
+             <remarks>
+             Send this event when the player accepts a message, gift, or invitation through social media.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="shareType">The mode of sharing, or media type used in the social engagement (required).</param>
+             <param name="socialNetwork">The network through which the message is shared (required).</param>
+             <param name="senderId">A unique identifier for the sender (optional).</param>
+             <param name="recipientId">A unique identifier for the recipient (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.SocialShareAccept(UnityEngine.Analytics.ShareType,System.String,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>social_share_accept</c> event.
+             <remarks>
+             Send this event when the player accepts a message, gift, or invitation through social media.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="shareType">The mode of sharing, or media type used in the social engagement (required).</param>
+             <param name="socialNetwork">The network through which the message is shared (required).</param>
+             <param name="senderId">A unique identifier for the sender (optional).</param>
+             <param name="recipientId">A unique identifier for the recipient (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.SocialShareAccept(System.String,UnityEngine.Analytics.SocialNetwork,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>social_share_accept</c> event.
+             <remarks>
+             Send this event when the player accepts a message, gift, or invitation through social media.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="shareType">The mode of sharing, or media type used in the social engagement (required).</param>
+             <param name="socialNetwork">The network through which the message is shared (required).</param>
+             <param name="senderId">A unique identifier for the sender (optional).</param>
+             <param name="recipientId">A unique identifier for the recipient (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.SocialShareAccept(System.String,System.String,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>social_share_accept</c> event.
+             <remarks>
+             Send this event when the player accepts a message, gift, or invitation through social media.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="shareType">The mode of sharing, or media type used in the social engagement (required).</param>
+             <param name="socialNetwork">The network through which the message is shared (required).</param>
+             <param name="senderId">A unique identifier for the sender (optional).</param>
+             <param name="recipientId">A unique identifier for the recipient (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.StoreItemClick(UnityEngine.Analytics.StoreType,System.String,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>store_item_click</c> event.
+             <remarks>
+             Send this event when the player clicks on an item in the store.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="storeType">Set to StoreType.Premium if purchases use real-world money; otherwise, StoreType.Soft (required).</param>
+             <param name="itemId">A unique identifier for the item (required).</param>
+             <param name="itemName">The item's name (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.StoreOpened(UnityEngine.Analytics.StoreType,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>store_opened</c> event.
+             <remarks>
+             Send this event when the player opens a store in game.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="storeType">Set to StoreType.Premium if purchases use real-world money; otherwise, StoreType.Soft (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.TutorialComplete(System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>tutorial_complete</c> event.
+             <remarks>
+             Send this event when the player completes a tutorial.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="tutorialId">The tutorial name or ID (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.TutorialSkip(System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>tutorial_skip</c> event.
+             <remarks>
+             Send this event when the player opts to skip a tutorial.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="tutorialId">The tutorial name or ID (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.TutorialStart(System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>tutorial_start</c> event.
+             <remarks>
+             Send this event when the player starts a tutorial.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="tutorialId">The tutorial name or ID (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.TutorialStep(System.Int32,System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>tutorial_step</c> event.
+             <remarks>
+             Send this event when the player completes a step or stage in a multi-part tutorial.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="stepIndex">The step or stage completed in a multi-part tutorial (required).</param>
+             <param name="tutorialId">The tutorial name or ID (optional).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.UserSignup(UnityEngine.Analytics.AuthorizationNetwork,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>user_signup</c> event.
+             <remarks>
+             Send this event when the player registers or logs in for the first time.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="authorizationNetwork">The authorization network or login service provider (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="M:UnityEngine.Analytics.AnalyticsEvent.UserSignup(System.String,System.Collections.Generic.IDictionary{System.String,System.Object})">
+             <summary>
+             Sends a <c>user_signup</c> event.
+             <remarks>
+             Send this event when the player registers or logs in for the first time.
+             </remarks>
+             </summary>
+             <returns>The result of the analytics event sent.</returns>
+             <param name="authorizationNetwork">The authorization network or login service provider (required).</param>
+             <param name="eventData">Dictionary of custom parameters. (optional)</param>
+            </member>
+        <member name="T:UnityEngine.Analytics.AcquisitionSource">
+             <summary>
+             The source through which an item, consumable, or currency was acquired.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AcquisitionSource.None">
+             <summary>No available source, or source unknown. Note: Use a string value
+             if the acquisition source is not one of the elements defined in this enumeration.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AcquisitionSource.Store">
+             <summary>Purchased using currency or consumable resources.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AcquisitionSource.Earned">
+             <summary>Awarded through an achievement or other in-game interaction.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AcquisitionSource.Promotion">
+             <summary>Granted as a promotion of some in-game feature or through cross promotion.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AcquisitionSource.Gift">
+             <summary>Granted without motive other than good feelings.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AcquisitionSource.RewardedAd">
+             <summary>Granted as a reward for watching an advertisement.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AcquisitionSource.TimedReward">
+             <summary>Granted periodically.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AcquisitionSource.SocialReward">
+             <summary>Granted through social engagement.</summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.AcquisitionType">
+             <summary>
+             The type of currency (premium or soft) used to acquire the item.
+             SA: AnalyticsEvent.ItemAcquired
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AcquisitionType.Soft">
+             <summary>Not directly purchased with real-world money.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AcquisitionType.Premium">
+             <summary>Purchased with real-world money.</summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.AdvertisingNetwork">
+             <summary>
+             The list of advertising or mediation network service providers.
+            
+             Use the members of this list when possible to promote consistency in your Analytics data. However, if the
+             advertising network is not included in this list, pass the argument to the Standard Event function as a string.
+            
+             SA: AnalyticsEvent.AdComplete, AnalyticsEvent.AdOffer, AnalyticsEvent.AdSkip, AnalyticsEvent.AdStart, AnalyticsEvent.PostAdAction
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.None">
+             <summary>No available network, or network unknown.
+             Note: Use a string value to indicate a network
+             not defined in this enumeration.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Aarki">
+             <summary>Aarki network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.AdAction">
+             <summary>AdAction network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.AdapTv">
+             <summary>AdapTv network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Adcash">
+             <summary>Adcash network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.AdColony">
+             <summary>AdColony network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.AdMob">
+             <summary>AdMob network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.AerServ">
+             <summary>AerServ network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Airpush">
+             <summary>Airpush network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Altrooz">
+             <summary>Altrooz network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Ampush">
+             <summary>Ampush network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.AppleSearch">
+             <summary>AppleSearch network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.AppLift">
+             <summary>AppLift network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.AppLovin">
+             <summary>AppLovin network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Appnext">
+             <summary>Appnext network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.AppNexus">
+             <summary>AppNexus network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Appoday">
+             <summary>Appoday network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Appodeal">
+             <summary>Appodeal network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.AppsUnion">
+             <summary>AppsUnion network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Avazu">
+             <summary>Avazu network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.BlueStacks">
+             <summary>BlueStacks network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Chartboost">
+             <summary>Chartboost network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.ClickDealer">
+             <summary>ClickDealer network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.CPAlead">
+             <summary>CPAlead network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.CrossChannel">
+             <summary>CrossChannel network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.CrossInstall">
+             <summary>CrossInstall network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Epom">
+             <summary>Epom network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Facebook">
+             <summary>Facebook network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Fetch">
+             <summary>Fetch network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Fiksu">
+             <summary>Fiksu network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Flurry">
+             <summary>Flurry network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Fuse">
+             <summary>Fuse network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Fyber">
+             <summary>Fyber network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Glispa">
+             <summary>Glispa network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Google">
+             <summary>Google network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.GrowMobile">
+             <summary>GrowMobile network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.HeyZap">
+             <summary>HeyZap network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.HyperMX">
+             <summary>HyperMX network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Iddiction">
+             <summary>Iddiction network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.IndexExchange">
+             <summary>IndexExchange network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.InMobi">
+             <summary>InMobi network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Instagram">
+             <summary>Instagram network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Instal">
+             <summary>Instal network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Ipsos">
+             <summary>Ipsos network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.IronSource">
+             <summary>IronSource network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Jirbo">
+             <summary>Jirbo network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Kimia">
+             <summary>Kimia network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Leadbolt">
+             <summary>Leadbolt network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Liftoff">
+             <summary>Liftoff network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Manage">
+             <summary>Manage network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Matomy">
+             <summary>Matomy network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.MediaBrix">
+             <summary>MediaBrix network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.MillenialMedia">
+             <summary>MillenialMedia network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Minimob">
+             <summary>Minimob network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.MobAir">
+             <summary>MobAir network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.MobileCore">
+             <summary>MobileCore network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Mobobeat">
+             <summary>Mobobeat network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Mobusi">
+             <summary>Mobusi network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Mobvista">
+             <summary>Mobvista network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.MoPub">
+             <summary>MoPub network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Motive">
+             <summary>Motive network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Msales">
+             <summary>Msales network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.NativeX">
+             <summary>NativeX network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.OpenX">
+             <summary>OpenX network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Pandora">
+             <summary>Pandora network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.PropellerAds">
+             <summary>PropellerAds network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Revmob">
+             <summary>Revmob network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.RubiconProject">
+             <summary>RubiconProject network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.SiriusAd">
+             <summary>SiriusAd network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Smaato">
+             <summary>Smaato network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.SponsorPay">
+             <summary>SponsorPay network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.SpotXchange">
+             <summary>SpotXchange network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.StartApp">
+             <summary>StartApp network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Tapjoy">
+             <summary>Tapjoy network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Taptica">
+             <summary>Taptica network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Tremor">
+             <summary>Tremor network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.TrialPay">
+             <summary>TrialPay network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Twitter">
+             <summary>Twitter network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.UnityAds">
+             <summary>UnityAds network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Vungle">
+             <summary>Vungle network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.Yeahmobi">
+             <summary>Yeahmobi network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdvertisingNetwork.YuMe">
+             <summary>YuMe network.</summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.AuthorizationNetwork">
+             <summary>
+             The list of authorization networks for in-game login sessions.
+            
+             Use the members of this list when possible to promote consistency in your Analytics data. However, if the
+             authorization network is not included in this list, pass the argument to the Standard Event function as a string.
+            
+             SA: AnalyticsEvent.UserSignup
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AuthorizationNetwork.None">
+             <summary>No available authorization network, or network unknown.
+             Note: Use a string value to indicate an authorization network
+             not defined in this enumeration.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AuthorizationNetwork.Internal">
+             <summary>You use your own authorization system.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AuthorizationNetwork.Facebook">
+             <summary>Facebook authorization.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AuthorizationNetwork.Twitter">
+             <summary>Twitter authorization.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AuthorizationNetwork.Google">
+             <summary>Google authorization.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AuthorizationNetwork.GameCenter">
+             <summary>GameCenter authorization.</summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.ScreenName">
+             <summary>
+             The list of the in-game screen or interface types.
+            
+             Use the members of this list when possible to promote consistency in your Analytics data. However, if the
+             screen name is not included in this list, pass the argument to the Standard Event function as a string.
+            
+             SA: AnalyticsEvent.ScreenVisit
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ScreenName.None">
+             <summary>No defined screen name.
+             Note: Use a string value to indicate a screen name
+             not defined in this enumeration.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ScreenName.MainMenu">
+             <summary>The game's main menu screen.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ScreenName.Settings">
+             <summary>The game's settings screen.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ScreenName.Map">
+             <summary>The game's map screen.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ScreenName.Lose">
+             <summary>The screen shown when the player loses the game.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ScreenName.Win">
+             <summary>The screen shown when the player wins the game.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ScreenName.Credits">
+             <summary>The game's credits screen.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ScreenName.Title">
+             <summary>The game's title screen.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ScreenName.IAPPromo">
+             <summary>The screen shown for IAP promotions.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ScreenName.CrossPromo">
+             <summary>The screen shown for cross promotions.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ScreenName.FeaturePromo">
+             <summary>The screen shown for feature promotions.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ScreenName.Hint">
+             <summary>The game's hint screen.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ScreenName.Pause">
+             <summary>The game's pause screen.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ScreenName.Inventory">
+             <summary>The game's inventory screen.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ScreenName.Leaderboard">
+             <summary>The game's leaderboard screen.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ScreenName.Achievements">
+             <summary>The game's achievement screen.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ScreenName.Lobby">
+             <summary>The game's lobby screen.</summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.ShareType">
+             <summary>
+             The list of media types or modes used for social engagements.
+            
+             Use the members of this list when possible to promote consistency in your Analytics data. However, if the
+             media type or mode is not included in this list, pass the argument to the Standard Event function as a string.
+            
+             SA: AnalyticsEvent.SocialShare, AnalyticsEvent.SocialShareAccept
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ShareType.None">
+             <summary>No defined engagement media or mode.
+             Note: Use a string value to indicate a mode of social engagement
+             not defined in this enumeration.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ShareType.TextOnly">
+             <summary>A text-based mode of engagement, such as a text or chat message.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ShareType.Image">
+             <summary>An image-based mode of engagement.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ShareType.Video">
+             <summary>A video-based mode of engagement.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ShareType.Invite">
+             <summary>A mode of engagement that involves an invitation.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ShareType.Achievement">
+             <summary>An in-game achievement.</summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.SocialNetwork">
+             <summary>
+             The list of social networks used with social engagements.
+            
+             Use the members of this list when possible to promote consistency in your Analytics data. However, if the
+             social network is not included in this list, pass the argument to the Standard Event function as a string.
+            
+             SA: AnalyticsEvent.SocialShare, AnalyticsEvent.SocialShareAccept
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialNetwork.None">
+             <summary>No available social network, or network unknown.
+             Note: Use a string value to indicate social network
+             not defined in this enumeration.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialNetwork.Facebook">
+             <summary>Facebook.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialNetwork.Twitter">
+             <summary>Twitter.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialNetwork.Instagram">
+             <summary>Instagram.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialNetwork.GooglePlus">
+             <summary>Google Plus.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialNetwork.Pinterest">
+             <summary>Pinterest.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialNetwork.WeChat">
+             <summary>WeChat.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialNetwork.SinaWeibo">
+             <summary>The Sina Weibo social network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialNetwork.TencentWeibo">
+             <summary>The Tencent Weibo social network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialNetwork.QQ">
+             <summary>QQ and QZone networks.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialNetwork.Zhihu">
+             <summary>Zhihu network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialNetwork.VK">
+             <summary>VKontakte network.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialNetwork.OK_ru">
+             <summary>Odnoklassniki network.</summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.StoreType">
+             <summary>
+             The list of in-game store categories.
+            
+             SA: AnalyticsEvent.StoreItemClick, AnalyticsEvent.StoreOpened
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.StoreType.Soft">
+             <summary>Contains items purchasable with in-game currency only.</summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.StoreType.Premium">
+             <summary>Contains items purchasable with real-world money.</summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.CustomEvent">
+             <summary>
+             An event you define yourself.
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.AchievementStep">
+             <summary>
+             Send this event when a requirement or step toward completing a multi-part achievement is complete.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AchievementStep.stepIndex">
+             <summary>
+             The order of the step.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AchievementStep.achievementId">
+             <summary>
+             A unique id for this achievement.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.AchievementUnlocked">
+             <summary>
+             Send this event when all requirements to unlock an achievement have been met.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AchievementUnlocked.achievementId">
+             <summary>
+             A unique id for this achievement.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.AdComplete">
+             <summary>
+             Send this event when an ad is successfully viewed and not skipped.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdComplete.rewarded">
+             <summary>
+             Set to true if a reward is offered for this ad.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdComplete.network">
+             <summary>
+             The ad or mediation network provider.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdComplete.placementId">
+             <summary>
+             An ad placement or configuration ID.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.AdOffer">
+             <summary>
+             Send this event when the player is offered the opportunity to view an ad.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdOffer.rewarded">
+             <summary>
+             Set to true if a reward is offered for this ad.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdOffer.network">
+             <summary>
+             The ad or mediation network provider.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdOffer.placementId">
+             <summary>
+             An ad placement or configuration ID.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.AdSkip">
+             <summary>
+             Send this event when the player opts to skip a video ad during video playback.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdSkip.rewarded">
+             <summary>
+             Set to true if a reward is offered for this ad.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdSkip.network">
+             <summary>
+             The ad or mediation network provider.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdSkip.placementId">
+             <summary>
+             An ad placement or configuration ID.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.AdStart">
+             <summary>
+             Send this event when playback of an ad begins.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdStart.rewarded">
+             <summary>
+             Set to true if a reward is offered for this ad.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdStart.network">
+             <summary>
+             The ad or mediation network provider.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.AdStart.placementId">
+             <summary>
+             An ad placement or configuration ID.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.PostAdAction">
+             <summary>
+             Send this event with the first action a player takes after an ad is shown, or after an ad is offered but not shown.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.PostAdAction.rewarded">
+             <summary>
+             Set to true if a reward is offered for this ad.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.PostAdAction.network">
+             <summary>
+             The ad or mediation network provider.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.PostAdAction.placementId">
+             <summary>
+             An ad placement or configuration ID.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.ChatMessageSent">
+             <summary>
+             Send this event when the player sends a chat message in game.
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.CutsceneStart">
+             <summary>
+             Send this event when the player begins to watch a cutscene or cinematic screen.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.CutsceneStart.name">
+             <summary>
+             The name of the cutscene being viewed.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.CutsceneSkip">
+             <summary>
+             Send this event when the player opts to skip a cutscene or cinematic screen.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.CutsceneSkip.name">
+             <summary>
+             The name of the cutscene skipped.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.GameOver">
+             <summary>
+             Send this event when gameplay ends (in a game with an identifiable conclusion).
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.GameOver.index">
+             <summary>
+             The order of this level within the game.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.GameOver.name">
+             <summary>
+             The level name.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.GameStart">
+             <summary>
+             Send this event when gameplay starts. Usually used only in games with an identifiable conclusion.
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.IAPTransaction">
+             <summary>
+             Send this event when the player spends real-world money to make an In-App Purchase.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.IAPTransaction.transactionContext">
+             <summary>
+             In what context (store, gift, reward) was the item acquired?
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.IAPTransaction.price">
+             <summary>
+             How much did the item cost?
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.IAPTransaction.itemId">
+             <summary>
+             A name or unique identifier for the acquired item.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.IAPTransaction.itemType">
+             <summary>
+             The category of the item that was acquired.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.IAPTransaction.level">
+             <summary>
+             The name or id of the level where the item was acquired.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.IAPTransaction.transactionId">
+             <summary>
+             A unique identifier for the specific transaction that occurred. You can use this to group multiple events into a single transaction.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.ItemAcquired">
+             <summary>
+             Send this event when the player acquires an item within the game.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ItemAcquired.currencyType">
+             <summary>
+             Set to AcquisitionType.Premium if the item was purchased with real money; otherwise, AcqusitionType.Soft.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ItemAcquired.transactionContext">
+             <summary>
+             In what context(store, gift, reward, crafting) was the item acquired?
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ItemAcquired.amount">
+             <summary>
+             The unit quantity of the item that was acquired
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ItemAcquired.itemId">
+             <summary>
+             A name or unique identifier for the acquired item.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ItemAcquired.balance">
+             <summary>
+             The balance of the acquired item.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ItemAcquired.itemType">
+             <summary>
+             The category of the item that was acquired.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ItemAcquired.level">
+             <summary>
+             The name or id of the level where the item was acquired.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ItemAcquired.transactionId">
+             <summary>
+             A unique identifier for the specific transaction that occurred. You can use this to group multiple events into a single transaction.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.ItemSpent">
+             <summary>
+             Send this event when the player spends an item.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ItemSpent.currencyType">
+             <summary>
+             Set to AcquisitionType.Premium if the item was purchased with real money; otherwise, AcqusitionType.Soft.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ItemSpent.transactionContext">
+             <summary>
+             In what context(store, gift, reward, crafting) was the item spent?
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ItemSpent.amount">
+             <summary>
+             The unit quantity of the item that was spent
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ItemSpent.itemId">
+             <summary>
+             A name or unique identifier for the spent item.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ItemSpent.balance">
+             <summary>
+             The balance of the spent item.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ItemSpent.itemType">
+             <summary>
+             The category of the item that was spent.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ItemSpent.level">
+             <summary>
+             The name or id of the level where the item was spent.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ItemSpent.transactionId">
+             <summary>
+             A unique identifier for the specific transaction that occurred. You can use this to group multiple events into a single transaction.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.LevelComplete">
+             <summary>
+             Send this event when the player has successfully completed a level.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.LevelComplete.name">
+             <summary>
+             The level name.
+             <remarks>
+             Either level_name or level_index is required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.LevelComplete.index">
+             <summary>
+             The order of this level within the game.
+             <remarks>
+             Either level_name or level_index is required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.LevelFail">
+             <summary>
+             Send this event when the player fails a level.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.LevelFail.name">
+             <summary>
+             The level name.
+             <remarks>
+             Either level_name or level_index is required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.LevelFail.index">
+             <summary>
+             The order of this level within the game. 
+             <remarks>
+             Either level_name or level_index is required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.LevelQuit">
+             <summary>
+             Send this event when the player opts to quit from a level before completing it.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.LevelQuit.name">
+             <summary>
+             The level name.
+             <remarks>
+             Either level_name or level_index is required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.LevelQuit.index">
+             <summary>
+             The order of this level within the game. 
+             <remarks>
+             Either level_name or level_index is required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.LevelSkip">
+             <summary>
+             Send this event when the player opts to skip past a level.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.LevelSkip.name">
+             <summary>
+             The level name.
+             <remarks>
+             Either level_name or level_index is required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.LevelSkip.index">
+             <summary>
+             The order of this level within the game. 
+             <remarks>
+             Either level_name or level_index is required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.LevelStart">
+             <summary>
+             Send this event when the player enters into or begins a level.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.LevelStart.name">
+             <summary>
+             The level name.
+             <remarks>
+             Either level_name or level_index is required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.LevelStart.index">
+             <summary>
+             The order of this level within the game. 
+             <remarks>
+             Either level_name or level_index is required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.LevelUp">
+             <summary>
+             Send this event when the player rank or level increases.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.LevelUp.name">
+             <summary>
+             The new rank or level name.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.LevelUp.index">
+             <summary>
+             The new rank or level index.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.FirstInteraction">
+             <summary>
+             Send this event with the first voluntary action the user takes after install.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.FirstInteraction.actionId">
+             <summary>
+             The action ID or name. For example, a unique identifier for the button clicked.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.PushNotificationClick">
+             <summary>
+             Send this event when the player responds to a push notification.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.PushNotificationClick.message_id">
+             <summary>
+             The message name or ID.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.PushNotificationEnable">
+             <summary>
+             Send this event when the player enables or grants permission for the game to use push notifications.
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.ScreenVisit">
+             <summary>
+             Send this event when the player opens a menu or visits a screen in the game.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.ScreenVisit.screenName">
+             <summary>
+             The name of the screen or type of screen visited.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.SocialShare">
+             <summary>
+             Send this event when the player posts a message, gift, or invitation through social media.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialShare.shareType">
+             <summary>
+             The mode of sharing, or media type used in the social engagement.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialShare.socialNetwork">
+             <summary>
+             The network through which the message is shared.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialShare.senderId">
+             <summary>
+             A unique identifier for the sender.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialShare.recipientId">
+             <summary>
+             A unique identifier for the recipient.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.SocialShareAccept">
+             <summary>
+             Send this event when the player accepts a message, gift, or invitation through social media.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialShareAccept.shareType">
+             <summary>
+             The mode of sharing, or media type used in the social engagement.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialShareAccept.socialNetwork">
+             <summary>
+             The network through which the message is shared.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialShareAccept.senderId">
+             <summary>
+             A unique identifier for the sender.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.SocialShareAccept.recipientId">
+             <summary>
+             A unique identifier for the recipient.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.StoreItemClick">
+             <summary>
+             Send this event when the player clicks on an item in the store.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.StoreItemClick.storeType">
+             <summary>
+             Set to StoreType.Premium if purchases use real-world money; otherwise, StoreType.Soft.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.StoreItemClick.itemId">
+             <summary>
+             A unique identifier for the item.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.StoreItemClick.itemName">
+             <summary>
+             The item's name.
+             <remarks>
+             Optional.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.StoreOpened">
+             <summary>
+             Send this event when the player opens a store in game.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.StoreOpened.storeType">
+             <summary>
+             Set to StoreType.Premium if purchases use real-world money; otherwise, StoreType.Soft.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.TutorialComplete">
+             <summary>
+             Send this event when the player completes a tutorial.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.TutorialComplete.tutorialId">
+             <summary>
+             The tutorial name or ID.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.TutorialSkip">
+             <summary>
+             Send this event when the player opts to skip a tutorial.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.TutorialSkip.tutorialId">
+             <summary>
+             The tutorial name or ID.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.TutorialStart">
+             <summary>
+             Send this event when the player starts a tutorial.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.TutorialStart.tutorialId">
+             <summary>
+             The tutorial name or ID.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.TutorialStep">
+             <summary>
+             Send this event when the player completes a step or stage in a multi-part tutorial.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.TutorialStep.stepIndex">
+             <summary>
+             The step or stage completed in a multi-part tutorial.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.TutorialStep.tutorialId">
+             <summary>
+             The tutorial name or ID.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+        <member name="T:UnityEngine.Analytics.UserSignup">
+             <summary>
+             Send this event when the player registers or logs in for the first time.
+             </summary>
+            </member>
+        <member name="F:UnityEngine.Analytics.UserSignup.authorizationNetwork">
+             <summary>
+             The authorization network or login service provider.
+             <remarks>
+             Required.
+             </remarks>
+             </summary>
+            </member>
+    </members>
+</doc>

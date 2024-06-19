@@ -1,0 +1,13 @@
+{
+    "_appTitle": "Unity Documentation",
+    "enableTocForManual": true,
+    "hideGlobalNamespace": true,
+    "useMemberPages": true,
+    "_noIndex": true,
+    "includeAssembliesInSrc":[
+        "**/Unity.Analytics.Tracker.dll",
+        "**/Unity.Analytics.Editor.dll",
+        "**/AnalyticsStandardEvents/Unity.Analytics.StandardEvents.dll"
+    ]
+
+}

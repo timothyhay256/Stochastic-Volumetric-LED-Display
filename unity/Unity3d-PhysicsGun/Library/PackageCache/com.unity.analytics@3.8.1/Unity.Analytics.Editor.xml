@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Unity.Analytics.Editor</name>
+    </assembly>
+    <members>
+        <member name="M:UnityEditor.Analytics.CustomEnumPopup.EnumToString(System.Object)">
+             <summary>
+             Converts a Standard Event enum value to its standardized string value.
+             <remarks>
+             Any Non-Standard Event enum values provided are simply converted to string.
+             </remarks>
+             </summary>
+             <returns>The standard string value for the provided enum value.</returns>
+             <param name="enumValue">The num value.</param>
+            </member>
+    </members>
+</doc>

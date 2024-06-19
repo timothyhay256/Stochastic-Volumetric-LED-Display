@@ -1,0 +1,4 @@
+[*.cs]
+dotnet_diagnostic.IDE0007.severity = none
+dotnet_diagnostic.IDE0180.severity = none
+dotnet_analyzer_diagnostic.category-Style.severity = none

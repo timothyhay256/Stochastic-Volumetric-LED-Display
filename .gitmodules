@@ -1,0 +1,3 @@
+[submodule "Simple-Logger"]
+	path = Simple-Logger
+	url = git@timothyhay.org:timothyhay/Simple-Logger.git
