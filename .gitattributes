@@ -98,7 +98,6 @@ Assets/Plugins/**       linguist-vendored
 # Images
 *.bmp                   lfs
 *.exr                   lfs
-*.gif                   lfs
 *.hdr                   lfs
 *.iff                   lfs
 *.jpeg                  lfs
