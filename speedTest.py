@@ -1,14 +1,15 @@
-from receive_esp8266.esp8266_udp import set_color
+from led_manager import set_color
 import time
 from simpleLog import log
 from random import randint
 
-numLed = 200
+numLed = 100
 
 # log("All white!")
 # for i in range(numLed):
-#     set_color(i, 255, 255, 255)
+#     set_color(i, 0, 0, 255)
 # time.sleep(1)
+
 
 # log("All random!")
 # for i in range(numLed):
