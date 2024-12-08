@@ -1,25 +1,29 @@
-from receive_esp8266.esp8266_udp import set_color
+from led_manager import set_color, set_communicate_mode
 from simpleLog import log
 import socket
 import time # TODO: Does writing to disk slow stuff down?
 
-# Set up UDP socket
-UDP_IP = "127.0.0.1"
-UDP_PORT = 5002
-
-record_data = True # Record the data to disk?
+# record_data = True # Record the data to disk?
 data_file = 'unityOut.vled'
 
-def get_events():
+def get_events(UDP_IP, UDP_PORT, communicate_mode, serial_port='', serial_baudrate='', led_host='', led_port='', record_data=False, data_file='unityOut.vled'):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((UDP_IP, UDP_PORT))
 
-    print("UDP server listening on {}:{}".format(UDP_IP, UDP_PORT))
+    log("UDP server listening on {}:{}".format(UDP_IP, UDP_PORT))
 
     if record_data:
         log("Writing animation data to "+data_file)
         df = open(data_file, 'w')
 
+    if communicate_mode == 1 and len(led_host) != 0 and led_port != 0:
+        log("Setting UDP as communicateion mode!")
+        set_communicate_mode(1, udp_host=led_host, udp_port=led_port)
+    elif communicate_mode == 2 and len(serial_port) != 0 and serial_baudrate != 0:
+        log("Setting serial as communication mode!")
+        set_communicate_mode(2, serial_port=serial_port, serial_baudrate=serial_baudrate)
+    else:
+        log("No valid options provided to get_events for communication mode, using default communication defined in led_manager!", "w")
     # Receive data continuously
     while True:
         if record_data:
