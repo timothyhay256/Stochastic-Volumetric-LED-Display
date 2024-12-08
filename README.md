@@ -1,4 +1,5 @@
-# Stochastic Volumetric LEDs (3D Mapped LEDs [pretty looking lights])
+# SVLEDD
+## Stochastic Volumetric LEDs (3D Mapped LEDs [pretty looking lights])
 *Note videos of it working/Unity project cleanup is coming very soon. The code currently does work.*
 
 This project allows you to scan a container full of individually addressible RGB leds, and create a representation of those LEDs in 3d space in Unity, where you can apply whatever effects in 3d that you desire.  
