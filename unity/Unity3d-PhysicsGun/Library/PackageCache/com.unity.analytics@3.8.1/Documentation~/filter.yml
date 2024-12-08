@@ -1,4 +1,0 @@
-apiRules:
-  - exclude:
-      uidRegex: ^UnityEngine.Analytics.Tests
-      type: Namespace
