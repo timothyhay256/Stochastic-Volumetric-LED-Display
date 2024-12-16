@@ -1,4 +1,4 @@
-# SVLEDD
+# SVLED
 ## Stochastic Volumetric LEDs (3D Mapped LEDs [pretty looking lights])
 *Note videos of it working/Unity project cleanup is coming very soon. The code currently does work.*
 
