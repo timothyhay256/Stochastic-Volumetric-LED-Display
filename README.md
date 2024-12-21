@@ -21,3 +21,6 @@ If you want to use this project, you will need a couple of things:
  - A ESP32 or ESP8266 depending on the number of LEDs and features that you want  
  
 Once you have the hardware, go to the [Wiki.](https://github.com/timothyhay256/Stochastic-volumetric-LED-display/wiki/Setting-up-LEDs)
+
+## SVLED-RS
+If you want to help contribute, please note that the current plan is to rewrite all the Python into Rust so this project is actually usable. (Currently you are bound to run into runtime errors.)
