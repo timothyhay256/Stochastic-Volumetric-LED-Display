@@ -1,3 +1,6 @@
 [submodule "Simple-Logger"]
 	path = Simple-Logger
 	url = git@timothyhay.org:timothyhay/Simple-Logger.git
+[submodule "unity/Stochastic-Volumetric-LED-Display-Unity"]
+	path = unity/Stochastic-Volumetric-LED-Display-Unity
+	url = https://github.com/timothyhay256/Stochastic-Volumetric-LED-Display-Unity
