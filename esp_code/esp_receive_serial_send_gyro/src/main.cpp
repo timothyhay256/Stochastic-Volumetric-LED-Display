@@ -38,8 +38,8 @@ End MPU6050 code
 TaskHandle_t ledCommands; // Task for multicore
 
 // Set variables below!
-const char* ssid = "STN"; // Network SSID
-const char* password = "88bb6b7054"; // Network password
+const char* ssid = "SSID"; // Network SSID
+const char* password = "PASSWORD"; // Network password
 const char* udpTarget = "192.168.86.111"; // Where should I send gyroscope data?
 const int udpPort = 5011; // On what port should I send gyroscope data?
 

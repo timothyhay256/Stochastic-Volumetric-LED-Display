@@ -65,8 +65,8 @@ const uint8_t* activeAnimationArray;
 #define LED_COUNT 100 // How many LEDs are you using? For more advanced usage, such as parallel outputs, just change the FastLED setup section. As long as the leds array is setup, the rest of the program will work.
 #define LED_PIN 27 // What pin are we using for the data line?
 
-const char* ssid = "STN"; // WiFi network SSID
-const char* password = "88bb6b7054"; // WiFi network password
+const char* ssid = "SSID"; // WiFi network SSID
+const char* password = "PASSWORD"; // WiFi network password
 const char* udpTarget = "192.168.86.111"; // Where should gyro data be sent?
 const int udpPort = 5014; // What port should gyro data be sent on?
 

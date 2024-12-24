@@ -1,11 +1,7 @@
-// Remotely control Neopixel over WiFi - UDP for parallel strands using FastLED. 
-// For the WS2811, this file runs strings of 50 LEDs in parallel, to allow for much faster "frame rates", around 300 on the ESP8266 vs 150 without parallel.
-// ESP8266: WS2811_PORTA - pins 12, 13, 14 and 15 (or pins 6,7,5 and 8 on the NodeMCU boards/pin layout).   From FastLED wiki
-
-// If you just want to use UDP without parallel strands, just change the FastLED.addLeds section and change WS2811_PORTA to your chipset, and NUM_STRIPS with your pin, and LED_COUNT_PER_STRIP with the LED count.
+// Simple script to use ESP32 over UDP
 
 #include <FastLED.h>
-#include <ESP8266WiFi.h>
+#include <WiFi.h>
 #include <WiFiUdp.h>
 
 // Change variables below!
