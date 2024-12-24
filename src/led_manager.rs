@@ -1,5 +1,5 @@
 use crate::ManagerData;
-use log::{debug, error, warn, info};
+use log::{debug, error, info, warn};
 use std::env;
 use std::error::Error;
 use std::fs::{remove_file, File};
@@ -10,13 +10,7 @@ use std::net::UdpSocket;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-pub fn set_color(
-    manager: &mut ManagerData,
-    n: u8,
-    r: u8,
-    g: u8,
-    b: u8,
-) -> Result<(), Box<dyn Error>> {
+pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
     // &mut should mean changes will persist, so no need to return ManagerData
     let record_data;
     let record_esp_data;
@@ -46,21 +40,28 @@ pub fn set_color(
     if record_data || record_esp_data {
         if record_data && manager.data_file_buf.is_none() {
             manager.data_file_buf = Some(BufWriter::new(
-                check_and_create_file(&manager.record_data_file).unwrap_or_else(|_| {
-                    panic!(
-                        "Could not open {} for writing animation!",
-                        manager.record_data_file.display()
-                    )
-                }),
+                match check_and_create_file(&manager.record_data_file) {
+                    Ok(file) => file,
+                    Err(e) => {
+                        panic!(
+                            "Could not open {} for writing animation: {}",
+                            manager.record_data_file.display(),
+                            e
+                        );
+                    }
+                },
             ));
         } else if record_esp_data && manager.esp_data_file_buf.is_none() {
             manager.esp_data_file_buf = Some(BufWriter::new(
-                check_and_create_file(&manager.record_esp_data_file).unwrap_or_else(|_| {
-                    panic!(
-                        "Could not open {} for writing animation!",
-                        manager.record_esp_data_file.display()
-                    )
-                }),
+                match check_and_create_file(&manager.record_esp_data_file) {
+                    Ok(file) => file,
+                    Err(e) => {
+                        panic!(
+                            "Could not open {} for writing animation: {}",
+                            manager.record_esp_data, e
+                        )
+                    }
+                },
             ));
         }
         let end = SystemTime::now();
@@ -71,12 +72,12 @@ pub fn set_color(
                     if record_data {
                         match manager.data_file_buf.as_mut() {
                             Some(data_file_buf) => {
-                                writeln!(data_file_buf, "T:{}", &millis.to_string())?;
+                                writeln!(data_file_buf, "T:{}", &millis.to_string()).expect("Could not write to data_file_buf!");
                                 if n == 1 && r == 2 && g == 3 && b == 4 {
                                     warn!("Modifying instruction to disk by 1 to prevent parsing error!"); // This is a timing instruction, so we cannot let it be written.
-                                    writeln!(data_file_buf, "{}|{}|{}|{}", n, r + 1, g, b)?;
+                                    writeln!(data_file_buf, "{}|{}|{}|{}", n, r + 1, g, b).expect("Could not write to data_file_buf!");
                                 } else {
-                                    writeln!(data_file_buf, "{}|{}|{}|{}", n, r, g, b)?;
+                                    writeln!(data_file_buf, "{}|{}|{}|{}", n, r, g, b).expect("Could not write to data_file_buf!");
                                 }
                             }
                             None => error!("record_data is true, but data_file_buf is None! Something has gone very wrong, please report this.")
@@ -90,21 +91,21 @@ pub fn set_color(
                                     debug!("Detected integer overflow, adding to other element");
                                     for i in 1..=5 {
                                         // Indicates a timing instruction, as it is unlikely that LED 1 will be set to 2,3,4 (r,g,b)
-                                        write!(esp_data_file_buf, "{}", i)?;
+                                        write!(esp_data_file_buf, "{}", i).expect("Could not write to esp_data_file_buf!");
                                         // TODO: Better way to do this?
                                     }
-                                    write!(esp_data_file_buf, "{}", 255)?;
+                                    write!(esp_data_file_buf, "{}", 255).expect("Could not write to esp_data_file_buf!");
 
                                     millis -= 255;
                                 }
                                 if millis > 0 {
                                     debug!("No longer or not overflow.");
                                     for i in 1..=5 {
-                                        write!(esp_data_file_buf, "{}", i)?;
+                                        write!(esp_data_file_buf, "{}", i).expect("Could not write to esp_data_file_buf!");
                                     }
-                                    write!(esp_data_file_buf, "{}", millis)?;
+                                    write!(esp_data_file_buf, "{}", millis).expect("Could not write to esp_data_file_buf!");
                                 }
-                                write!(esp_data_file_buf, "{}{}{}{}", n, r, g, b)?;
+                                write!(esp_data_file_buf, "{}{}{}{}", n, r, g, b).expect("Could not write to esp_data_file_buf!");
                             }
                             None => error!("record_esp_data is true, but esp_data_file_buf is None!, Something has gone very wrong, please report this.")
                         }
@@ -117,16 +118,12 @@ pub fn set_color(
 
     if manager.communication_mode == 1 {
         if manager.udp_socket.is_none() {
-            manager.udp_socket = Some(
-                UdpSocket::bind(format!("{}:{}", manager.host, manager.port)).unwrap_or_else(
-                    |_| {
-                        panic!(
-                            "Could not establish UDP connection to {}:{}!",
-                            manager.host, manager.port
-                        )
-                    },
-                ),
-            );
+            manager.udp_socket = Some(match UdpSocket::bind(format!("0.0.0.0:{}", manager.port)) {
+                Ok(socket) => socket,
+                Err(e) => {
+                    panic!("Could not bind to 0.0.0.0:{}: {}", manager.port, e);
+                }
+            });
         }
         match manager.udp_socket.as_mut() {
             Some(udp_socket) => {
@@ -135,12 +132,13 @@ pub fn set_color(
                     .expect("set_read_timeout call failed");
 
                 let bytes: [u8; 4] = [n, r, g, b];
-                udp_socket.send(&bytes).unwrap_or_else(|_| {
-                    panic!(
-                        "Could not send packet: {:#?} to {}:{}!",
-                        bytes, manager.host, manager.port
-                    )
-                });
+                debug!("Sending {:?}", bytes);
+                match udp_socket.send_to(&bytes, format!("{}:{}", manager.host, manager.port)) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        panic!("Could not write bytes to UDP socket: {}", e)
+                    }
+                }
                 let mut buf = [0; 3];
                 let udp_result = udp_socket.recv(&mut buf);
 
@@ -151,12 +149,14 @@ pub fn set_color(
                         warn!(
                             "UDP timeout reached! Will resend packet, but won't wait for response!"
                         );
-                        udp_socket.send(&bytes).unwrap_or_else(|_| {
-                            panic!(
-                                "Could not send packet: {:#?} to {}:{}!",
-                                bytes, manager.host, manager.port
-                            )
-                        });
+                        match udp_socket
+                            .send_to(&bytes, format!("{}:{}", manager.host, manager.port))
+                        {
+                            Ok(_) => {}
+                            Err(e) => {
+                                panic!("Could not write bytes to UDP socket: {}", e)
+                            }
+                        }
                         manager.failures += 1
                     }
                     Err(e) => {
@@ -175,49 +175,64 @@ pub fn set_color(
     } else if manager.communication_mode == 2 {
         if manager.serial_port.is_none() {
             manager.serial_port = Some(
-                serialport::new(manager.serial_port_path.clone(), manager.baud_rate)
+                match serialport::new(manager.serial_port_path.clone(), manager.baud_rate)
                     .timeout(Duration::from_millis(10))
                     .open()
-                    .expect(&format!("Failed to open port {}", manager.serial_port_path)),
+                {
+                    Ok(port) => port,
+                    Err(e) => panic!("Could not open {}: {}", manager.serial_port_path, e),
+                },
             );
         }
-        match manager.serial_port.as_mut() {
-            Some(serial_port) => {
-                let msg: [u8; 6] = [0xFF, 0xBB, n, r, g, b]; // 0xFF & 0xBB indicate a start of packet.
-                serial_port.write(&msg).expect(&format!("Could not write to {}!", manager.serial_port_path));
+        if let Some(serial_port) = manager.serial_port.as_mut() {
+            let msg: [u8; 6] = [0xFF, 0xBB, n, r, g, b]; // 0xFF & 0xBB indicate a start of packet.
+            match serial_port.write_all(&msg) {
+                Ok(_) => {}
+                Err(e) => {
+                    panic!(
+                        "Could not write bytes to {}:{}",
+                        manager.serial_port_path, e
+                    )
+                }
+            }
 
-                if manager.print_send_back {
-                    let mut serial_buf: Vec<u8> = vec![0; 7];
+            if manager.print_send_back {
+                let mut serial_buf: Vec<u8> = vec![0; 7];
 
-                    let read_result = serial_port.read(serial_buf.as_mut_slice());
+                let read_result = serial_port.read(serial_buf.as_mut_slice());
 
-                    match read_result {
-                        Ok(_size) => {
-                            info!("print_send_back returned {:?}", serial_buf);
-                        },
+                match read_result {
+                    Ok(_size) => {
+                        info!("print_send_back returned {:?}", serial_buf);
+                    }
+                    Err(e) => {
+                        error!("print_send_back could not read serial port: {}", e);
+                    }
+                };
+            } else {
+                let mut failures = 0;
+                let mut serial_buf: Vec<u8> = vec![0; 1];
+
+                while serial_buf != [0x01] {
+                    match serial_port.read_exact(serial_buf.as_mut_slice()) {
+                        Ok(_) => {}
                         Err(e) => {
-                            error!("print_send_back could not read serial port: {}", e);
+                            panic!("Could not read from {}:{}", manager.serial_port_path, e)
                         }
-                    };
-                } else {
-                    let mut failures = 0;
-                    let mut serial_buf: Vec<u8> = vec![0; 1];
+                    }
+                    failures += 1;
 
-                    while serial_buf != [0x01] {
-                        serial_port.read(serial_buf.as_mut_slice()).expect(&format!("Could not read {}", manager.serial_port_path));
-                        failures += 1;
-
-                        if failures >= manager.serial_read_timeout {
-                            error!("Did not receive confirmation byte after {}ms! Continuing anyway!", manager.serial_read_timeout)
-                            break;
-                        }
+                    if failures >= manager.serial_read_timeout {
+                        error!(
+                            "Did not receive confirmation byte after {}ms! Continuing anyway!",
+                            manager.serial_read_timeout
+                        );
+                        break;
                     }
                 }
             }
-            None => {},
         };
     }
-    Ok(())
 }
 
 fn check_and_create_file(file: &PathBuf) -> Result<File, Box<dyn Error>> {
@@ -230,8 +245,10 @@ fn check_and_create_file(file: &PathBuf) -> Result<File, Box<dyn Error>> {
             Err(error) => error!("Could not remove {}: {}.", &file.display(), error),
         }
     }
-    let data_file = File::open(file.clone())
-        .unwrap_or_else(|_| panic!("Could not open {} for writing!", file.display()));
+    let data_file = match File::open(file.clone()) {
+        Ok(file) => file,
+        Err(e) => panic!("Could not open {}:{}", file.display(), e),
+    };
 
     Ok(data_file)
 }
