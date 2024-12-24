@@ -1,5 +1,5 @@
 use crate::ManagerData;
-use log::{debug, error, warn};
+use log::{debug, error, warn, info};
 use std::env;
 use std::error::Error;
 use std::fs::{remove_file, File};
@@ -171,6 +171,50 @@ pub fn set_color(
                 }
             }
             None => panic!("Could not send packet as manager.udp_socket does not exist!"),
+        };
+    } else if manager.communication_mode == 2 {
+        if manager.serial_port.is_none() {
+            manager.serial_port = Some(
+                serialport::new(manager.serial_port_path.clone(), manager.baud_rate)
+                    .timeout(Duration::from_millis(10))
+                    .open()
+                    .expect(&format!("Failed to open port {}", manager.serial_port_path)),
+            );
+        }
+        match manager.serial_port.as_mut() {
+            Some(serial_port) => {
+                let msg: [u8; 6] = [0xFF, 0xBB, n, r, g, b]; // 0xFF & 0xBB indicate a start of packet.
+                serial_port.write(&msg).expect(&format!("Could not write to {}!", manager.serial_port_path));
+
+                if manager.print_send_back {
+                    let mut serial_buf: Vec<u8> = vec![0; 7];
+
+                    let read_result = serial_port.read(serial_buf.as_mut_slice());
+
+                    match read_result {
+                        Ok(_size) => {
+                            info!("print_send_back returned {:?}", serial_buf);
+                        },
+                        Err(e) => {
+                            error!("print_send_back could not read serial port: {}", e);
+                        }
+                    };
+                } else {
+                    let mut failures = 0;
+                    let mut serial_buf: Vec<u8> = vec![0; 1];
+
+                    while serial_buf != [0x01] {
+                        serial_port.read(serial_buf.as_mut_slice()).expect(&format!("Could not read {}", manager.serial_port_path));
+                        failures += 1;
+
+                        if failures >= manager.serial_read_timeout {
+                            error!("Did not receive confirmation byte after {}ms! Continuing anyway!", manager.serial_read_timeout)
+                            break;
+                        }
+                    }
+                }
+            }
+            None => {},
         };
     }
     Ok(())
