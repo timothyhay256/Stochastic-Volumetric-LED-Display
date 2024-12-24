@@ -1,15 +1,13 @@
 /*
-This is the main script to use the project. Uncomment and comment the #define lines that apply to your setup. 
+This is the main script to use the project. Uncomment and comment the #define lines that apply to your setup.
 After that, go to the user defined variables and set them
 */
 
 // Uncomment if you want to use a MPU6050 Gyroscope
 #define USE_GYRO
 
-
-
 #include <Arduino.h>
-#include <FastLED.h> 
+#include <FastLED.h>
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
@@ -18,27 +16,28 @@ After that, go to the user defined variables and set them
 Begin MPU6050 Code
 */
 #ifdef USE_GYRO
-  #include "I2Cdev.h"
-  #include "MPU6050_6Axis_MotionApps20.h"
+#include "I2Cdev.h"
+#include "MPU6050_6Axis_MotionApps20.h"
 
-  MPU6050 mpu;
+MPU6050 mpu;
 
-  #define INTERRUPT_PIN 2
+#define INTERRUPT_PIN 2
 
-  volatile bool mpuInterrupt = false; // Interrupt flag
-  bool dmpReady = false;              // DMP status flag
-  uint8_t mpuIntStatus;               // MPU interrupt status
-  uint8_t devStatus;                  // Device status
-  uint16_t packetSize;                // DMP packet size
-  uint8_t fifoBuffer[64];             // FIFO buffer
+volatile bool mpuInterrupt = false; // Interrupt flag
+bool dmpReady = false;              // DMP status flag
+uint8_t mpuIntStatus;               // MPU interrupt status
+uint8_t devStatus;                  // Device status
+uint16_t packetSize;                // DMP packet size
+uint8_t fifoBuffer[64];             // FIFO buffer
 
-  Quaternion q;                       // Quaternion data container
-  VectorFloat gravity;                // Gravity vector
-  float ypr[3];                       // Yaw/Pitch/Roll angles
+Quaternion q;        // Quaternion data container
+VectorFloat gravity; // Gravity vector
+float ypr[3];        // Yaw/Pitch/Roll angles
 
-  void dmpDataReady() {
-      mpuInterrupt = true;
-  }
+void dmpDataReady()
+{
+    mpuInterrupt = true;
+}
 #endif
 /*
 End MPU6050 code
@@ -58,39 +57,39 @@ int sizeOfAnimationOne = sizeof(animationOne) / sizeof(animationOne[0]);
 // Empty the jar top to bottom. This plays when the microphone detects sound, after filling the string.
 const uint8_t playOnTrigger[] = {0x0d, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x0b, 0x03, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x07, 0x09, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x09, 0x18, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x01, 0x07, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x01, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x05, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x0e, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x0a, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x0f, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x0b, 0x1f, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x1d, 0x16, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x10, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x02, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x08, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x21, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x07, 0x12, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x03, 0x0b, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x01, 0x06, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x1b, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x24, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x03, 0x22, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x04, 0x13, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x29, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x20, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x11, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x0c, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x1c, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x2f, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x1a, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x1e, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x23, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x14, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x19, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x1d, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x03, 0x28, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x01, 0x2c, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x17, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x15, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x0b, 0x2b, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x04, 0x25, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x27, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x0e, 0x2a, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x2e, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x04, 0x30, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x09, 0x26, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x04, 0x31, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x02, 0x2d, 0x00, 0x00, 0x00};
 int sizeOfAnimationPlayOnTrigger = sizeof(playOnTrigger) / sizeof(playOnTrigger[0]);
-const uint8_t* activeAnimationArray;
+const uint8_t *activeAnimationArray;
 
 // End animation data
 
 // Change variables below me!
 
 #define BAUD_RATE 921600 // Baud rate for serial communication
-#define LED_COUNT 100 // How many LEDs are you using? For more advanced usage, such as parallel outputs, just change the FastLED setup section. As long as the leds array is setup, the rest of the program will work.
-#define LED_PIN 27 // What pin are we using for the data line?
+#define LED_COUNT 100    // How many LEDs are you using? For more advanced usage, such as parallel outputs, just change the FastLED setup section. As long as the leds array is setup, the rest of the program will work.
+#define LED_PIN 27       // What pin are we using for the data line?
 
-const char* ssid = "STN"; // WiFi network SSID
-const char* password = "88bb6b7054"; // WiFi network password
-const char* udpTarget = "192.168.86.111"; // Where should gyro data be sent?
-const int udpPort = 5014; // What port should gyro data be sent on?
+const char *ssid = "SSID";                 // WiFi network SSID
+const char *password = "PASSWORD";      // WiFi network password
+const char *udpTarget = "192.168.86.111"; // Where should gyro data be sent?
+const int udpPort = 5014;                 // What port should gyro data be sent on?
 
 const int microphonePin = 26; // If you are using a microphone, it should be connected to this pin.
 
 // If using a gyroscope, then you need to set the offsets. These are printed to serial on boot, in the following format:
 // >.....>.......ignoreMe,  ignoreMe,   zAccelOffset,   xGyroOffset,    yGyroOffset,    zGyroOffset
-const int xGyroOffset = -8; // 54, -14 
-const int yGyroOffset = 13; // -4, 1
-const int zGyroOffset = 30; // -20, 30
+const int xGyroOffset = -8;    // 54, -14
+const int yGyroOffset = 13;    // -4, 1
+const int zGyroOffset = 30;    // -20, 30
 const int zAccelOffset = 4940; // 5086, 4940
 
 // Change variables above me!
 
-TaskHandle_t animationTask; // Task for multicore
-void secondCoreManager(void * parameter); // Needed for PIO
+TaskHandle_t animationTask;              // Task for multicore
+void secondCoreManager(void *parameter); // Needed for PIO
 void animateSoundReactive();
 void sendGyroData();
 void receiveCommands();
 
-int activeAnimation = 0; 
+int activeAnimation = 0;
 int currentLoop = 0;
 int activeR = 0;
 int activeG = 0;
@@ -101,37 +100,38 @@ bool animationZeroActive = true;
 bool animationOneActive = false;
 bool soundModeActive = false;
 bool sendReceiveActive = false; // Accept LED commands, send Gyroscope data
-bool sendBack = false; // Should I send back the values I set? For debugging only
-String brightnessValue; // How bright the strip should be
-int speedValue = 50; // Relative range of how fast animations should play (0 much slower, 50 regular speed, 100 fastest possible)
+bool sendBack = false;          // Should I send back the values I set? For debugging only
+String brightnessValue;         // How bright the strip should be
+int speedValue = 50;            // Relative range of how fast animations should play (0 much slower, 50 regular speed, 100 fastest possible)
 float maxSpeedMultiplier = 2.0; // Multiply the delay by this value when speedValue is at 0 (e.g, at 2, the slowest speed is 2x as slow) [not working yet]
 
 int n, r, g, b, firstSOPByte, secondSOPByte; // Used when accepting commands
 
 int selectedMode = 0; // Default to animation zero
-int numOfModes = 3; // How many modes are there? (Total modes)
+int numOfModes = 3;   // How many modes are there? (Total modes)
 int test = 0;
 
 int wifiFailCounter = 0;
 
 int activeByteIndex = 0; // Track which byte we are looking at (index, r, g, b, timing)
-int currentIndex = 0; // Track how far into the array we are
+int currentIndex = 0;    // Track how far into the array we are
 
 // #define LED_COUNT_PER_STRIP 50
-// #define NUM_STRIPS 
-const char* PARAM_MESSAGE = "message";
+// #define NUM_STRIPS
+const char *PARAM_MESSAGE = "message";
 
 CRGB leds[LED_COUNT];
-
 
 AsyncWebServer server(80);
 WiFiUDP udp;
 
-void notFound(AsyncWebServerRequest *request) {
+void notFound(AsyncWebServerRequest *request)
+{
     request->send(404, "text/plain", "Not found");
 }
 
-String createHtml() {
+String createHtml()
+{
     String response = R"(
       <!DOCTYPE html><html>
         <head>
@@ -194,7 +194,8 @@ String createHtml() {
     return response;
 }
 
-void setup() {
+void setup()
+{
     Serial.begin(BAUD_RATE);
 
     pinMode(microphonePin, INPUT);
@@ -207,26 +208,28 @@ void setup() {
     FastLED.setBrightness(255);
     FastLED.clear();
     FastLED.show();
-    xTaskCreatePinnedToCore( // Start animation process 
-        secondCoreManager, /* Function to implement the task */
-        "animationTask", /* Name of the task */
-        10000,  /* Stack size in words */
-        NULL,  /* Task input parameter */
-        0,  /* Priority of the task */
-        &animationTask,  /* Task handle. */
-    0); /* Core where the task should run */
+    xTaskCreatePinnedToCore( // Start animation process
+        secondCoreManager,   /* Function to implement the task */
+        "animationTask",     /* Name of the task */
+        10000,               /* Stack size in words */
+        NULL,                /* Task input parameter */
+        0,                   /* Priority of the task */
+        &animationTask,      /* Task handle. */
+        0);                  /* Core where the task should run */
 
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
 
     Serial.print("Connecting to ");
     Serial.print(ssid);
-    while (WiFi.status() != WL_CONNECTED) {
+    while (WiFi.status() != WL_CONNECTED)
+    {
         delay(500);
         Serial.print(".");
-        wifiFailCounter ++;
+        wifiFailCounter++;
 
-        if (wifiFailCounter >= 20) {
+        if (wifiFailCounter >= 20)
+        {
             Serial.println("Resetting ESP due to failure to connect to WiFi in time...");
             ESP.restart();
         }
@@ -235,7 +238,8 @@ void setup() {
     Serial.print("IP: ");
     Serial.println(WiFi.localIP());
 
-    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
         if(request->hasParam("toggle")) {
             AsyncWebParameter* led = request->getParam("toggle");
             Serial.print("Toggle animation #");
@@ -278,32 +282,32 @@ void setup() {
             }
         }
   
-        request->send(200, "text/html", createHtml());
-    });
+        request->send(200, "text/html", createHtml()); });
 
     // Send a GET request to <IP>/get?message=<message>
-    server.on("/get", HTTP_GET, [] (AsyncWebServerRequest *request) {
+    server.on("/get", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
         String message;
         if (request->hasParam(PARAM_MESSAGE)) {
             message = request->getParam(PARAM_MESSAGE)->value();
         } else {
             message = "No message sent";
         }
-        request->send(200, "text/plain", "Hello, GET: " + message);
-    });
+        request->send(200, "text/plain", "Hello, GET: " + message); });
 
     // Send a POST request to <IP>/post with a form field message set to <message>
-    server.on("/post", HTTP_POST, [](AsyncWebServerRequest *request){
+    server.on("/post", HTTP_POST, [](AsyncWebServerRequest *request)
+              {
         String message;
         if (request->hasParam(PARAM_MESSAGE, true)) {
             message = request->getParam(PARAM_MESSAGE, true)->value();
         } else {
             message = "No message sent";
         }
-        request->send(200, "text/plain", "Hello, POST: " + message);
-    });
+        request->send(200, "text/plain", "Hello, POST: " + message); });
 
-    server.on("/slider", HTTP_GET, [] (AsyncWebServerRequest *request) {
+    server.on("/slider", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
     String inputMessage;
     // GET input1 value on <ESP_IP>/slider?value=<inputMessage>
     if (request->hasParam("value")) {
@@ -316,8 +320,7 @@ void setup() {
       inputMessage = "No message sent";
     }
     Serial.println(inputMessage);
-    request->send(200, "text/plain", "OK");
-  });
+    request->send(200, "text/plain", "OK"); });
 
     server.onNotFound(notFound);
 
@@ -332,7 +335,8 @@ void setup() {
     Wire.begin();
     Wire.setClock(400000); // Optional, adjust as necessary
     Serial.begin(BAUD_RATE);
-    while (!Serial);
+    while (!Serial)
+        ;
 
     pinMode(INTERRUPT_PIN, INPUT);
 
@@ -350,7 +354,8 @@ void setup() {
     mpu.setZGyroOffset(zGyroOffset);
     mpu.setZAccelOffset(zAccelOffset); // Adjust as necessary
 
-    if (devStatus == 0) {
+    if (devStatus == 0)
+    {
         mpu.CalibrateAccel(6);
         mpu.CalibrateGyro(6);
         mpu.PrintActiveOffsets();
@@ -368,7 +373,9 @@ void setup() {
         dmpReady = true;
 
         packetSize = mpu.dmpGetFIFOPacketSize();
-    } else {
+    }
+    else
+    {
         Serial.print(F("DMP Initialization failed (code "));
         Serial.print(devStatus);
         Serial.println(F(")"));
@@ -378,90 +385,108 @@ void setup() {
     MPU6050 Setup End
     */
 
-   Serial.println("Setup successful");
+    Serial.println("Setup successful");
 }
- 
-void loop() {
-    if (sendReceiveActive) {
+
+void loop()
+{
+    if (sendReceiveActive)
+    {
         receiveCommands();
     }
-    else if (touchRead(4) <= 20) {
-        while (touchRead(4) <= 20) {
+    else if (touchRead(4) <= 20)
+    {
+        while (touchRead(4) <= 20)
+        {
             delay(20);
         }
         selectedMode += 1;
-        if (selectedMode > (numOfModes - 1)) {
+        if (selectedMode > (numOfModes - 1))
+        {
             selectedMode = 0;
         }
         Serial.print("Current selectedMode: ");
         Serial.println(selectedMode);
         FastLED.clear();
-        switch (selectedMode) {
-            case 0:
-                activeAnimation = 0;
-                animationZeroActive = true;
-                animationOneActive = false;
-                soundModeActive = false;
-                break;
-            case 1:
-                activeAnimation = 1;
-                animationZeroActive = false;
-                animationOneActive = true;
-                soundModeActive = false;
-                break;
-            case 2:
-                Serial.println("Starting sound sensitive mode");
-                activeAnimation = 50;
-                animationZeroActive = false;
-                animationOneActive = false;
-                soundModeActive = true;
-                break;
+        switch (selectedMode)
+        {
+        case 0:
+            activeAnimation = 0;
+            animationZeroActive = true;
+            animationOneActive = false;
+            soundModeActive = false;
+            break;
+        case 1:
+            activeAnimation = 1;
+            animationZeroActive = false;
+            animationOneActive = true;
+            soundModeActive = false;
+            break;
+        case 2:
+            Serial.println("Starting sound sensitive mode");
+            activeAnimation = 50;
+            animationZeroActive = false;
+            animationOneActive = false;
+            soundModeActive = true;
+            break;
         }
-    } else {
+    }
+    else
+    {
         delay(40); // Allow CPU to do other tasks
     }
 }
 
-
-void secondCoreManager(void * parameter) { // Manages all second core activities
-    for (;;) {
+void secondCoreManager(void *parameter)
+{ // Manages all second core activities
+    for (;;)
+    {
         // delay(1000);
-        switch (activeAnimation) {
-            case 0:
-                activeAnimationArray = animationZero;
-                if (currentIndex >= sizeOfAnimationZero) {
-                    currentIndex = 0;
-                    // Serial.println("Resetting index");
-                }
-                break;
-            case 1:
-                activeAnimationArray = animationOne;
-                if (currentIndex >= sizeOfAnimationOne) {
-                    currentIndex = 0;
-                }
-                break;
-            case 50: // Special modes should be some number that will not be feasibly reached by stored animations
-                // Serial.println("Running animateSoundReactive");
-                animateSoundReactive();
-                break;
-            case 60:
-                sendGyroData();
-                break;
+        switch (activeAnimation)
+        {
+        case 0:
+            activeAnimationArray = animationZero;
+            if (currentIndex >= sizeOfAnimationZero)
+            {
+                currentIndex = 0;
+                // Serial.println("Resetting index");
+            }
+            break;
+        case 1:
+            activeAnimationArray = animationOne;
+            if (currentIndex >= sizeOfAnimationOne)
+            {
+                currentIndex = 0;
+            }
+            break;
+        case 50: // Special modes should be some number that will not be feasibly reached by stored animations
+            // Serial.println("Running animateSoundReactive");
+            animateSoundReactive();
+            break;
+        case 60:
+            sendGyroData();
+            break;
         }
-        if (activeAnimation != 50 && activeAnimation != 60) { // Add any special modes or conditions here that should prevent the regular animation from running
-                if (activeAnimationArray[currentIndex] == 1 && activeAnimationArray[currentIndex+1] == 2 && activeAnimationArray[currentIndex+2] == 3 && activeAnimationArray[currentIndex+3] == 4) { 
-                if (speedValue = 50) {
-                    delay(activeAnimationArray[currentIndex+4]);
+        if (activeAnimation != 50 && activeAnimation != 60)
+        { // Add any special modes or conditions here that should prevent the regular animation from running
+            if (activeAnimationArray[currentIndex] == 1 && activeAnimationArray[currentIndex + 1] == 2 && activeAnimationArray[currentIndex + 2] == 3 && activeAnimationArray[currentIndex + 3] == 4)
+            {
+                if (speedValue = 50)
+                {
+                    delay(activeAnimationArray[currentIndex + 4]);
                 }
-                if (0 <= speedValue < 50) {
-                    delay(activeAnimationArray[currentIndex+4]);
+                if (0 <= speedValue < 50)
+                {
+                    delay(activeAnimationArray[currentIndex + 4]);
                 }
                 currentIndex += 5;
-            } else { // No timing instruction, assume it is a LED instruction
+            }
+            else
+            { // No timing instruction, assume it is a LED instruction
                 activeIndex = activeAnimationArray[currentIndex];
-                activeR = activeAnimationArray[currentIndex+1];
-                activeG = activeAnimationArray[currentIndex+2];
-                activeB = activeAnimationArray[currentIndex+3];
+                activeR = activeAnimationArray[currentIndex + 1];
+                activeG = activeAnimationArray[currentIndex + 2];
+                activeB = activeAnimationArray[currentIndex + 3];
 
                 leds[activeIndex] = CRGB(activeR, activeG, activeB);
                 FastLED.show();
@@ -472,22 +497,28 @@ void secondCoreManager(void * parameter) { // Manages all second core activities
     }
 }
 
-void animateSoundReactive() { // Plays animation once when sound threshold is exceeded
+void animateSoundReactive()
+{ // Plays animation once when sound threshold is exceeded
     // Serial.println(digitalRead(microphonePin));
-    if (digitalRead(microphonePin) == HIGH) {
-        Serial.println("Exceeded sound threshold!"); 
+    if (digitalRead(microphonePin) == HIGH)
+    {
+        Serial.println("Exceeded sound threshold!");
         fill_solid(leds, 50, CRGB(255, 255, 25));
         FastLED.show();
         currentIndex = 0;
-        while (currentIndex < sizeOfAnimationPlayOnTrigger) {
-            if (playOnTrigger[currentIndex] == 1 && playOnTrigger[currentIndex+1] == 2 && playOnTrigger[currentIndex+2] == 3 && playOnTrigger[currentIndex+3] == 4) { // TODO: Delay multiplier to change speed of animations
-                delay(playOnTrigger[currentIndex+4]);
+        while (currentIndex < sizeOfAnimationPlayOnTrigger)
+        {
+            if (playOnTrigger[currentIndex] == 1 && playOnTrigger[currentIndex + 1] == 2 && playOnTrigger[currentIndex + 2] == 3 && playOnTrigger[currentIndex + 3] == 4)
+            { // TODO: Delay multiplier to change speed of animations
+                delay(playOnTrigger[currentIndex + 4]);
                 currentIndex += 5;
-            } else { // No timing instruction, assume it is a LED instruction
+            }
+            else
+            { // No timing instruction, assume it is a LED instruction
                 activeIndex = playOnTrigger[currentIndex];
-                activeR = playOnTrigger[currentIndex+1];
-                activeG = playOnTrigger[currentIndex+2];
-                activeB = playOnTrigger[currentIndex+3];
+                activeR = playOnTrigger[currentIndex + 1];
+                activeG = playOnTrigger[currentIndex + 2];
+                activeB = playOnTrigger[currentIndex + 3];
 
                 leds[activeIndex] = CRGB(activeR, activeG, activeB);
                 FastLED.show();
@@ -498,35 +529,41 @@ void animateSoundReactive() { // Plays animation once when sound threshold is ex
     }
 }
 
-
-void sendGyroData() {
-    if (!dmpReady) return;
+void sendGyroData()
+{
+    if (!dmpReady)
+        return;
     delay(10);
-    if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) {
-        Serial.println("fds");
+    if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer))
+    {
+        // Serial.println("fds");
         mpu.dmpGetQuaternion(&q, fifoBuffer);
 
         udp.beginPacket(udpTarget, udpPort);
         udp.print(q.w);
-        Serial.println(q.w);
+        // Serial.println(q.w);
         udp.print(",");
         udp.print(q.x);
-        Serial.println(q.x);
+        // Serial.println(q.x);
         udp.print(",");
         udp.print(q.y);
-        Serial.println(q.y);
+        // Serial.println(q.y);
         udp.print(",");
         udp.println(q.z);
-        Serial.println(q.z);
+        // Serial.println(q.z);
         udp.endPacket();
     }
 }
 
-void receiveCommands() { // Listen for and get commands over Serial
+void receiveCommands()
+{ // Listen for and get commands over Serial
 
-    if (Serial.available() >= 2) { // Wait for start of packet bytes to be available
-        if (Serial.read() == 0xFF) {
-            if (Serial.read() == 0xBB) { // SOP bytes confirmed
+    if (Serial.available() >= 2)
+    { // Wait for start of packet bytes to be available
+        if (Serial.read() == 0xFF)
+        {
+            if (Serial.read() == 0xBB)
+            {                      // SOP bytes confirmed
                 n = Serial.read(); // Read the first byte and assign it to n
                 r = Serial.read(); // Read the second byte and assign it to r
                 g = Serial.read(); // Read the third byte and assign it to g
@@ -536,12 +573,15 @@ void receiveCommands() { // Listen for and get commands over Serial
                 leds[n] = CRGB(r, g, b);
                 FastLED.show();
 
-                if (sendBack) {
+                if (sendBack)
+                {
                     String message = String(n) + "|" + String(r) + "|" + String(g) + "|" + String(b);
-        
+
                     // Print the message via Serial
                     Serial.println(message);
-                } else {
+                }
+                else
+                {
                     Serial.write(0x01); // Send a single byte (acknowledgment)
                 }
             }
@@ -559,7 +599,7 @@ void receiveCommands() { // Listen for and get commands over Serial
 
     //     if (sendBack) {
     //          String message = String(n) + "|" + String(r) + "|" + String(g) + "|" + String(b);
-  
+
     //         // Print the message via Serial
     //         Serial.println(message);
     //     } else {
