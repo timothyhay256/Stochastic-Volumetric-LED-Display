@@ -24,3 +24,6 @@ Once you have the hardware, go to the [Wiki.](https://github.com/timothyhay256/S
 
 ## SVLED-RS
 If you want to help contribute, please note that the current plan is to rewrite all the Python into Rust so this project is actually usable. (Currently you are bound to run into runtime errors.) Please see the [svled-rs](https://github.com/timothyhay256/Stochastic-Volumetric-LED-Display/tree/svled-rs) branch for current progress.
+
+## TODO:
+UDP currently *doesn't work*. I need to rewrite it to use bytes instead of a string, and use a SOP indicator.
