@@ -46,7 +46,7 @@ End MPU6050 code
 TaskHandle_t ledCommands; // Task for multicore
 
 const char* ssid = "STN";
-const char* password = "88bb6b7054";
+const char* password = "PASSWORD";
 
 #define BAUD_RATE 921600
 CRGB leds[50];
