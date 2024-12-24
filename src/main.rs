@@ -1,5 +1,6 @@
 use log::{debug, info, warn}; // TODO: Depreceate unity export byte data
 use serde::Deserialize;
+use serialport::SerialPort;
 use std::fs::File;
 use std::io::BufWriter;
 use std::io::Read;
@@ -17,7 +18,9 @@ pub struct Config {
     communication_mode: i8,
     host: Ipv4Addr,
     port: i32,
-    serial_port: PathBuf,
+    serial_port_path: String,
+    baud_rate: u32,
+    serial_read_timeout: u32,
     record_data: bool,
     record_esp_data: bool,
     unity_controls_recording: bool,
@@ -33,7 +36,9 @@ pub struct ManagerData {
     communication_mode: i8,
     host: Ipv4Addr,
     port: i32,
-    serial_port: PathBuf,
+    serial_port_path: String,
+    baud_rate: u32,
+    serial_read_timeout: u32,
     record_data: bool,
     record_esp_data: bool,
     unity_controls_recording: bool,
@@ -48,6 +53,7 @@ pub struct ManagerData {
     data_file_buf: Option<BufWriter<File>>, // On the first run that requires writing to disk, this will be initialized.
     esp_data_file_buf: Option<BufWriter<File>>, // We could either add two new variables to track each ones init state, or we could just init both when either one needs to.
     udp_socket: Option<UdpSocket>, // The second option reduces clutter, and barely reduces performance, so we do that.
+    serial_port: Option<Box<dyn SerialPort>>,
 }
 
 fn main() {
@@ -70,7 +76,9 @@ fn main() {
     let communication_mode = config_holder[0].communication_mode;
     let host = config_holder[0].host;
     let port = config_holder[0].port;
-    let serial_port = config_holder[0].serial_port.clone();
+    let serial_port_path = config_holder[0].serial_port_path.clone();
+    let baud_rate = config_holder[0].baud_rate;
+    let serial_read_timeout = config_holder[0].serial_read_timeout;
 
     let record_data = config_holder[0].record_data;
     let record_esp_data = config_holder[0].record_esp_data;
@@ -84,13 +92,10 @@ fn main() {
 
     // Validate config and inform user of settings
     if communication_mode == 1 {
-        if serial_port.exists() {
-            debug!(
-                "Using serial for communication on {}!",
-                serial_port.display()
-            );
+        if Path::new(&serial_port_path).exists() {
+            debug!("Using serial for communication on {}!", serial_port_path);
         } else {
-            panic!("Serial port {} does not exist!", serial_port.display());
+            panic!("Serial port {} does not exist!", serial_port_path);
         }
     } else if communication_mode == 2 {
         debug!("Using udp for communication at {} on port {}", host, port);
@@ -131,7 +136,9 @@ fn main() {
         communication_mode,
         host,
         port,
-        serial_port,
+        serial_port_path,
+        baud_rate,
+        serial_read_timeout,
         record_data,
         record_data_file,
         record_esp_data,
@@ -146,6 +153,7 @@ fn main() {
         data_file_buf: None,
         esp_data_file_buf: None,
         udp_socket: None,
+        serial_port: None,
     };
 
     // Remember to flush our buffers at the end.
