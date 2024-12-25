@@ -1,5 +1,6 @@
 use log::info;
 use rand::Rng;
+use std::ops::Div;
 use std::time::Instant;
 
 use crate::led_manager;
@@ -16,7 +17,7 @@ pub fn speedtest(manager: &mut ManagerData, num_led: u32, writes: u32) {
     info!("Testing {} random writes", writes);
     let start = Instant::now();
 
-    for _n in 0..=writes {
+    for n in 0..=writes {
         led_manager::set_color(
             manager,
             rng.gen_range(0..num_led.try_into().unwrap()),
@@ -30,5 +31,8 @@ pub fn speedtest(manager: &mut ManagerData, num_led: u32, writes: u32) {
 
     info!("{:.2?} seconds.", end);
     info!("{:.5?} seconds per LED", end / writes);
-    info!("{} LEDs per second", writes as u64 / end.as_secs());
+    info!(
+        "{:.3} LEDs per second",
+        (writes as f64 / (end.as_millis() as f64)) * 1000.0
+    );
 }

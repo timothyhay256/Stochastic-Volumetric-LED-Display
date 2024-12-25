@@ -88,24 +88,23 @@ pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
                             Some(esp_data_file_buf) => {
                                 while millis > 255 {
                                     // Adds overflows where we can't store above 255 ms
-                                    debug!("Detected integer overflow, adding to other element");
+                                    // debug!("Detected integer overflow, adding to other element");
                                     for i in 1..=5 {
                                         // Indicates a timing instruction, as it is unlikely that LED 1 will be set to 2,3,4 (r,g,b)
-                                        write!(esp_data_file_buf, "{}", i).expect("Could not write to esp_data_file_buf!");
-                                        // TODO: Better way to do this?
+                                        write!(esp_data_file_buf, "{:#x}, ", i).expect("Could not write to esp_data_file_buf!");
                                     }
-                                    write!(esp_data_file_buf, "{}", 255).expect("Could not write to esp_data_file_buf!");
+                                    write!(esp_data_file_buf, "{:#x}, ", 255).expect("Could not write to esp_data_file_buf!");
 
                                     millis -= 255;
                                 }
                                 if millis > 0 {
-                                    debug!("No longer or not overflow.");
+                                    // debug!("No longer or not overflow.");
                                     for i in 1..=5 {
-                                        write!(esp_data_file_buf, "{}", i).expect("Could not write to esp_data_file_buf!");
+                                        write!(esp_data_file_buf, "{:#x}, ", i).expect("Could not write to esp_data_file_buf!");
                                     }
-                                    write!(esp_data_file_buf, "{}", millis).expect("Could not write to esp_data_file_buf!");
+                                    write!(esp_data_file_buf, "{:#x}, ", millis).expect("Could not write to esp_data_file_buf!");
                                 }
-                                write!(esp_data_file_buf, "{}{}{}{}", n, r, g, b).expect("Could not write to esp_data_file_buf!");
+                                write!(esp_data_file_buf, "{:#x}, {:#x}, {:#x}, {:#x}, ", n, r, g, b).expect("Could not write to esp_data_file_buf!");
                             }
                             None => error!("record_esp_data is true, but esp_data_file_buf is None!, Something has gone very wrong, please report this.")
                         }
@@ -236,18 +235,22 @@ pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
 }
 
 fn check_and_create_file(file: &PathBuf) -> Result<File, Box<dyn Error>> {
-    if !Path::new(&file).exists() {
-        Path::new(&file);
-    } else {
+    if Path::new(&file).exists() {
         let remove_file_result = remove_file(file);
         match remove_file_result {
             Ok(()) => debug!("Removed {}", &file.display()),
             Err(error) => error!("Could not remove {}: {}.", &file.display(), error),
         }
+        match File::create(file) {
+            Ok(_) => {}
+            Err(e) => {
+                panic!("Could not create {}: {}", file.display(), e);
+            }
+        }
     }
-    let data_file = match File::open(file.clone()) {
+    let data_file = match File::create(file.clone()) {
         Ok(file) => file,
-        Err(e) => panic!("Could not open {}:{}", file.display(), e),
+        Err(e) => panic!("Could not open {}: {}", file.display(), e),
     };
 
     Ok(data_file)
