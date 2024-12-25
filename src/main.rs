@@ -1,10 +1,11 @@
 use gumdrop::Options;
-use log::{error, info, warn}; // TODO: Depreceate unity export byte data
+use log::{debug, error, info, warn}; // TODO: Depreceate unity export byte data
 use serde::Deserialize;
 use serialport::SerialPort;
+use std::error::Error;
+use std::fs::{remove_file, File};
 use std::{
     env,
-    fs::File,
     io::{BufWriter, Read, Write},
     net::{Ipv4Addr, UdpSocket},
     path::{Path, PathBuf},
@@ -12,6 +13,8 @@ use std::{
 };
 
 pub mod led_manager;
+pub mod read_vled;
+pub mod scan;
 pub mod speedtest;
 
 #[derive(Deserialize)]
@@ -82,10 +85,22 @@ enum Command {
     // Names can be explicitly specified using `#[options(name = "...")]`
     #[options(help = "perform a connection speedtest")]
     Speedtest(SpeedtestOptions),
+
+    #[options(help = "play back a vled file")]
+    ReadVled(ReadvledOptions),
+
+    #[options(help = "calibrate a svled container")]
+    Calibrate(CalibrateOptions),
 }
 
 #[derive(Debug, Options)]
 struct SpeedtestOptions {}
+
+#[derive(Debug, Options)]
+struct ReadvledOptions {}
+
+#[derive(Debug, Options)]
+struct CalibrateOptions {}
 
 fn main() {
     let opts = MyOptions::parse_args_default_or_exit();
@@ -207,6 +222,12 @@ fn main() {
         speedtest::speedtest(&mut manager, num_led, 750);
     }
 
+    if let Some(Command::Calibrate(ref _calibrate_options)) = opts.command {
+        info!("Performing calibrating");
+
+        scan::scan().expect("failure");
+    }
+
     // led_manager::set_color(&mut manager, 1, 255, 255, 255);
 
     // Flush our BufWriters
@@ -241,4 +262,26 @@ fn main() {
     }
 
     // Remember to flush our buffers at the end.
+}
+
+fn check_and_create_file(file: &PathBuf) -> Result<File, Box<dyn Error>> {
+    if Path::new(&file).exists() {
+        let remove_file_result = remove_file(file);
+        match remove_file_result {
+            Ok(()) => debug!("Removed {}", &file.display()),
+            Err(error) => error!("Could not remove {}: {}.", &file.display(), error),
+        }
+        match File::create(file) {
+            Ok(_) => {}
+            Err(e) => {
+                panic!("Could not create {}: {}", file.display(), e);
+            }
+        }
+    }
+    let data_file = match File::create(file.clone()) {
+        Ok(file) => file,
+        Err(e) => panic!("Could not open {}: {}", file.display(), e),
+    };
+
+    Ok(data_file)
 }
