@@ -1,8 +1,7 @@
 use crate::ManagerData;
+
 use log::{debug, error, info, warn};
 use std::env;
-use std::error::Error;
-use std::fs::{remove_file, File};
 use std::io::BufWriter;
 use std::io::ErrorKind::WouldBlock;
 use std::io::Write;
@@ -40,7 +39,7 @@ pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
     if record_data || record_esp_data {
         if record_data && manager.data_file_buf.is_none() {
             manager.data_file_buf = Some(BufWriter::new(
-                match check_and_create_file(&manager.record_data_file) {
+                match crate::check_and_create_file(&manager.record_data_file) {
                     Ok(file) => file,
                     Err(e) => {
                         panic!(
@@ -53,7 +52,7 @@ pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
             ));
         } else if record_esp_data && manager.esp_data_file_buf.is_none() {
             manager.esp_data_file_buf = Some(BufWriter::new(
-                match check_and_create_file(&manager.record_esp_data_file) {
+                match crate::check_and_create_file(&manager.record_esp_data_file) {
                     Ok(file) => file,
                     Err(e) => {
                         panic!(
@@ -232,26 +231,4 @@ pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
             }
         };
     }
-}
-
-fn check_and_create_file(file: &PathBuf) -> Result<File, Box<dyn Error>> {
-    if Path::new(&file).exists() {
-        let remove_file_result = remove_file(file);
-        match remove_file_result {
-            Ok(()) => debug!("Removed {}", &file.display()),
-            Err(error) => error!("Could not remove {}: {}.", &file.display(), error),
-        }
-        match File::create(file) {
-            Ok(_) => {}
-            Err(e) => {
-                panic!("Could not create {}: {}", file.display(), e);
-            }
-        }
-    }
-    let data_file = match File::create(file.clone()) {
-        Ok(file) => file,
-        Err(e) => panic!("Could not open {}: {}", file.display(), e),
-    };
-
-    Ok(data_file)
 }
