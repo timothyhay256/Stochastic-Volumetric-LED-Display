@@ -1,11 +1,11 @@
 use gumdrop::Options;
-use log::{info, warn}; // TODO: Depreceate unity export byte data
+use log::{error, info, warn}; // TODO: Depreceate unity export byte data
 use serde::Deserialize;
 use serialport::SerialPort;
 use std::{
     env,
     fs::File,
-    io::{BufWriter, Read},
+    io::{BufWriter, Read, Write},
     net::{Ipv4Addr, UdpSocket},
     path::{Path, PathBuf},
     time::SystemTime,
@@ -147,7 +147,7 @@ fn main() {
         info!("Using udp for communication at {} on port {}", host, port);
     }
 
-    if unity_controls_recording || record_data {
+    if unity_controls_recording || record_data || record_esp_data {
         if Path::new(&record_data_file).exists() {
             warn!(
                 "{} Will be overwritten once you start recording!",
@@ -207,7 +207,38 @@ fn main() {
         speedtest::speedtest(&mut manager, num_led, 750);
     }
 
-    led_manager::set_color(&mut manager, 1, 255, 255, 255);
+    // led_manager::set_color(&mut manager, 1, 255, 255, 255);
+
+    // Flush our BufWriters
+    if manager.data_file_buf.is_some() {
+        if let Some(data_file_buf) = manager.data_file_buf.as_mut() {
+            match data_file_buf.flush() {
+                Ok(_) => {}
+                Err(e) => {
+                    error!(
+                        "Could not flush {}! It may be incomplete or corrupted. Error: {}",
+                        manager.record_data_file.display(),
+                        e
+                    )
+                }
+            }
+        };
+    }
+
+    if manager.esp_data_file_buf.is_some() {
+        if let Some(esp_data_file_buf) = manager.esp_data_file_buf.as_mut() {
+            match esp_data_file_buf.flush() {
+                Ok(_) => {}
+                Err(e) => {
+                    error!(
+                        "Could not flush {}! It may be incomplete or corrupted. Error: {}",
+                        manager.record_esp_data_file.display(),
+                        e
+                    )
+                }
+            }
+        };
+    }
 
     // Remember to flush our buffers at the end.
 }
