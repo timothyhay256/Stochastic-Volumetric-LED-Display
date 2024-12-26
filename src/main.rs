@@ -5,6 +5,7 @@ use serialport::SerialPort;
 use std::error::Error;
 use std::fs::{remove_file, File};
 use std::process;
+use std::thread;
 use std::{
     env,
     io::{BufWriter, Read, Write},
@@ -45,7 +46,6 @@ pub struct UnityOptions {
     unity_ip: Ipv4Addr,
     unity_ports: Vec<u32>,
     unity_serial_ports: Vec<PathBuf>,
-    unity_serial_baudrate: u32,
     unity_position_files: Vec<PathBuf>,
     scale: f32,
 }
@@ -73,7 +73,7 @@ pub struct ManagerData {
     esp_data_file_buf: Option<BufWriter<File>>, // We could either add two new variables to track each ones init state, or we could just init both when either one needs to.
     udp_socket: Option<UdpSocket>, // The second option reduces clutter, and barely reduces performance, so we do that.
     serial_port: Option<Box<dyn SerialPort>>,
-    unity_options: UnityOptions,
+    keepalive: bool, // Should our threads stay alive?
 }
 
 #[derive(Debug, Options)]
@@ -224,14 +224,14 @@ fn main() {
         communication_mode,
         host,
         port,
-        serial_port_path,
+        serial_port_path: serial_port_path.clone(), // So we can create new ManagerDatas
         baud_rate,
         serial_read_timeout,
         record_data,
-        record_data_file,
+        record_data_file: record_data_file.clone(),
         record_esp_data,
         unity_controls_recording,
-        record_esp_data_file,
+        record_esp_data_file: record_esp_data_file.clone(),
         failures: 0,
         print_send_back,
         udp_read_timeout,
@@ -241,8 +241,13 @@ fn main() {
         esp_data_file_buf: None,
         udp_socket: None,
         serial_port: None,
-        unity_options: unity_options.clone(),
+        keepalive: true,
     };
+
+    ctrlc::set_handler(move || {
+        manager.keepalive = false;
+    })
+    .expect("Error setting Ctrl-C handler");
 
     if let Some(Command::Speedtest(ref _speedtest_options)) = opts.command {
         info!("Performing speedtest...");
@@ -309,12 +314,61 @@ fn main() {
             }
         }
 
-        match unity::send_pos(unity_options) {
+        info!("Sending positions to Unity");
+
+        match unity::send_pos(unity_options.clone()) {
             Ok(_) => {}
             Err(e) => {
                 panic!("There was an issue connecting to Unity: {}", e);
             }
         };
+        let mut children = Vec::new();
+
+        info!("Spawning listening threads");
+
+        for i in 1..unity_options.num_container {
+            let mut owned_manager = ManagerData {
+                num_led,
+                communication_mode,
+                host,
+                port,
+                serial_port_path: serial_port_path.clone(),
+                baud_rate,
+                serial_read_timeout,
+                record_data,
+                record_data_file: record_data_file.clone(),
+                record_esp_data,
+                unity_controls_recording,
+                record_esp_data_file: record_esp_data_file.clone(),
+                failures: 0,
+                print_send_back,
+                udp_read_timeout,
+                first_run: true,
+                call_time: SystemTime::now(),
+                data_file_buf: None,
+                esp_data_file_buf: None,
+                udp_socket: None,
+                serial_port: None,
+                keepalive: true,
+            };
+
+            let owned_options = unity_options.clone();
+
+            children.push(thread::spawn(move || {
+                match unity::get_events(
+                    &mut owned_manager,
+                    owned_options.unity_ip,
+                    owned_options.unity_ports.clone()[i as usize]
+                        .try_into()
+                        .unwrap(),
+                ) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        panic!("get_events thread crashed with error: {}", e)
+                    }
+                }
+            }))
+        }
     }
 
     // led_manager::set_color(&mut manager, 1, 255, 255, 255);
