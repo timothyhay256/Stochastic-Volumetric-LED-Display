@@ -4,6 +4,7 @@ use serde::Deserialize;
 use serialport::SerialPort;
 use std::error::Error;
 use std::fs::{remove_file, File};
+use std::process;
 use std::{
     env,
     io::{BufWriter, Read, Write},
@@ -52,7 +53,7 @@ pub struct ManagerData {
     record_esp_data_file: PathBuf,
     print_send_back: bool,
     udp_read_timeout: u32,
-    failures: u8,
+    failures: u32,
     first_run: bool,       // First ManagerData specific option, above is just Config
     call_time: SystemTime, // Used to persist so we can track time between set_color calls
     data_file_buf: Option<BufWriter<File>>, // On the first run that requires writing to disk, this will be initialized.
@@ -97,7 +98,10 @@ enum Command {
 struct SpeedtestOptions {}
 
 #[derive(Debug, Options)]
-struct ReadvledOptions {}
+struct ReadvledOptions {
+    #[options(help = "vled file to read")]
+    vled_file: PathBuf,
+}
 
 #[derive(Debug, Options)]
 struct CalibrateOptions {}
@@ -163,16 +167,16 @@ fn main() {
     }
 
     if unity_controls_recording || record_data || record_esp_data {
-        if Path::new(&record_data_file).exists() {
+        if Path::new(&record_data_file).exists() && record_data {
             warn!(
-                "{} Will be overwritten once you start recording!",
+                "{} will be overwritten once you start recording!",
                 record_data_file.display()
             );
         }
-        if Path::new(&record_esp_data_file).exists() {
+        if Path::new(&record_esp_data_file).exists() && record_esp_data {
             warn!(
-                "{} Will be overwritten once you start recording!",
-                record_data_file.display()
+                "{} will be overwritten once you start recording!",
+                record_esp_data_file.display()
             )
         }
     }
@@ -228,8 +232,56 @@ fn main() {
         scan::scan().expect("failure");
     }
 
+    if let Some(Command::ReadVled(ref readvled_options)) = opts.command {
+        if !readvled_options.vled_file.is_file() {
+            error!("You must pass a valid vled file with --vled-file!");
+            process::exit(0);
+        } else {
+            info!("Playing back {}!", readvled_options.vled_file.display());
+
+            manager.record_data = false;
+            manager.record_esp_data = false;
+            match read_vled::read_vled(&mut manager, readvled_options.vled_file.clone()) {
+                Ok(_) => {}
+                Err(e) => {
+                    panic!(
+                        "Could not read {}: {}",
+                        readvled_options.vled_file.display(),
+                        e
+                    )
+                }
+            };
+        }
+    }
+
     // led_manager::set_color(&mut manager, 1, 255, 255, 255);
 
+    flush_data(&mut manager);
+}
+
+fn check_and_create_file(file: &PathBuf) -> Result<File, Box<dyn Error>> {
+    if Path::new(&file).exists() {
+        let remove_file_result = remove_file(file);
+        match remove_file_result {
+            Ok(()) => debug!("Removed {}", &file.display()),
+            Err(error) => error!("Could not remove {}: {}.", &file.display(), error),
+        }
+        match File::create(file) {
+            Ok(_) => {}
+            Err(e) => {
+                panic!("Could not create {}: {}", file.display(), e);
+            }
+        }
+    }
+    let data_file = match File::create(file.clone()) {
+        Ok(file) => file,
+        Err(e) => panic!("Could not open {}: {}", file.display(), e),
+    };
+
+    Ok(data_file)
+}
+
+fn flush_data(manager: &mut ManagerData) {
     // Flush our BufWriters
     if manager.data_file_buf.is_some() {
         if let Some(data_file_buf) = manager.data_file_buf.as_mut() {
@@ -260,28 +312,4 @@ fn main() {
             }
         };
     }
-
-    // Remember to flush our buffers at the end.
-}
-
-fn check_and_create_file(file: &PathBuf) -> Result<File, Box<dyn Error>> {
-    if Path::new(&file).exists() {
-        let remove_file_result = remove_file(file);
-        match remove_file_result {
-            Ok(()) => debug!("Removed {}", &file.display()),
-            Err(error) => error!("Could not remove {}: {}.", &file.display(), error),
-        }
-        match File::create(file) {
-            Ok(_) => {}
-            Err(e) => {
-                panic!("Could not create {}: {}", file.display(), e);
-            }
-        }
-    }
-    let data_file = match File::create(file.clone()) {
-        Ok(file) => file,
-        Err(e) => panic!("Could not open {}: {}", file.display(), e),
-    };
-
-    Ok(data_file)
 }

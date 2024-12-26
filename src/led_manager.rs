@@ -66,6 +66,7 @@ pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
         let end = SystemTime::now();
         match end.duration_since(manager.call_time) {
             Ok(duration) => {
+                manager.call_time = SystemTime::now(); // Reset timer
                 let mut millis = duration.as_millis();
                 if millis >= 1 {
                     if record_data {
