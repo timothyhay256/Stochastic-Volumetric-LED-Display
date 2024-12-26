@@ -24,3 +24,15 @@ Once you have the hardware, go to the [Wiki.](https://github.com/timothyhay256/S
 
 ## SVLED-RS
 If you want to help contribute, please note that the current plan is to rewrite all the Python into Rust so this project is actually usable. (Currently you are bound to run into runtime errors.)
+
+## Rewrite progress
+
+| Script  | Rewrite status |
+| ------------- | ------------- |
+| led_manager.rs  | Rewritten, not fully tested |
+| speedtest.rs  | Complete |
+| read_vled.rs | Rewritten, not fully tested |
+| scan.rs | In progress |
+| unity_get_event.rs | Not started |
+| unity_manager.rs | Not started |
+| unity_send_pos.rs | Not Started |

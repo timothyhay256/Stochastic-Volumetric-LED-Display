@@ -1,5 +1,8 @@
+use log::error;
 use log::info;
+use log::warn;
 use std::error::Error;
+use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
@@ -11,6 +14,10 @@ use crate::led_manager;
 use crate::ManagerData;
 
 pub fn read_vled(manager: &mut ManagerData, file: PathBuf) -> Result<(), Box<dyn Error>> {
+    if file.extension().and_then(OsStr::to_str) != Some("vled") {
+        // Only doing this check because I feel like people are gonna try using bvled files with this function
+        warn!("File extension is not a vled file, it may not be read correctly");
+    }
     info!("Playing back {}", file.display());
 
     let mut start = Instant::now();
@@ -20,13 +27,13 @@ pub fn read_vled(manager: &mut ManagerData, file: PathBuf) -> Result<(), Box<dyn
         for mut line in lines.map_while(Result::ok) {
             if line.contains("E") {
                 // Clear color of index `EN`
-                let index = match line.remove(1).to_string().parse::<u8>() {
+                line.remove(0);
+                let index = match line.to_string().parse::<u8>() {
                     Ok(index) => index,
                     Err(e) => {
                         panic!(
                             "VLED was malformed: Attempted to convert {} to u8: {}",
-                            line.remove(1),
-                            e
+                            line, e
                         )
                     }
                 };
@@ -50,24 +57,28 @@ pub fn read_vled(manager: &mut ManagerData, file: PathBuf) -> Result<(), Box<dyn
                 led_manager::set_color(manager, xs[0], xs[1], xs[2], xs[3]);
                 packets_per_second += 1;
             } else if line.contains("T") {
-                let sleep = match line.remove(1).to_string().parse::<u8>() {
+                line.remove(0);
+                line.remove(0);
+                let sleep = match line.to_string().parse::<u8>() {
                     Ok(sleep) => sleep,
                     Err(e) => {
                         panic!(
                             "VLED was malformed: Attempted to convert {} to u8: {}",
-                            line.remove(1),
-                            e
+                            line, e
                         )
                     }
                 };
-                thread::sleep(time::Duration::from_secs(sleep as u64));
+                // println!("Sleeping for {}");
+                thread::sleep(time::Duration::from_millis(sleep as u64));
+            } else {
+                error!("Unable to parse invalid line of vled file.");
             }
 
             if start.elapsed().as_secs() >= 1 {
                 info!(
                     "{} packets per {} seconds.",
                     packets_per_second,
-                    start.elapsed().as_millis() * 1000
+                    start.elapsed().as_secs()
                 );
                 packets_per_second = 0;
                 start = Instant::now();
