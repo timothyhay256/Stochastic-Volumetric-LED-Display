@@ -17,6 +17,7 @@ pub mod led_manager;
 pub mod read_vled;
 pub mod scan;
 pub mod speedtest;
+pub mod unity;
 
 #[derive(Deserialize)]
 pub struct Config {
@@ -35,6 +36,18 @@ pub struct Config {
     record_esp_data_file: PathBuf,
     print_send_back: bool,
     udp_read_timeout: u32,
+    unity_options: UnityOptions,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct UnityOptions {
+    num_container: u8,
+    unity_ip: Ipv4Addr,
+    unity_ports: Vec<u32>,
+    unity_serial_ports: Vec<PathBuf>,
+    unity_serial_baudrate: u32,
+    unity_position_files: Vec<PathBuf>,
+    scale: f32,
 }
 
 pub struct ManagerData {
@@ -60,6 +73,7 @@ pub struct ManagerData {
     esp_data_file_buf: Option<BufWriter<File>>, // We could either add two new variables to track each ones init state, or we could just init both when either one needs to.
     udp_socket: Option<UdpSocket>, // The second option reduces clutter, and barely reduces performance, so we do that.
     serial_port: Option<Box<dyn SerialPort>>,
+    unity_options: UnityOptions,
 }
 
 #[derive(Debug, Options)]
@@ -92,6 +106,9 @@ enum Command {
 
     #[options(help = "calibrate a svled container")]
     Calibrate(CalibrateOptions),
+
+    #[options(help = "connect to Unity")]
+    Unity(UnityCommandOptions),
 }
 
 #[derive(Debug, Options)]
@@ -105,6 +122,9 @@ struct ReadvledOptions {
 
 #[derive(Debug, Options)]
 struct CalibrateOptions {}
+
+#[derive(Debug, Options)]
+struct UnityCommandOptions {}
 
 fn main() {
     let opts = MyOptions::parse_args_default_or_exit();
@@ -154,6 +174,8 @@ fn main() {
     let udp_read_timeout = config_holder.udp_read_timeout;
 
     let print_send_back = config_holder.print_send_back;
+
+    let unity_options = config_holder.unity_options;
 
     // Validate config and inform user of settings
     if communication_mode == 2 {
@@ -218,6 +240,7 @@ fn main() {
         esp_data_file_buf: None,
         udp_socket: None,
         serial_port: None,
+        unity_options: unity_options.clone(),
     };
 
     if let Some(Command::Speedtest(ref _speedtest_options)) = opts.command {
@@ -251,6 +274,38 @@ fn main() {
                     )
                 }
             };
+        }
+    }
+
+    if let Some(Command::Unity(ref _unity_options)) = opts.command {
+        // Validate Unity section of config, if we are using Unity.
+
+        if unity_options.unity_serial_ports.len() < unity_options.num_container.into()
+            || unity_options.unity_position_files.len() < unity_options.num_container.into()
+        {
+            panic!("You need to have enough paths in both unity_serial_ports and unity_position_files to continue!");
+        }
+
+        for i in 0..=unity_options.num_container {
+            if !Path::new(&unity_options.unity_serial_ports[i as usize]).is_file() {
+                error!(
+                    "{} is not a valid file! Will attempt to continue anyway.",
+                    unity_options.unity_serial_ports[i as usize]
+                        .clone()
+                        .display()
+                );
+            }
+        }
+
+        for i in 0..=unity_options.num_container {
+            if !Path::new(&unity_options.unity_position_files[i as usize]).is_file() {
+                error!(
+                    "{} is not a valid file! Will attempt to continue anyway.",
+                    unity_options.unity_position_files[i as usize]
+                        .clone()
+                        .display()
+                );
+            }
         }
     }
 
