@@ -178,6 +178,7 @@ fn main() {
     let unity_options = config_holder.unity_options;
 
     // Validate config and inform user of settings
+
     if communication_mode == 2 {
         if Path::new(&serial_port_path).exists() {
             info!("Using serial for communication on {}!", serial_port_path);
@@ -286,7 +287,7 @@ fn main() {
             panic!("You need to have enough paths in both unity_serial_ports and unity_position_files to continue!");
         }
 
-        for i in 0..=unity_options.num_container {
+        for i in 0..=unity_options.num_container - 1 {
             if !Path::new(&unity_options.unity_serial_ports[i as usize]).is_file() {
                 error!(
                     "{} is not a valid file! Will attempt to continue anyway.",
@@ -297,7 +298,7 @@ fn main() {
             }
         }
 
-        for i in 0..=unity_options.num_container {
+        for i in 0..=unity_options.num_container - 1 {
             if !Path::new(&unity_options.unity_position_files[i as usize]).is_file() {
                 error!(
                     "{} is not a valid file! Will attempt to continue anyway.",
@@ -307,6 +308,13 @@ fn main() {
                 );
             }
         }
+
+        match unity::send_pos(unity_options) {
+            Ok(_) => {}
+            Err(e) => {
+                panic!("There was an issue connecting to Unity: {}", e);
+            }
+        };
     }
 
     // led_manager::set_color(&mut manager, 1, 255, 255, 255);
