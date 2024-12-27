@@ -1,3 +1,4 @@
+use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use log::error;
 use std::error::Error;
 use std::fs::File;
@@ -6,6 +7,7 @@ use std::net::Ipv4Addr;
 use std::net::TcpStream;
 use std::net::UdpSocket;
 use std::str;
+use std::time::Duration;
 
 use crate::led_manager;
 use crate::ManagerData;
@@ -47,12 +49,28 @@ pub fn send_pos(unity: UnityOptions) -> std::io::Result<()> {
                 )
             }
         };
+
+        let pb = ProgressBar::new(json.len().try_into().unwrap());
+        pb.set_style(ProgressStyle::with_template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {pos:>3}/{len:3} ({eta})")
+        .unwrap()
+        .with_key("eta", |state: &ProgressState, w: &mut dyn std::fmt::Write| write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap())
+        .progress_chars("#>-")); // This can take a while, especially for alot of LEDs
+        let mut pb_count = 0;
+
         let mut stream = TcpStream::connect(format!(
             "{}:{}",
             unity.unity_ip.clone(),
             unity.unity_ports.clone()[i as usize]
         ))?;
+        stream
+            .set_read_timeout(Some(Duration::new(0, 1000000000)))
+            .unwrap();
+        stream
+            .set_write_timeout(Some(Duration::new(0, 1000000000)))
+            .unwrap();
         for led in json.iter() {
+            pb_count += 1;
+            pb.set_position(pb_count);
             stream.write_all(
                 format!(
                     "{},{},{}",
@@ -73,6 +91,7 @@ pub fn send_pos(unity: UnityOptions) -> std::io::Result<()> {
                 error!("Did not get acknowledgement from Unity! You may have missing LEDs.");
             }
         }
+        pb.finish();
 
         stream.write_all("END".as_bytes())?;
     }
@@ -129,6 +148,7 @@ pub fn get_events(
                         }
                     };
                 }
+                println!("NRGB: {}|{}|{}|{}", xs[0], xs[1], xs[2], xs[3]);
                 led_manager::set_color(manager, xs[0], xs[1], xs[2], xs[3]);
             } else {
                 error!("Unity packet was malformed! Packet: {}", msg);

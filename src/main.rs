@@ -326,7 +326,7 @@ fn main() {
 
         info!("Spawning listening threads");
 
-        for i in 1..unity_options.num_container {
+        for i in 0..unity_options.num_container {
             let mut owned_manager = ManagerData {
                 num_led,
                 communication_mode,
@@ -368,6 +368,15 @@ fn main() {
                     }
                 }
             }))
+        }
+
+        for child in children {
+            match child.join() {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("Couldn't join child thread {:?}", e)
+                }
+            };
         }
     }
 
