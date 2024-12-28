@@ -1,0 +1,164 @@
+import { Button, VerticalBox, HorizontalBox, CheckBox, TextEdit, LineEdit, ComboBox } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
+    // preferred-height: 500px;
+    // preferred-width: 500px;
+    in-out property <int> counter: 42;
+    callback request-increase-value();
+    default-font-size: 20px;
+    VerticalBox {
+        spacing: 5px;
+        Text {
+            text: "CONFIG";
+            font-size: 35px;
+            font-weight: 300;
+            letter-spacing: 23px;
+            horizontal-alignment: center;
+            vertical-alignment: top;
+        }
+
+        HorizontalBox {
+            padding: 5px;
+            Text {
+                text: "Number of LEDS in use:";
+            }
+
+            LineEdit {
+                input-type: number;
+                height: 20px;
+                placeholder-text: "50";
+                horizontal-alignment: right;
+            }
+        }
+
+        HorizontalBox {
+            padding: 5px;
+            Text {
+                text: "Communication mode:";
+            }
+
+            ComboBox {
+                width: 100px;
+                model: ["UDP", "Serial"];
+                current-value: "UDP";
+            }
+        }
+
+        HorizontalBox {
+            padding: 5px;
+            Text {
+                text: "UDP Host:";
+            }
+
+            LineEdit {
+                height: 20px;
+                placeholder-text: "192.168.86.148";
+                horizontal-alignment: right;
+            }
+        }
+
+        HorizontalBox {
+            padding: 5px;
+            Text {
+                text: "UDP Port:";
+            }
+
+            LineEdit {
+                input-type: number;
+                height: 20px;
+                placeholder-text: "8888";
+                horizontal-alignment: right;
+            }
+        }
+
+        HorizontalBox {
+            padding: 5px;
+            Text {
+                text: "Serial Port Path:";
+            }
+
+            LineEdit {
+                height: 20px;
+                placeholder-text: "/dev/ttyUSB0";
+                horizontal-alignment: right;
+            }
+        }
+
+        HorizontalBox {
+            padding: 5px;
+            Text {
+                text: "Baud Rate:";
+            }
+
+            LineEdit {
+                input-type: number;
+                height: 20px;
+                placeholder-text: "921600";
+                horizontal-alignment: right;
+            }
+        }
+
+        HorizontalBox {
+            padding: 5px;
+            Text {
+                text: "Serial Timeout (ms):";
+            }
+
+            LineEdit {
+                input-type: number;
+                height: 20px;
+                placeholder-text: "10";
+                horizontal-alignment: right;
+            }
+        }
+
+        HorizontalBox {
+            padding: 5px;
+            Text {
+                text: "UDP Timeout (ms):";
+            }
+
+            LineEdit {
+                input-type: number;
+                height: 20px;
+                placeholder-text: "100";
+                horizontal-alignment: right;
+            }
+        }
+
+        HorizontalBox {
+            padding: 5px;
+            Text {
+                text: "VLED recording path:";
+            }
+
+            LineEdit {
+                text: "recording.vled";
+                height: 20px;
+                placeholder-text: "10";
+                horizontal-alignment: right;
+            }
+        }
+
+        HorizontalBox {
+            padding: 5px;
+            Text {
+                text: "BVLED recording path:";
+            }
+
+            LineEdit {
+                text: "recording.bvled";
+                height: 20px;
+                placeholder-text: "10";
+                horizontal-alignment: right;
+            }
+        }
+
+        Text {
+            text: "Unity Config";
+            font-size: 20px;
+            font-weight: 200;
+            horizontal-alignment: center;
+        }
+    }
+}
