@@ -8,7 +8,7 @@ import os.path
 # User definied variables, set settings here!
 communicate_mode = 2 # What mode to use for communication with LEDs? 1 for UDP, 2 for serial.
 
-host = "192.168.86.124" # If using UDP, what is the ESPs IP address? This is printed to serial when the ESP starts up.
+host = "192.168.86.164" # If using UDP, what is the ESPs IP address? This is printed to serial when the ESP starts up.
 port = 8888 # Don't change unless you changed this in the ESPs script.
 
 serial_port = '/dev/ttyUSB0' # If using serial, what is the serial port of the ESP? Whatever is listed when you run `ls /dev | grep USB` is probably the right port.
