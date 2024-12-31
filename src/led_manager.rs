@@ -1,13 +1,13 @@
 use crate::ManagerData;
 
 use log::{debug, error, info, warn};
-use std::env;
 use std::io::BufWriter;
 use std::io::ErrorKind::WouldBlock;
 use std::io::Write;
 use std::net::UdpSocket;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
+use std::{env, process};
 
 pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
     // &mut should mean changes will persist, so no need to return ManagerData
@@ -117,6 +117,7 @@ pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
 
     if manager.communication_mode == 1 {
         if manager.udp_socket.is_none() {
+            debug!("Binding to 0.0.0.0:{}", manager.port);
             manager.udp_socket = Some(match UdpSocket::bind(format!("0.0.0.0:{}", manager.port)) {
                 Ok(socket) => socket,
                 Err(e) => {
@@ -143,8 +144,14 @@ pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
 
                 match udp_result {
                     // TODO: This is untested! Test it
-                    Ok(_size) => {}
+                    Ok(_size) => {
+                        manager.failures = 0; // Reset consecutive failure count
+                    }
                     Err(ref e) if e.kind() == WouldBlock => {
+                        if manager.failures >= manager.con_fail_limit {
+                            error!("Too many consecutive communication failures, exiting.");
+                            process::exit(1);
+                        }
                         warn!(
                             "UDP timeout reached! Will resend packet, but won't wait for response!"
                         );
