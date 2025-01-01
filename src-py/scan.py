@@ -79,7 +79,6 @@ def mouse_crop(event, x, y, flags, param):
           x_end, y_end = x, y
           cropping = False
           refPoint = [(x_start, y_start), (x_end, y_end)]
-          ledPos[numLed] = refPoint
           log("refPoint is now "+str(refPoint))
 
 def mouse_manual(event, x, y, flags, param):
