@@ -1,5 +1,5 @@
 [package]
-name = "Stochastic-Volumetric-LED-Display"
+name = "svled"
 version = "0.1.0"
 edition = "2021"
 
@@ -16,3 +16,10 @@ serde = { version = "1.0.216", features = ["derive"] }
 serde_json = "1.0.134"
 serialport = "4.6.1"
 toml = "0.8.19"
+slint = { version = "1.8.0", optional = true }
+
+[build-dependencies]
+slint-build = { version = "1.8.0", optional = true }
+
+[features]
+gui = ["dep:slint", "dep:slint-build"]
