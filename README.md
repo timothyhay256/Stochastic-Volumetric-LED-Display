@@ -10,7 +10,7 @@ You can see a short demo video here: `TODO: make video`
 
 Please note that a much cooler demo with gyroscopes and multiple containers is coming soon :3  
 
-![Demo video showing Unity integration](assets/demo.gif)
+![Demo video showing Unity integration](docs/demo.gif)
 
 *Alot of this code was written in around a week, and school was taking most of my time, so if there are any issues with documentation or code, please let me know and I will be happy to help*
 
@@ -33,6 +33,6 @@ If you want to help contribute, please note that the current plan is to rewrite 
 | speedtest.rs  | Complete |
 | read_vled.rs | Rewritten, not fully tested |
 | scan.rs | In progress |
-| unity_get_event.rs | In progress (unity.rs) |
-| unity_manager.rs | Not started |
-| unity_send_pos.rs | In progress (unity.rs) |
+| unity_get_event.rs | Rewritten, not fully tested |
+| unity_manager.rs | Rewritten, not fully tested |
+| unity_send_pos.rs | Rewritten, not fully tested |

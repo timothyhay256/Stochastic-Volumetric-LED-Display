@@ -37,6 +37,8 @@ pub struct Config {
     record_esp_data_file: PathBuf,
     print_send_back: bool,
     udp_read_timeout: u32,
+    camera_index: i32,
+    con_fail_limit: u32,
     unity_options: UnityOptions,
 }
 
@@ -67,6 +69,7 @@ pub struct ManagerData {
     print_send_back: bool,
     udp_read_timeout: u32,
     failures: u32,
+    con_fail_limit: u32,
     first_run: bool,       // First ManagerData specific option, above is just Config
     call_time: SystemTime, // Used to persist so we can track time between set_color calls
     data_file_buf: Option<BufWriter<File>>, // On the first run that requires writing to disk, this will be initialized.
@@ -172,13 +175,17 @@ fn main() {
     let record_data_file = config_holder.record_data_file.clone();
     let record_esp_data_file = config_holder.record_esp_data_file.clone();
     let udp_read_timeout = config_holder.udp_read_timeout;
+    let con_fail_limit = config_holder.con_fail_limit;
 
     let print_send_back = config_holder.print_send_back;
 
-    let unity_options = config_holder.unity_options;
+    let unity_options = config_holder.unity_options.clone();
 
     // Validate config and inform user of settings
 
+    if num_led > 255 {
+        panic!("You currently cannot use over 255 LEDs do to how the driver delivers packets. This will be changed soon.")
+    }
     if communication_mode == 2 {
         if Path::new(&serial_port_path).exists() {
             info!("Using serial for communication on {}!", serial_port_path);
@@ -233,6 +240,7 @@ fn main() {
         unity_controls_recording,
         record_esp_data_file: record_esp_data_file.clone(),
         failures: 0,
+        con_fail_limit,
         print_send_back,
         udp_read_timeout,
         first_run: true,
@@ -246,6 +254,7 @@ fn main() {
 
     ctrlc::set_handler(move || {
         manager.keepalive = false;
+        process::exit(0);
     })
     .expect("Error setting Ctrl-C handler");
 
@@ -253,15 +262,11 @@ fn main() {
         info!("Performing speedtest...");
 
         speedtest::speedtest(&mut manager, num_led, 750);
-    }
-
-    if let Some(Command::Calibrate(ref _calibrate_options)) = opts.command {
+    } else if let Some(Command::Calibrate(ref _calibrate_options)) = opts.command {
         info!("Performing calibrating");
 
-        scan::scan().expect("failure");
-    }
-
-    if let Some(Command::ReadVled(ref readvled_options)) = opts.command {
+        scan::scan(config_holder, &mut manager).expect("failure");
+    } else if let Some(Command::ReadVled(ref readvled_options)) = opts.command {
         if !readvled_options.vled_file.is_file() {
             error!("You must pass a valid vled file with --vled-file!");
             process::exit(0);
@@ -281,9 +286,7 @@ fn main() {
                 }
             };
         }
-    }
-
-    if let Some(Command::Unity(ref _unity_options)) = opts.command {
+    } else if let Some(Command::Unity(ref _unity_options)) = opts.command {
         // Validate Unity section of config, if we are using Unity.
 
         if unity_options.unity_serial_ports.len() < unity_options.num_container.into()
@@ -341,6 +344,7 @@ fn main() {
                 unity_controls_recording,
                 record_esp_data_file: record_esp_data_file.clone(),
                 failures: 0,
+                con_fail_limit,
                 print_send_back,
                 udp_read_timeout,
                 first_run: true,
@@ -378,6 +382,8 @@ fn main() {
                 }
             };
         }
+    } else {
+        error!("No valid command was passed.");
     }
 
     // led_manager::set_color(&mut manager, 1, 255, 255, 255);
