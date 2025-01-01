@@ -382,6 +382,8 @@ fn main() {
                 }
             };
         }
+    } else {
+        error!("No valid command was passed.");
     }
 
     // led_manager::set_color(&mut manager, 1, 255, 255, 255);
