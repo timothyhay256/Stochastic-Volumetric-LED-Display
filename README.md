@@ -33,6 +33,6 @@ If you want to help contribute, please note that the current plan is to rewrite 
 | speedtest.rs  | Complete |
 | read_vled.rs | Rewritten, not fully tested |
 | scan.rs | In progress |
-| unity_get_event.rs | In progress (unity.rs) |
-| unity_manager.rs | Not started |
-| unity_send_pos.rs | In progress (unity.rs) |
+| unity_get_event.rs | Rewritten, not fully tested |
+| unity_manager.rs | Rewritten, not fully tested |
+| unity_send_pos.rs | Rewritten, not fully tested |
