@@ -14,6 +14,9 @@ use std::{
     time::SystemTime,
 };
 
+#[cfg(feature = "gui")]
+pub mod gui;
+
 pub mod led_manager;
 pub mod read_vled;
 pub mod scan;
@@ -112,6 +115,9 @@ enum Command {
 
     #[options(help = "connect to Unity")]
     Unity(UnityCommandOptions),
+    #[cfg(feature = "gui")]
+    #[options(help = "launch the GUI")]
+    Gui(GuiOptions),
 }
 
 #[derive(Debug, Options)]
@@ -128,6 +134,9 @@ struct CalibrateOptions {}
 
 #[derive(Debug, Options)]
 struct UnityCommandOptions {}
+#[cfg(feature = "gui")]
+#[derive(Debug, Options)]
+struct GuiOptions {}
 
 fn main() {
     let opts = MyOptions::parse_args_default_or_exit();
@@ -384,6 +393,11 @@ fn main() {
         }
     } else {
         error!("No valid command was passed.");
+    }
+
+    #[cfg(feature = "gui")]
+    if let Some(Command::Gui(ref _gui_options)) = opts.command {
+        gui::main();
     }
 
     // led_manager::set_color(&mut manager, 1, 255, 255, 255);
