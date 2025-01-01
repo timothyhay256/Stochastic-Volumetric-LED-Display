@@ -26,6 +26,8 @@ pub struct ScanData {
     y_end: i32,
     darkest: f64,
     brightest: f64,
+    invert: bool,
+    depth: bool,
 }
 type PosEntry = Vec<(String, (i32, i32), Option<(i32, i32)>)>;
 
@@ -164,67 +166,92 @@ pub fn scan_area(
     cam: &mut videoio::VideoCapture,
     led_pos: &mut PosEntry,
     scan_data: ScanData,
-    invert: bool,
 ) -> Result<(i32, i32), Box<dyn Error>> {
     let mut success = 0;
     let mut failures = 0;
-    for i in 0..=config.num_led {
-        led_manager::set_color(manager, i.try_into().unwrap(), 255, 255, 255);
-        let mut frame = Mat::default();
-        cam.read(&mut frame)?;
-        if invert {
-            flip(&frame.clone(), &mut frame, 1).unwrap();
-        }
-        let mut frame = Mat::roi(
-            &frame,
-            opencv::core::Rect {
-                x: scan_data.x_start,
-                y: scan_data.y_start,
-                width: scan_data.x_end - scan_data.x_start,
-                height: scan_data.y_end - scan_data.y_start,
-            },
-        )?
-        .try_clone()?;
-        let (_, max_val, pos) = get_brightest_pos(frame.try_clone()?);
+    for i in 0..config.num_led {
+        if led_pos[i as usize].0 != "SUCCESS-XY" && led_pos[i as usize].0 != "SUCCESSS-Z" {
+            led_manager::set_color(manager, i.try_into().unwrap(), 255, 255, 255);
+            let mut frame = Mat::default();
+            cam.read(&mut frame)?;
+            if scan_data.invert {
+                flip(&frame.clone(), &mut frame, 1).unwrap();
+            }
+            let mut frame = Mat::roi(
+                &frame,
+                opencv::core::Rect {
+                    x: scan_data.x_start,
+                    y: scan_data.y_start,
+                    width: scan_data.x_end - scan_data.x_start,
+                    height: scan_data.y_end - scan_data.y_start,
+                },
+            )?
+            .try_clone()?;
+            let (_, max_val, pos) = get_brightest_pos(frame.try_clone()?);
 
-        if max_val >= scan_data.darkest + ((scan_data.brightest - scan_data.darkest) * 0.5) {
-            debug!("Succesful xy calibration: {:?}", pos);
-            success += 1;
-            imgproc::circle(
-                &mut frame,
-                pos,
-                20,
-                Scalar::new(0.0, 255.0, 0.0, 255.0),
-                2,
-                LINE_8,
-                0,
-            )?;
-            led_pos.push(("SUCCESS-XY".to_string(), (pos.x, pos.y), None));
-        } else {
-            debug!("Failed xy calibration: {:?}", pos);
-            failures += 1;
-            imgproc::circle(
-                &mut frame,
-                pos,
-                20,
-                Scalar::new(0.0, 0.0, 255.0, 255.0),
-                2,
-                LINE_8,
-                0,
-            )?;
-            led_pos.push(("RECALIBRATE-XY".to_string(), (pos.x, pos.y), None));
+            if max_val >= scan_data.darkest + ((scan_data.brightest - scan_data.darkest) * 0.5) {
+                debug!("Succesful xy calibration: {:?}", pos);
+                success += 1;
+                imgproc::circle(
+                    &mut frame,
+                    pos,
+                    20,
+                    Scalar::new(0.0, 255.0, 0.0, 255.0),
+                    2,
+                    LINE_8,
+                    0,
+                )?;
+                if scan_data.depth {
+                    led_pos[i as usize] = (
+                        "SUCCESS-Z".to_string(),
+                        led_pos[i as usize].1,
+                        Some((pos.x, pos.y)),
+                    );
+                } else {
+                    led_pos[i as usize] = (
+                        "SUCCESS-XY".to_string(),
+                        (pos.x, pos.y),
+                        led_pos[i as usize].2,
+                    );
+                }
+            } else {
+                debug!("Failed xy calibration: {:?}", pos);
+                failures += 1;
+                imgproc::circle(
+                    &mut frame,
+                    pos,
+                    20,
+                    Scalar::new(0.0, 0.0, 255.0, 255.0),
+                    2,
+                    LINE_8,
+                    0,
+                )?;
+                if scan_data.depth {
+                    led_pos[i as usize] = (
+                        "RECALIBRATE-Z".to_string(),
+                        led_pos[i as usize].1,
+                        Some((pos.x, pos.y)),
+                    );
+                } else {
+                    led_pos[i as usize] = (
+                        "RECALIBRATE-XY".to_string(),
+                        (pos.x, pos.y),
+                        led_pos[i as usize].2,
+                    );
+                }
+            }
+            highgui::set_window_title(window, &("LED index: ".to_owned() + &i.to_string()))?;
+            highgui::wait_key(10)?;
+            highgui::imshow(window, &frame)?;
+            led_manager::set_color(manager, i.try_into().unwrap(), 0, 0, 0);
         }
-        highgui::set_window_title(window, &("LED index: ".to_owned() + &i.to_string()))?;
-        highgui::wait_key(10)?;
-        highgui::imshow(window, &frame)?;
-        led_manager::set_color(manager, i.try_into().unwrap(), 0, 0, 0);
     }
     Ok((success, failures))
 }
 
 pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
-    let mut led_pos: PosEntry = Vec::new(); // Make Z coords an Option so on first run we can set it to None since we won't have them yet.
-                                            // We also can't use a point since Serde cannot serialize it.
+    let mut led_pos: PosEntry =
+        vec![("UNCALIBRATED".to_string(), (0, 0), Some((0, 0))); config.num_led as usize];
     info!("Clearing strip");
     // for i in 1..=manager.num_led {
     //     led_manager::set_color(manager, i.try_into().unwrap(), 0, 0, 0);
@@ -284,16 +311,18 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
     )?;
     let (_, darkest, _) = get_brightest_pos(frame.try_clone()?);
 
-    let data = ScanData {
+    let mut data = ScanData {
         x_start,
         y_start,
         x_end,
         y_end,
         darkest,
         brightest,
+        invert: false,
+        depth: false,
     };
 
-    // Scan XY
+    info!("Scan XY");
     let (success, failures) = match scan_area(
         manager,
         &config,
@@ -301,7 +330,6 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
         &mut cam,
         &mut led_pos,
         data.clone(),
-        false,
     ) {
         Ok((success, failures)) => (success, failures),
         Err(e) => {
@@ -313,15 +341,86 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
 
     if failures > 0 {
         // Rescan XY from the back if there are failures
+        data.invert = true;
+        info!("Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.");
+        highgui::set_window_title(window, "Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.")?;
         match wait(data.clone(), &mut cam, window) {
             Ok(_) => {}
             Err(e) => {
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
             }
         }
+        let (_, _) = match scan_area(
+            manager,
+            &config,
+            window,
+            &mut cam,
+            &mut led_pos,
+            data.clone(),
+        ) {
+            Ok((success, failures)) => (success, failures),
+            Err(e) => {
+                panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
+            }
+        };
+        info!("Please rotate the container 270 degrees to calibrate Z. Press any key to continue."); // The LEDS will be 180 degrees away from the original position, and they need to be rotated 270 degrees in this case to go to the appropriate Z calibration position.
+        highgui::set_window_title(
+            window,
+            "Please rotate the container 270 degrees to calibrate Z. Press any key to continue.",
+        )?;
+    }
+
+    if failures == 0 {
+        info!("Please rotate the container 90 degrees to calibrate Z. Press any key to continue.");
+        highgui::set_window_title(
+            window,
+            "Please rotate the container 90 degrees to calibrate Z. Press any key to continue.",
+        )?;
+    }
+    match wait(data.clone(), &mut cam, window) {
+        Ok(_) => {}
+        Err(e) => {
+            panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
+        }
+    }
+    info!("Scan Z");
+
+    data.invert = false;
+    data.depth = true;
+    let (success, failures) = match scan_area(
+        manager,
+        &config,
+        window,
+        &mut cam,
+        &mut led_pos,
+        data.clone(),
+    ) {
+        Ok((success, failures)) => (success, failures),
+        Err(e) => {
+            panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
+        }
+    };
+
+    info!("{success} succesful calibrations, {failures} failed calibrations");
+
+    if failures < 0 {
+        data.invert = true;
         info!("Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.");
         highgui::set_window_title(window, "Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.")?;
-        let (_, _) = match scan_area(manager, &config, window, &mut cam, &mut led_pos, data, true) {
+        match wait(data.clone(), &mut cam, window) {
+            Ok(_) => {}
+            Err(e) => {
+                panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
+            }
+        }
+        let (_, _) = match scan_area(
+            manager,
+            &config,
+            window,
+            &mut cam,
+            &mut led_pos,
+            data.clone(),
+        ) {
             Ok((success, failures)) => (success, failures),
             Err(e) => {
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
