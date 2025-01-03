@@ -2,15 +2,14 @@ use gumdrop::Options;
 use log::{debug, error, info, warn}; // TODO: Depreceate unity export byte data
 use serde::Deserialize;
 use serialport::SerialPort;
-use std::error::Error;
-use std::fs::{remove_file, File};
-use std::process;
-use std::thread;
 use std::{
     env,
+    error::Error,
+    fs::{remove_file, File},
     io::{BufWriter, Read, Write},
     net::{Ipv4Addr, UdpSocket},
     path::{Path, PathBuf},
+    process, thread,
     time::SystemTime,
 };
 
