@@ -1,4 +1,5 @@
 use chrono::Local;
+use inquire;
 use log::{debug, error, info, warn};
 use opencv::{
     core::{self, flip, min_max_loc, no_array, Point, Scalar},
@@ -9,12 +10,8 @@ use opencv::{
     videoio, Result,
 };
 use std::{
-    error::Error,
-    fs::File,
-    io::Write,
-    path::Path,
-    sync::{Arc, Mutex},
-};
+    error::Error, fs::File, io::Write, path::Path, sync::{Arc, Mutex}, process
+}; // This will be used for more things in the future, so it's not bloat
 
 use crate::led_manager;
 use crate::Config;
@@ -359,7 +356,7 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
             }
         }
-        let (failures, success) = match scan_area(
+        let (success, failures) = match scan_area(
             manager,
             &config,
             window,
@@ -372,11 +369,6 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
             }
         };
-        info!("Please rotate the container 270 degrees to calibrate Z. Press any key to continue."); // The LEDS will be 180 degrees away from the original position, and they need to be rotated 270 degrees in this case to go to the appropriate Z calibration position.
-        highgui::set_window_title(
-            window,
-            "Please rotate the container 270 degrees to calibrate Z. Press any key to continue.",
-        )?;
         info!("{success} succesful calibrations, {failures} failed calibrations");
         if failures > 0 {
             info!("Entering manual calibration mode!");
@@ -394,6 +386,11 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
                 }
             }
         }
+        info!("Please rotate the container 270 degrees to calibrate Z. Press any key to continue."); // The LEDS will be 180 degrees away from the original position, and they need to be rotated 270 degrees in this case to go to the appropriate Z calibration position.
+        highgui::set_window_title(
+            window,
+            "Please rotate the container 270 degrees to calibrate Z. Press any key to continue.",
+        )?;
     }
 
     if failures == 0 {
@@ -429,7 +426,7 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
 
     info!("{success} succesful calibrations, {failures} failed calibrations");
 
-    if failures < 0 {
+    if failures > 0 {
         data.invert = true;
         info!("Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.");
         highgui::set_window_title(window, "Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.")?;
@@ -439,7 +436,7 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
             }
         }
-        let (failures, success) = match scan_area(
+        let (success, failures) = match scan_area(
             manager,
             &config,
             window,
@@ -470,7 +467,46 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
             }
         }
     }
+    highgui::destroy_all_windows().unwrap();
+    loop {
+        let date = Local::now();
+        let name = inquire::Text::new(&format!(
+            "File name:({}-ledpos.json)",
+            date.format("%Y-%m-%d-%H:%M:%S")
+        ))
+        .prompt();
 
+        match name {
+            Ok(mut name) => {
+                if name.is_empty(){
+                    name = format!("{}-ledpos.json", date.format("%Y-%m-%d-%H:%M:%S"));
+                }
+                let json = serde_json::to_string_pretty(&led_pos).expect("Unable to serialize metadata!");
+                let mut file = match File::create(Path::new(&name)) {
+                    Ok(file) => file,
+                    Err(e) => {
+                        error!(
+                            "Unable to write temp-pos to {name}"
+                        );
+                        println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}", failed_calibration(led_pos.clone()), e);
+                        process::exit(1);
+                    }
+                };
+                
+                match file.write_all(json.as_bytes()) {
+                    Ok(_) => {},
+                    Err(e) => {
+                        error!(
+                            "Unable to write temp-pos to {name}"
+                        );
+                        println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}", failed_calibration(led_pos.clone()), e);
+                    }
+                }
+                break;
+            }
+            Err(_) => println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}.", failed_calibration(led_pos.clone())),
+        };
+    }
     Ok(())
 }
 
@@ -538,11 +574,37 @@ pub fn manual_calibrate(
     Left Click: Select the illuminated LED.
     Q: Exit calibration and move on.
     
-    Any LEDs that are thought to need recalibration will be circled red, and the LEDs that are thought to be accurate will be green.");
-    highgui::set_window_title(window, "R for next, E for previous, Q to finish").unwrap();
+    Any LEDs that are thought to need recalibration will be circled red, and the LEDs that are thought to be accurate will be blue.");
+
+    let x_click = Arc::new(Mutex::new(0));
+    let y_click = Arc::new(Mutex::new(0));
+    let callback_called = Arc::new(Mutex::new(false));
+
+    let x_click_guard = Arc::clone(&x_click);
+    let y_click_guard = Arc::clone(&y_click);
+    let callback_called_guard = Arc::clone(&callback_called);
+
+    highgui::set_mouse_callback(
+        window,
+        Some(Box::new(move |event, x, y, _flag| {
+            if event == EVENT_LBUTTONDOWN {
+                *callback_called_guard.lock().unwrap() = true;
+                *x_click_guard.lock().unwrap() = x;
+                *y_click_guard.lock().unwrap() = y;
+            }
+        })),
+    )?;
 
     let mut led_index: usize = 0;
     'video: loop {
+        highgui::set_window_title(
+            window,
+            &format!(
+                "R for next, E for previous, Q to finish. On LED {}",
+                led_index,
+            ),
+        )
+        .unwrap();
         led_manager::set_color(manager, led_index as u8, 255, 255, 255);
         let mut frame = Mat::default();
         cam.read(&mut frame)?;
@@ -559,72 +621,76 @@ pub fn manual_calibrate(
         .unwrap()
         .try_clone()?;
 
-        if led_pos[led_index].0.contains("RECALIBRATE") {
-            let pos: Point = if scan_data.depth {
-                match led_pos[led_index].2 {
+        let mut color = Scalar::new(0.0, 0.0, 255.0, 255.0);
+        if !led_pos[led_index].0.contains("RECALIBRATE") {
+            color = Scalar::new(0.0, 255.0, 0.0, 255.0);
+        }
+        let pos;
+        if scan_data.depth {
+            if !*callback_called.lock().unwrap() {
+                pos = match led_pos[led_index].2 {
                     Some(pos) => Point::new(pos.0, pos.1),
                     None => {
                         error!("led_pos does not contain any depth data, setting to 0, 0!");
                         Point::new(0, 0)
                     }
-                }
+                };
             } else {
-                Point::new(led_pos[led_index].1 .0, led_pos[led_index].1 .1)
-            };
-            imgproc::circle(
-                &mut frame,
-                pos,
-                20,
-                Scalar::new(0.0, 0.0, 255.0, 255.0),
-                2,
-                LINE_8,
-                0,
-            )?;
+                led_pos[led_index].0 = "MANUAL-Z".to_string();
+                led_pos[led_index].2 = Some((*x_click.lock().unwrap(), *y_click.lock().unwrap()));
+                pos = Point::new(*x_click.lock().unwrap(), *y_click.lock().unwrap());
+                color = Scalar::new(0.0, 255.0, 0.0, 255.0);
+                *callback_called.lock().unwrap() = false;
+            }
+        } else if !*callback_called.lock().unwrap() {
+            pos = Point::new(led_pos[led_index].1 .0, led_pos[led_index].1 .1)
+        } else {
+            led_pos[led_index].0 = "MANUAL-XY".to_string();
+            led_pos[led_index].1 = (*x_click.lock().unwrap(), *y_click.lock().unwrap());
+            pos = Point::new(*x_click.lock().unwrap(), *y_click.lock().unwrap());
+            color = Scalar::new(0.0, 255.0, 0.0, 255.0);
+            *callback_called.lock().unwrap() = false;
         }
+        imgproc::circle(&mut frame, pos, 20, color, 2, LINE_8, 0)?;
 
         if frame.size()?.width > 0 {
             highgui::imshow(window, &frame)?;
         }
-        /*
-        R: 114
-        E: 101
-        F: 102
-        D: 100
-        Q: 113 */
 
-        let mut key = 0;
-        while key != 114 || key != 101 || key != 102 {
-            key = highgui::wait_key(0)?;
+        loop {
+            if *callback_called.lock().unwrap() {
+                debug!("Breaking key loop on detected callback!");
+                break;
+            }
+            let key = highgui::wait_key(10)?;
             if key == 114 {
                 debug!("got R");
-                // R
                 if led_index + 1 < config.num_led.try_into().unwrap() {
                     led_index += 1;
                 } else {
                     warn!("At end of LEDs!");
                 }
+                break;
             } else if key == 101 {
                 debug!("got E");
-                // E
                 if led_index - 1 > 0 {
                     led_index -= 1;
                 } else {
                     warn!("At first LED!");
                 }
+                break;
             } else if key == 102 {
                 debug!("got F");
-                // F
                 let led_begin = led_index; // Needed because of clippy::mut_range_bound
-                for _ in led_begin..=config.num_led.try_into().unwrap() {
+                for _ in led_begin..config.num_led.try_into().unwrap() {
                     led_index += 1;
                     if led_pos[led_index].0.contains("RECALIBRATE") {
                         break;
                     }
                 }
-            } else if key == 100 {
+                break;
+            } else if key == 113 {
                 break 'video;
-            } else {
-                warn!("Invalid key command. Received: {}", key);
             }
         }
     }
