@@ -133,7 +133,7 @@ pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
                     .expect("set_read_timeout call failed");
 
                 let bytes: [u8; 4] = [n, r, g, b];
-                debug!("Sending {:?}", bytes);
+                // debug!("Sending {:?}", bytes);
                 match udp_socket.send_to(&bytes, format!("{}:{}", manager.host, manager.port)) {
                     Ok(_) => {}
                     Err(e) => {
