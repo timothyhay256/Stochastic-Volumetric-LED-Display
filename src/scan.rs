@@ -1,5 +1,5 @@
 use chrono::Local;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use opencv::core::{self, flip, no_array, Scalar};
 use opencv::core::{min_max_loc, Point};
 use opencv::imgproc::COLOR_BGR2GRAY;
@@ -119,8 +119,8 @@ pub fn crop(config: &Config) -> Result<(i32, i32, i32, i32), Box<dyn Error>> {
         }
         let key = highgui::wait_key(10)?;
         if key > 0 && key != 255 {
-            highgui::destroy_all_windows().unwrap();
             if x_start_guard != 0 && x_end_guard != 0 {
+                highgui::destroy_all_windows().unwrap();
                 break (x_start_guard, y_start_guard, x_end_guard, y_end_guard);
             } else {
                 error!("Please select a valid are for the crop");
@@ -170,13 +170,17 @@ pub fn scan_area(
     let mut success = 0;
     let mut failures = 0;
     for i in 0..config.num_led {
-        if led_pos[i as usize].0 != "SUCCESS-XY" && led_pos[i as usize].0 != "SUCCESSS-Z" {
+        let valid_cycle = if scan_data.depth {
+            led_pos[i as usize].0 != "SUCCESS-Z"
+        } else {
+            !led_pos[i as usize].0.contains("SUCCESS")
+        };
+
+        if valid_cycle {
+            debug!("valid_cycle");
             led_manager::set_color(manager, i.try_into().unwrap(), 255, 255, 255);
             let mut frame = Mat::default();
             cam.read(&mut frame)?;
-            if scan_data.invert {
-                flip(&frame.clone(), &mut frame, 1).unwrap();
-            }
             let mut frame = Mat::roi(
                 &frame,
                 opencv::core::Rect {
@@ -187,6 +191,9 @@ pub fn scan_area(
                 },
             )?
             .try_clone()?;
+            if scan_data.invert {
+                flip(&frame.clone(), &mut frame, 1).unwrap();
+            }
             let (_, max_val, pos) = get_brightest_pos(frame.try_clone()?);
 
             if max_val >= scan_data.darkest + ((scan_data.brightest - scan_data.darkest) * 0.5) {
@@ -350,7 +357,7 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
             }
         }
-        let (_, _) = match scan_area(
+        let (failures, success) = match scan_area(
             manager,
             &config,
             window,
@@ -368,6 +375,23 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
             window,
             "Please rotate the container 270 degrees to calibrate Z. Press any key to continue.",
         )?;
+        info!("{success} succesful calibrations, {failures} failed calibrations");
+        if failures > 0 {
+            info!("Entering manual calibration mode!");
+            match manual_calibrate(
+                manager,
+                &config,
+                window,
+                &mut cam,
+                &mut led_pos,
+                data.clone(),
+            ) {
+                Ok(_) => {}
+                Err(e) => {
+                    panic!("Something went wrong during manual calibration: {}", e);
+                }
+            }
+        }
     }
 
     if failures == 0 {
@@ -413,7 +437,7 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
             }
         }
-        let (_, _) = match scan_area(
+        let (failures, success) = match scan_area(
             manager,
             &config,
             window,
@@ -426,6 +450,23 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
             }
         };
+        info!("{success} succesful calibrations, {failures} failed calibrations");
+        if failures > 0 {
+            info!("Entering manual calibration mode!");
+            match manual_calibrate(
+                manager,
+                &config,
+                window,
+                &mut cam,
+                &mut led_pos,
+                data.clone(),
+            ) {
+                Ok(_) => {}
+                Err(e) => {
+                    panic!("Something went wrong during manual calibration: {}", e);
+                }
+            }
+        }
     }
 
     Ok(())
@@ -474,6 +515,115 @@ pub fn wait(
         let key = highgui::wait_key(10)?;
         if key > 0 && key != 255 {
             break;
+        }
+    }
+    Ok(())
+}
+
+pub fn manual_calibrate(
+    manager: &mut ManagerData,
+    config: &Config,
+    window: &str,
+    cam: &mut videoio::VideoCapture,
+    led_pos: &mut PosEntry,
+    scan_data: ScanData,
+) -> Result<()> {
+    info!("You are entering manual calibration mode. \n
+    This is to manually calibrate all LEDs that failed to properly calibrate, and to make sure all LEDs did calibrate properly. The controls are:\n
+    R: Move to the next LED
+    E: Move to the previous LED
+    F: Move to the next uncalibrated LED
+    Left Click: Select the illuminated LED.
+    Q: Exit calibration and move on.
+    
+    Any LEDs that are thought to need recalibration will be circled red, and the LEDs that are thought to be accurate will be green.");
+    highgui::set_window_title(window, "R for next, E for previous, Q to finish").unwrap();
+
+    let mut led_index: usize = 0;
+    'video: loop {
+        led_manager::set_color(manager, led_index as u8, 255, 255, 255);
+        let mut frame = Mat::default();
+        cam.read(&mut frame)?;
+
+        let mut frame = Mat::roi(
+            &frame,
+            opencv::core::Rect {
+                x: scan_data.x_start,
+                y: scan_data.y_start,
+                width: scan_data.x_end - scan_data.x_start,
+                height: scan_data.y_end - scan_data.y_start,
+            },
+        )
+        .unwrap()
+        .try_clone()?;
+
+        if led_pos[led_index].0.contains("RECALIBRATE") {
+            let pos: Point = if scan_data.depth {
+                match led_pos[led_index].2 {
+                    Some(pos) => Point::new(pos.0, pos.1),
+                    None => {
+                        error!("led_pos does not contain any depth data, setting to 0, 0!");
+                        Point::new(0, 0)
+                    }
+                }
+            } else {
+                Point::new(led_pos[led_index].1 .0, led_pos[led_index].1 .1)
+            };
+            imgproc::circle(
+                &mut frame,
+                pos,
+                20,
+                Scalar::new(0.0, 0.0, 255.0, 255.0),
+                2,
+                LINE_8,
+                0,
+            )?;
+        }
+
+        if frame.size()?.width > 0 {
+            highgui::imshow(window, &frame)?;
+        }
+        /*
+        R: 114
+        E: 101
+        F: 102
+        D: 100
+        Q: 113 */
+
+        let mut key = 0;
+        while key != 114 || key != 101 || key != 102 {
+            key = highgui::wait_key(0)?;
+            if key == 114 {
+                debug!("got R");
+                // R
+                if led_index + 1 < config.num_led.try_into().unwrap() {
+                    led_index += 1;
+                } else {
+                    warn!("At end of LEDs!");
+                }
+            } else if key == 101 {
+                debug!("got E");
+                // E
+                if led_index - 1 > 0 {
+                    led_index -= 1;
+                } else {
+                    warn!("At first LED!");
+                }
+            } else if key == 102 {
+                debug!("got F");
+                // F
+                let led_begin = led_index; // Needed because of clippy::mut_range_bound
+                for _ in led_begin..=config.num_led.try_into().unwrap() {
+                    led_index += 1;
+                    if led_pos[led_index].0.contains("RECALIBRATE") {
+                        break;
+                    }
+                }
+            } else if key == 100 {
+                break 'video;
+            } else {
+                warn!("Invalid key command. Received: {}", key);
+            }
         }
     }
     Ok(())

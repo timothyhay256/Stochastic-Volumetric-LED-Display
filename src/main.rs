@@ -54,7 +54,6 @@ pub struct UnityOptions {
     unity_position_files: Vec<PathBuf>,
     scale: f32,
 }
-
 pub struct ManagerData {
     // Used to persist data through led_manager::set_color.
     num_led: u32,
