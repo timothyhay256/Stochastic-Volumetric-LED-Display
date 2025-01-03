@@ -1,14 +1,14 @@
-use log::error;
-use log::info;
-use log::warn;
-use std::error::Error;
-use std::ffi::OsStr;
-use std::fs::File;
-use std::io::{self, BufRead};
-use std::path::Path;
-use std::path::PathBuf;
-use std::time::Instant;
-use std::{thread, time};
+use log::{error, info, warn};
+use {
+    std::error::Error,
+    std::ffi::OsStr,
+    std::fs::File,
+    std::io::{self, BufRead},
+    std::path::{Path, PathBuf},
+    std::thread,
+    std::time,
+    time::Instant,
+};
 
 use crate::led_manager;
 use crate::ManagerData;

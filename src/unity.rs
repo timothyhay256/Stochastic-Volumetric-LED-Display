@@ -1,13 +1,13 @@
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use log::error;
-use std::error::Error;
-use std::fs::File;
-use std::io::prelude::*;
-use std::net::Ipv4Addr;
-use std::net::TcpStream;
-use std::net::UdpSocket;
-use std::str;
-use std::time::Duration;
+use std::{
+    error::Error,
+    fs::File,
+    io::prelude::*,
+    net::{Ipv4Addr, TcpStream, UdpSocket},
+    str,
+    time::Duration,
+};
 
 use crate::led_manager;
 use crate::ManagerData;

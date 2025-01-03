@@ -1,13 +1,14 @@
-use crate::ManagerData;
-
 use log::{debug, error, info, warn};
-use std::io::BufWriter;
-use std::io::ErrorKind::WouldBlock;
-use std::io::Write;
-use std::net::UdpSocket;
-use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime};
-use std::{env, process};
+use std::{
+    env,
+    io::{BufWriter, ErrorKind::WouldBlock, Write},
+    net::UdpSocket,
+    path::{Path, PathBuf},
+    process,
+    time::{Duration, SystemTime},
+};
+
+use crate::ManagerData;
 
 pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
     // &mut should mean changes will persist, so no need to return ManagerData

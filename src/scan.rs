@@ -1,18 +1,20 @@
 use chrono::Local;
 use log::{debug, error, info, warn};
-use opencv::core::{self, flip, no_array, Scalar};
-use opencv::core::{min_max_loc, Point};
-use opencv::imgproc::COLOR_BGR2GRAY;
-use opencv::imgproc::{self, LINE_8};
 use opencv::{
-    highgui, highgui::EVENT_LBUTTONDOWN, highgui::EVENT_LBUTTONUP, highgui::EVENT_MOUSEMOVE,
-    prelude::*, videoio, Result,
+    core::{self, flip, min_max_loc, no_array, Point, Scalar},
+    highgui,
+    highgui::{EVENT_LBUTTONDOWN, EVENT_LBUTTONUP, EVENT_MOUSEMOVE},
+    imgproc::{self, COLOR_BGR2GRAY, LINE_8},
+    prelude::*,
+    videoio, Result,
 };
-use std::error::Error;
-use std::fs::File;
-use std::io::Write;
-use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::{
+    error::Error,
+    fs::File,
+    io::Write,
+    path::Path,
+    sync::{Arc, Mutex},
+};
 
 use crate::led_manager;
 use crate::Config;
