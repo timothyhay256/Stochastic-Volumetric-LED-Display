@@ -10,7 +10,7 @@ use opencv::{
     videoio, Result,
 };
 use std::{
-    error::Error, fs::File, io::Write, path::Path, sync::{Arc, Mutex}, process
+    cmp::{min, max}, error::Error, fs::File, io::Write, path::Path, process, sync::{Arc, Mutex}
 }; // This will be used for more things in the future, so it's not bloat
 
 use crate::led_manager;
@@ -468,6 +468,7 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
         }
     }
     highgui::destroy_all_windows().unwrap();
+    post_process(&mut led_pos, manager.num_led);
     loop {
         let date = Local::now();
         let name = inquire::Text::new(&format!(
@@ -695,4 +696,50 @@ pub fn manual_calibrate(
         }
     }
     Ok(())
+}
+
+pub fn post_process(led_pos: &mut PosEntry, led_count: u32) {
+    let mut y_max = i32::MIN;
+    let mut z_max = i32::MIN;
+
+    let mut x_min = i32::MAX;
+    let mut y_min = i32::MAX;
+    let mut z_min = i32::MAX;
+    
+    for i in 0..led_count { // Get max and min values in led_pos
+        x_min = min(led_pos[i as usize].1.0, x_min);
+
+        y_max = max(led_pos[i as usize].1.1, y_max);
+        y_min = min(led_pos[i as usize].1.1, y_min);
+
+        z_min = min(led_pos[i as usize].2.unwrap().0, z_min);
+        z_max = max(led_pos[i as usize].2.unwrap().0, z_max);
+    }
+
+    for i in 0..led_count { // Normalize values
+        led_pos[i as usize].1.0 -= x_min;
+        led_pos[i as usize].1.1 -= y_min;
+        led_pos[i as usize].2.unwrap().0 = led_pos[i as usize].2.unwrap().0 - z_min;
+    }
+
+    for i in 0..led_count {
+        let y_mid = y_max / 2;
+        let current_y = led_pos[i as usize].1.1;
+
+        let z_mid = y_max / 2;
+        let current_z = led_pos[i as usize].2.unwrap().0;
+
+        led_pos[i as usize].1.1 = match current_y {
+            y if y > y_mid => y_mid - (y - y_mid),
+            y if y < y_mid => y_mid + (y_mid - y),
+            _ => led_pos[i as usize].1.1, // when current_y == y_mid, no change
+        };
+        
+
+        if current_z > z_mid {
+            led_pos[i as usize].2.unwrap().0 = z_mid - (current_z - z_mid);
+        } else if current_y < y_mid {
+            led_pos[i as usize].2.unwrap().0 = z_mid + (z_mid - current_z);
+        }
+    }
 }
