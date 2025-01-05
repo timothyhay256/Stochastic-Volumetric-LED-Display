@@ -10,14 +10,14 @@ use opencv::{
     videoio, Result,
 };
 use std::{
-    cmp::{min, max}, error::Error, fs::File, io::Write, path::Path, process, sync::{Arc, Mutex}
+    cmp::{max, min}, error::Error, fs::File, io::Write, path::Path, process, sync::{Arc, Mutex}, thread, time::Duration
 }; // This will be used for more things in the future, so it's not bloat
 
 use crate::led_manager;
 use crate::Config;
 use crate::ManagerData;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ScanData {
     x_start: i32,
     y_start: i32,
@@ -162,7 +162,7 @@ pub fn scan_area(
     manager: &mut ManagerData,
     config: &Config,
     window: &str,
-    cam: &mut videoio::VideoCapture,
+    cam: &Arc<Mutex<videoio::VideoCapture>>,
     led_pos: &mut PosEntry,
     scan_data: ScanData,
 ) -> Result<(i32, i32), Box<dyn Error>> {
@@ -176,10 +176,15 @@ pub fn scan_area(
         };
 
         if valid_cycle {
-            debug!("valid_cycle");
+            debug!("valid_cycle: {}", i);
             led_manager::set_color(manager, i.try_into().unwrap(), 255, 255, 255);
             let mut frame = Mat::default();
-            cam.read(&mut frame)?;
+            {
+                let mut cam = cam.lock().unwrap();
+                for _ in 0..3 { // This is still needed unfortunately. It may need to be increased if you continue to encounter issues
+                    cam.read(&mut frame)?;
+                }
+            }
             let mut frame = Mat::roi(
                 &frame,
                 opencv::core::Rect {
@@ -196,7 +201,7 @@ pub fn scan_area(
             let (_, max_val, pos) = get_brightest_pos(frame.try_clone()?);
 
             if max_val >= scan_data.darkest + ((scan_data.brightest - scan_data.darkest) * 0.5) {
-                debug!("Succesful xy calibration: {:?}", pos);
+                debug!("Succesful xy calibration: {:?} on index: {}", pos, i);
                 success += 1;
                 imgproc::circle(
                     &mut frame,
@@ -221,7 +226,7 @@ pub fn scan_area(
                     );
                 }
             } else {
-                debug!("Failed xy calibration: {:?}", pos);
+                debug!("Failed xy calibration: {:?} on index: {}", pos, i);
                 failures += 1;
                 imgproc::circle(
                     &mut frame,
@@ -247,8 +252,8 @@ pub fn scan_area(
                 }
             }
             highgui::set_window_title(window, &("LED index: ".to_owned() + &i.to_string()))?;
-            highgui::wait_key(10)?;
             highgui::imshow(window, &frame)?;
+            highgui::wait_key(1)?;
             led_manager::set_color(manager, i.try_into().unwrap(), 0, 0, 0);
         }
     }
@@ -259,9 +264,9 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
     let mut led_pos: PosEntry =
         vec![("UNCALIBRATED".to_string(), (0, 0), Some((0, 0))); config.num_led as usize];
     info!("Clearing strip");
-    // for i in 1..=manager.num_led {
-    //     led_manager::set_color(manager, i.try_into().unwrap(), 0, 0, 0);
-    // }
+    for i in 0..=manager.num_led {
+        led_manager::set_color(manager, i.try_into().unwrap(), 0, 0, 0);
+    }
     let (x_start, y_start, x_end, y_end) = match crop(&config) {
         Ok((x_start, y_start, x_end, y_end)) => (x_start, y_start, x_end, y_end),
         Err(e) => {
@@ -271,51 +276,73 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
 
     let window = "Please wait...";
     highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
-    let mut cam = videoio::VideoCapture::new(config.camera_index, videoio::CAP_ANY)?; // 0 is the default camera
-    let opened = videoio::VideoCapture::is_opened(&cam)?;
-    if !opened {
-        panic!(
-            "Unable to open camera {}! Please select another.",
-            config.camera_index
-        );
+
+    let cam = Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index, videoio::CAP_ANY)?)); // We need to constantly poll this in the background to get the most recent frame due to OpenCV bug(?)
+
+    let cam_guard = Arc::clone(&cam);
+    
+    thread::spawn(move || {
+        loop {
+            let mut frame = Mat::default();
+            cam_guard.lock().unwrap().read(&mut frame).unwrap();
+            let _frame = Mat::roi(
+                &frame,
+                opencv::core::Rect {
+                    x: x_start,
+                    y: y_start,
+                    width: x_end - x_start,
+                    height: y_end - y_start,
+                },
+            ).unwrap();
+            thread::sleep(Duration::from_millis(1)); // Give us a chance to grab the lock
+        }
+
+    });
+    let brightest;
+    let darkest;
+    {
+        let mut cam = cam.lock().unwrap();
+        let opened = videoio::VideoCapture::is_opened(&cam)?;
+        if !opened {
+            panic!(
+                "Unable to open camera {}! Please select another.",
+                config.camera_index
+            );
+        }
+
+        info!("Collecting brightest and darkest points, please wait...");
+        debug!("Get brightest");
+        led_manager::set_color(manager, 5, 255, 255, 255);
+
+        let mut frame = Mat::default();
+        cam.read(&mut frame)?;
+        let frame = Mat::roi(
+            &frame,
+            opencv::core::Rect {
+                x: x_start,
+                y: y_start,
+                width: x_end - x_start,
+                height: y_end - y_start,
+            },
+        )?;
+        (_, brightest, _) = get_brightest_pos(frame.try_clone()?);
+
+        debug!("get darkest");
+        led_manager::set_color(manager, 5, 0, 0, 0);
+
+        let mut frame = Mat::default();
+        cam.read(&mut frame)?;
+        let frame = Mat::roi(
+            &frame,
+            opencv::core::Rect {
+                x: x_start,
+                y: y_start,
+                width: x_end - x_start,
+                height: y_end - y_start,
+            },
+        )?;
+        (_, darkest, _) = get_brightest_pos(frame.try_clone()?);
     }
-
-    info!("Collecting brightest and darkest points, please wait...");
-    debug!("Get brightest");
-    for i in 1..=manager.num_led {
-        led_manager::set_color(manager, i.try_into().unwrap(), 255, 255, 255);
-    }
-
-    let mut frame = Mat::default();
-    cam.read(&mut frame)?;
-    let frame = Mat::roi(
-        &frame,
-        opencv::core::Rect {
-            x: x_start,
-            y: y_start,
-            width: x_end - x_start,
-            height: y_end - y_start,
-        },
-    )?;
-    let (_, brightest, _) = get_brightest_pos(frame.try_clone()?);
-
-    debug!("get darkest");
-    for i in 1..=manager.num_led {
-        led_manager::set_color(manager, i.try_into().unwrap(), 0, 0, 0);
-    }
-
-    let mut frame = Mat::default();
-    cam.read(&mut frame)?;
-    let frame = Mat::roi(
-        &frame,
-        opencv::core::Rect {
-            x: x_start,
-            y: y_start,
-            width: x_end - x_start,
-            height: y_end - y_start,
-        },
-    )?;
-    let (_, darkest, _) = get_brightest_pos(frame.try_clone()?);
 
     let mut data = ScanData {
         x_start,
@@ -327,13 +354,12 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
         invert: false,
         depth: false,
     };
-
     info!("Scan XY");
     let (success, failures) = match scan_area(
         manager,
         &config,
         window,
-        &mut cam,
+        &cam,
         &mut led_pos,
         data.clone(),
     ) {
@@ -350,7 +376,7 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
         data.invert = true;
         info!("Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.");
         highgui::set_window_title(window, "Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.")?;
-        match wait(data.clone(), &mut cam, window) {
+        match wait(data.clone(), &cam, window) {
             Ok(_) => {}
             Err(e) => {
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
@@ -360,7 +386,7 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
             manager,
             &config,
             window,
-            &mut cam,
+            &cam,
             &mut led_pos,
             data.clone(),
         ) {
@@ -376,7 +402,7 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
                 manager,
                 &config,
                 window,
-                &mut cam,
+                &cam,
                 &mut led_pos,
                 data.clone(),
             ) {
@@ -400,7 +426,7 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
             "Please rotate the container 90 degrees to calibrate Z. Press any key to continue.",
         )?;
     }
-    match wait(data.clone(), &mut cam, window) {
+    match wait(data.clone(), &cam, window) {
         Ok(_) => {}
         Err(e) => {
             panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
@@ -414,7 +440,7 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
         manager,
         &config,
         window,
-        &mut cam,
+        &cam,
         &mut led_pos,
         data.clone(),
     ) {
@@ -430,7 +456,7 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
         data.invert = true;
         info!("Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.");
         highgui::set_window_title(window, "Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.")?;
-        match wait(data.clone(), &mut cam, window) {
+        match wait(data.clone(), &cam, window) {
             Ok(_) => {}
             Err(e) => {
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
@@ -440,7 +466,7 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
             manager,
             &config,
             window,
-            &mut cam,
+            &cam,
             &mut led_pos,
             data.clone(),
         ) {
@@ -456,7 +482,7 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
                 manager,
                 &config,
                 window,
-                &mut cam,
+                &cam,
                 &mut led_pos,
                 data.clone(),
             ) {
@@ -529,12 +555,15 @@ pub fn failed_calibration(led_pos: PosEntry) -> String {
 
 pub fn wait(
     scan_data: ScanData,
-    cam: &mut videoio::VideoCapture,
+    cam: &Arc<Mutex<videoio::VideoCapture>>,
     window: &str,
 ) -> Result<(), Box<dyn Error>> {
     loop {
         let mut frame = Mat::default();
-        cam.read(&mut frame)?;
+        {
+            let mut cam = cam.lock().unwrap();
+            cam.read(&mut frame)?;
+        }
 
         let cropped_image = Mat::roi(
             &frame,
@@ -563,10 +592,11 @@ pub fn manual_calibrate(
     manager: &mut ManagerData,
     config: &Config,
     window: &str,
-    cam: &mut videoio::VideoCapture,
+    cam: &Arc<Mutex<videoio::VideoCapture>>,
     led_pos: &mut PosEntry,
     scan_data: ScanData,
 ) -> Result<()> {
+    debug!("scan_data: {:?}", scan_data);
     info!("You are entering manual calibration mode. \n
     This is to manually calibrate all LEDs that failed to properly calibrate, and to make sure all LEDs did calibrate properly. The controls are:\n
     R: Move to the next LED
@@ -598,6 +628,7 @@ pub fn manual_calibrate(
 
     let mut led_index: usize = 0;
     'video: loop {
+        debug!("led_index: {}", led_index);
         highgui::set_window_title(
             window,
             &format!(
@@ -608,7 +639,10 @@ pub fn manual_calibrate(
         .unwrap();
         led_manager::set_color(manager, led_index as u8, 255, 255, 255);
         let mut frame = Mat::default();
-        cam.read(&mut frame)?;
+        {
+            let mut cam = cam.lock().unwrap();
+            cam.read(&mut frame)?;
+        }
 
         let mut frame = Mat::roi(
             &frame,
@@ -621,6 +655,10 @@ pub fn manual_calibrate(
         )
         .unwrap()
         .try_clone()?;
+        if scan_data.invert {
+            debug!("inverting display");
+            flip(&frame.clone(), &mut frame, 1).unwrap();
+        }
 
         let mut color = Scalar::new(0.0, 0.0, 255.0, 255.0);
         if !led_pos[led_index].0.contains("RECALIBRATE") {
@@ -629,6 +667,7 @@ pub fn manual_calibrate(
         let pos;
         if scan_data.depth {
             if !*callback_called.lock().unwrap() {
+                debug!("pos is from depth, callback uncalled.");
                 pos = match led_pos[led_index].2 {
                     Some(pos) => Point::new(pos.0, pos.1),
                     None => {
@@ -637,6 +676,7 @@ pub fn manual_calibrate(
                     }
                 };
             } else {
+                debug!("pos is from callback");
                 led_pos[led_index].0 = "MANUAL-Z".to_string();
                 led_pos[led_index].2 = Some((*x_click.lock().unwrap(), *y_click.lock().unwrap()));
                 pos = Point::new(*x_click.lock().unwrap(), *y_click.lock().unwrap());
@@ -644,14 +684,17 @@ pub fn manual_calibrate(
                 *callback_called.lock().unwrap() = false;
             }
         } else if !*callback_called.lock().unwrap() {
+            debug!("pos not from depth, from led_pos[led_index].1 which is {:?}", led_pos[led_index].1);
             pos = Point::new(led_pos[led_index].1 .0, led_pos[led_index].1 .1)
         } else {
+            debug!("pos not from depth, from callback");
             led_pos[led_index].0 = "MANUAL-XY".to_string();
             led_pos[led_index].1 = (*x_click.lock().unwrap(), *y_click.lock().unwrap());
             pos = Point::new(*x_click.lock().unwrap(), *y_click.lock().unwrap());
             color = Scalar::new(0.0, 255.0, 0.0, 255.0);
             *callback_called.lock().unwrap() = false;
         }
+        debug!("setting cricle at {:?}", pos);
         imgproc::circle(&mut frame, pos, 20, color, 2, LINE_8, 0)?;
 
         if frame.size()?.width > 0 {
@@ -667,6 +710,7 @@ pub fn manual_calibrate(
             if key == 114 {
                 debug!("got R");
                 if led_index + 1 < config.num_led.try_into().unwrap() {
+                    led_manager::set_color(manager, led_index.try_into().unwrap(), 0, 0, 0);
                     led_index += 1;
                 } else {
                     warn!("At end of LEDs!");
@@ -674,6 +718,7 @@ pub fn manual_calibrate(
                 break;
             } else if key == 101 {
                 debug!("got E");
+                led_manager::set_color(manager, led_index.try_into().unwrap(), 0, 0, 0);
                 if led_index - 1 > 0 {
                     led_index -= 1;
                 } else {
@@ -682,6 +727,7 @@ pub fn manual_calibrate(
                 break;
             } else if key == 102 {
                 debug!("got F");
+                led_manager::set_color(manager, led_index.try_into().unwrap(), 0, 0, 0);
                 let led_begin = led_index; // Needed because of clippy::mut_range_bound
                 for _ in led_begin..config.num_led.try_into().unwrap() {
                     led_index += 1;
