@@ -183,7 +183,7 @@ pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
         if manager.serial_port.is_none() {
             manager.serial_port = Some(
                 match serialport::new(manager.serial_port_path.clone(), manager.baud_rate)
-                    .timeout(Duration::from_millis(10))
+                    .timeout(Duration::from_millis(manager.serial_read_timeout.into()))
                     .open()
                 {
                     Ok(port) => port,
@@ -224,7 +224,7 @@ pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
                     match serial_port.read_exact(serial_buf.as_mut_slice()) {
                         Ok(_) => {}
                         Err(e) => {
-                            panic!("Could not read from {}:{}", manager.serial_port_path, e)
+                            error!("Could not read from {}: {}", manager.serial_port_path, e)
                         }
                     }
                     failures += 1;

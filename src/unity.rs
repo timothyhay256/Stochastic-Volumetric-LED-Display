@@ -1,5 +1,5 @@
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use log::error;
+use log::{debug, error};
 use std::{
     error::Error,
     fs::File,
@@ -17,6 +17,10 @@ pub fn send_pos(unity: UnityOptions) -> std::io::Result<()> {
     type JsonEntry = Vec<(String, (f32, f32), (f32, f32))>;
     for mut i in 1..=unity.num_container {
         i -= 1; // TODO: There is def a better way
+        debug!(
+            "sending pos file {:?}",
+            unity.unity_position_files[i as usize]
+        );
         let mut pos_file = match File::open(unity.unity_position_files[i as usize].clone()) {
             Ok(file) => file,
             Err(e) => {
@@ -121,6 +125,7 @@ pub fn get_events(
             };
             let mut msg = msg.to_string();
             if msg.contains("E") {
+                println!("{msg}");
                 // Clear color of index `EN`
                 msg.remove(0);
                 let index = match msg.to_string().parse::<u8>() {
@@ -136,9 +141,9 @@ pub fn get_events(
             } else if msg.contains("|") {
                 // Set index n with r g b from string n|r|g|b
                 let mut xs: [u8; 4] = [0; 4];
-                let nrgb = msg.split("|");
+                let nrgb = msg.trim_matches(char::is_control).split("|");
                 for (i, el) in nrgb.enumerate() {
-                    xs[i] = match el.to_string().parse::<u8>() {
+                    xs[i] = match el.parse::<u8>() {
                         Ok(el) => el,
                         Err(e) => {
                             panic!(
@@ -148,7 +153,7 @@ pub fn get_events(
                         }
                     };
                 }
-                println!("NRGB: {}|{}|{}|{}", xs[0], xs[1], xs[2], xs[3]);
+                // println!("NRGB: {}|{}|{}|{}", xs[0], xs[1], xs[2], xs[3]);
                 led_manager::set_color(manager, xs[0], xs[1], xs[2], xs[3]);
             } else {
                 error!("Unity packet was malformed! Packet: {}", msg);
