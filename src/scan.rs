@@ -285,15 +285,6 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
         loop {
             let mut frame = Mat::default();
             cam_guard.lock().unwrap().read(&mut frame).unwrap();
-            let _frame = Mat::roi(
-                &frame,
-                opencv::core::Rect {
-                    x: x_start,
-                    y: y_start,
-                    width: x_end - x_start,
-                    height: y_end - y_start,
-                },
-            ).unwrap();
             thread::sleep(Duration::from_millis(1)); // Give us a chance to grab the lock
         }
 
@@ -641,7 +632,9 @@ pub fn manual_calibrate(
         let mut frame = Mat::default();
         {
             let mut cam = cam.lock().unwrap();
-            cam.read(&mut frame)?;
+            for _ in 0..3 {
+                cam.read(&mut frame)?;
+            }
         }
 
         let mut frame = Mat::roi(
