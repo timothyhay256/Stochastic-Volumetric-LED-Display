@@ -22,7 +22,7 @@ pub mod scan;
 pub mod speedtest;
 pub mod unity;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Config {
     // TODO: All of these should also be passable via commandline
     num_led: u32,
@@ -44,7 +44,7 @@ pub struct Config {
     unity_options: UnityOptions,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug)]
 pub struct UnityOptions {
     num_container: u8,
     unity_ip: Ipv4Addr,
@@ -53,6 +53,7 @@ pub struct UnityOptions {
     unity_position_files: Vec<PathBuf>,
     scale: f32,
 }
+#[derive(Debug)]
 pub struct ManagerData {
     // Used to persist data through led_manager::set_color.
     num_led: u32,
@@ -272,7 +273,7 @@ fn main() {
     } else if let Some(Command::Calibrate(ref _calibrate_options)) = opts.command {
         info!("Performing calibrating");
 
-        scan::scan(config_holder, &mut manager).expect("failure");
+        scan::scan(config_holder.clone(), &mut manager).expect("failure");
     } else if let Some(Command::ReadVled(ref readvled_options)) = opts.command {
         if !readvled_options.vled_file.is_file() {
             error!("You must pass a valid vled file with --vled-file!");
@@ -395,7 +396,7 @@ fn main() {
 
     #[cfg(feature = "gui")]
     if let Some(Command::Gui(ref _gui_options)) = opts.command {
-        gui::main();
+        gui::main(config_holder).unwrap();
     }
 
     // led_manager::set_color(&mut manager, 1, 255, 255, 255);

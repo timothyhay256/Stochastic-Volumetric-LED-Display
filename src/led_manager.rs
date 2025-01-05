@@ -11,7 +11,6 @@ use std::{
 use crate::ManagerData;
 
 pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
-    // &mut should mean changes will persist, so no need to return ManagerData
     let record_data;
     let record_esp_data;
 
@@ -137,14 +136,16 @@ pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
                 match udp_socket.send_to(&bytes, format!("{}:{}", manager.host, manager.port)) {
                     Ok(_) => {}
                     Err(e) => {
-                        panic!("Could not write bytes to UDP socket: {}", e)
+                        error!(
+                            "Could not write bytes to UDP socket: {}, trying to continue anyway",
+                            e
+                        )
                     }
                 }
                 let mut buf = [0; 3];
                 let udp_result = udp_socket.recv(&mut buf);
 
                 match udp_result {
-                    // TODO: This is untested! Test it
                     Ok(_size) => {
                         manager.failures = 0; // Reset consecutive failure count
                     }
@@ -161,7 +162,7 @@ pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
                         {
                             Ok(_) => {}
                             Err(e) => {
-                                panic!("Could not write bytes to UDP socket: {}", e)
+                                error!("Could not write bytes to UDP socket: {}, trying to continue anyway", e)
                             }
                         }
                         manager.failures += 1
