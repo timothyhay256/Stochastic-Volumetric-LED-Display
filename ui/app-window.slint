@@ -1,0 +1,85 @@
+import { Button, VerticalBox, HorizontalBox, CheckBox, TextEdit } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
+    // preferred-height: 500px;
+    // preferred-width: 500px;
+    callback request-increase-value();
+    default-font-size: 20px;
+    VerticalBox {
+        spacing: 5px;
+        Text {
+            text: "SVLED";
+            font-size: 35px;
+            font-weight: 300;
+            letter-spacing: 23px;
+            horizontal-alignment: center;
+            vertical-alignment: top;
+        }
+
+        HorizontalBox {
+            padding: 5px;
+            width: 50%;
+            conf := Button {
+                height: 50px;
+                width: 50%;
+                text: "Edit Configuration";
+                clicked => {
+                    root.request-increase-value();
+                }
+            }
+
+            speedtest := Button {
+                height: 50px;
+                width: 50%;
+                text: "Test Connection";
+                clicked => {
+                    root.request-increase-value();
+                }
+            }
+        }
+
+        HorizontalBox {
+            width: 50%;
+            padding: 5px;
+            unity := Button {
+                width: 49%;
+                height: 50px;
+                text: "Playback VLED";
+                clicked => {
+                    root.request-increase-value();
+                }
+            }
+
+            cal := Button {
+                width: 60%;
+                height: 50px;
+                text: "Calibrate";
+                clicked => {
+                    root.request-increase-value();
+                }
+            }
+        }
+
+        HorizontalBox {
+            padding: 5px;
+            Button {
+                text: "Connect to Unity";
+            }
+        }
+
+        HorizontalBox {
+            padding: 5px;
+            CheckBox {
+                text: "Unity Conrols Recording";
+            }
+
+            CheckBox {
+                text: "Record VLED";
+            }
+
+            CheckBox {
+                text: "Record BVLED";
+            }
+        }
+    }
+}
