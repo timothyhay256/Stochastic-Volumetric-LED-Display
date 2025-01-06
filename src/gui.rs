@@ -7,6 +7,7 @@ use crate::Config;
 use crate::ManagerData;
 use std::error::Error;
 use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::SystemTime;
 
 slint::include_modules!();
@@ -43,14 +44,18 @@ pub fn main(config: Config) -> Result<(), Box<dyn Error>> {
 
     let shared_manager_speedtest = Arc::clone(&shared_manager);
     ui.on_speedtest(move || {
-        let mut manager = shared_manager_speedtest.lock().unwrap();
-        speedtest(&mut manager, config.num_led, 750);
+        thread::spawn(move || {
+            let mut manager = shared_manager_speedtest.lock().unwrap();
+            speedtest(&mut manager, config.num_led, 750);
+        });
     });
 
     let shared_manager_calibrate = Arc::clone(&shared_manager);
     ui.on_calibrate(move || {
-        let mut manager = shared_manager_calibrate.lock().unwrap();
-        scan::scan(config.clone(), &mut manager).unwrap();
+        thread::spawn(move || {
+            let mut manager = shared_manager_calibrate.lock().unwrap();
+            scan::scan(config.clone(), &mut manager).unwrap();
+        })
     });
 
     ui.run()?;
