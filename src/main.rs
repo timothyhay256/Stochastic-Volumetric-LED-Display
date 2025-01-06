@@ -16,6 +16,7 @@ use std::{
 #[cfg(feature = "gui")]
 pub mod gui;
 
+pub mod driver_wizard;
 pub mod led_manager;
 pub mod read_vled;
 pub mod scan;
@@ -117,6 +118,9 @@ enum Command {
     #[cfg(feature = "gui")]
     #[options(help = "launch the GUI")]
     Gui(GuiOptions),
+
+    #[options(help = "interactively create a ino/cpp file for your LED driver")]
+    DriverWizard(DriverWizardOptions),
 }
 
 #[derive(Debug, Options)]
@@ -136,6 +140,8 @@ struct UnityCommandOptions {}
 #[cfg(feature = "gui")]
 #[derive(Debug, Options)]
 struct GuiOptions {}
+#[derive(Debug, Options)]
+struct DriverWizardOptions {}
 
 fn main() {
     let opts = MyOptions::parse_args_default_or_exit();
@@ -390,6 +396,9 @@ fn main() {
                 }
             };
         }
+    } else if let Some(Command::DriverWizard(ref _driver_wizard_options)) = opts.command {
+        info!("Starting driver configuration wizard!");
+        driver_wizard::wizard();
     } else {
         error!("No valid command was passed.");
     }
