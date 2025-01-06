@@ -1,6 +1,6 @@
 # Setting up LEDs
 ## Supported LED chipsets
-Anything that the FastLED library supports will work fine, although WS2811 and friends will be limited to 400 FPS max(When using a ESP32 and serial). This is due to a intentional limitation in FastLED.
+Anything that the FastLED library supports will work fine, although WS2811 and friends will be limited to 400 FPS max(When using a ESP32 and serial). This is due to a intentional limitation in FastLED, although it is possible to attempt overclocking the LEDs! See the FastLED wiki for more info.
 ## Setting up 
 If you want to use features such as the builtin web server, stored animations, or the ability to send gyroscope data, you will need to use a ESP32, since these all take advantage of the dual cores. If you just want to push commands to the LEDs from a seperate machine, a ESP8266 does fine (or any PIO compatible microcontroller), although it can only achieve up to 250 FPS on serial.  
 Depending on what configuration you are using, you will want to flash a different script to the ESP you are using.  
@@ -13,4 +13,5 @@ Depending on what configuration you are using, you will want to flash a differen
 
 Find pin assignments and any variables that you need to set inside the files. And if you are not using WS2811, then make sure to change the chipset type in the FastLED setup inside of `setup()`!
 You can flash these using PlatformIO or Arduino.  
-Once flashed, you can move on to calibrating the LEDs!
+Once flashed, you can move on to calibrating the LEDs!  
+*Please note that these scripts are still quite messy, and will be updated in the future to be cleaner and more usable.*
