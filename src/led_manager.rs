@@ -10,7 +10,7 @@ use std::{
 
 use crate::ManagerData;
 
-pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
+pub fn set_color(manager: &mut ManagerData, n: u16, r: u8, g: u8, b: u8) {
     let record_data;
     let record_esp_data;
 
@@ -131,7 +131,9 @@ pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
                     .set_read_timeout(Some(Duration::new(0, manager.udp_read_timeout * 1000000)))
                     .expect("set_read_timeout call failed");
 
-                let bytes: [u8; 4] = [n, r, g, b];
+                let mut bytes: [u8; 5] = [0; 5];
+                bytes.copy_from_slice(&n.to_le_bytes());
+                bytes = [bytes[0], bytes[1], r, g, b];
                 // debug!("Sending {:?}", bytes);
                 match udp_socket.send_to(&bytes, format!("{}:{}", manager.host, manager.port)) {
                     Ok(_) => {}
@@ -193,7 +195,10 @@ pub fn set_color(manager: &mut ManagerData, n: u8, r: u8, g: u8, b: u8) {
             );
         }
         if let Some(serial_port) = manager.serial_port.as_mut() {
-            let msg: [u8; 6] = [0xFF, 0xBB, n, r, g, b]; // 0xFF & 0xBB indicate a start of packet.
+            let mut msg: [u8; 7] = [0; 7];
+            msg[2..3].copy_from_slice(&n.to_le_bytes());
+            msg = [0xFF, 0xBB, msg[2], msg[3], r, g, b]; // 0xFF & 0xBB indicate a start of packet.
+
             match serial_port.write_all(&msg) {
                 Ok(_) => {}
                 Err(e) => {
