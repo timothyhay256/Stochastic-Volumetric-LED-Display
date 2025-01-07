@@ -28,7 +28,7 @@ pub fn read_vled(manager: &mut ManagerData, file: PathBuf) -> Result<(), Box<dyn
             if line.contains("E") {
                 // Clear color of index `EN`
                 line.remove(0);
-                let index = match line.to_string().parse::<u8>() {
+                let index = match line.to_string().parse::<u16>() {
                     Ok(index) => index,
                     Err(e) => {
                         panic!(
@@ -41,10 +41,10 @@ pub fn read_vled(manager: &mut ManagerData, file: PathBuf) -> Result<(), Box<dyn
                 packets_per_second += 1;
             } else if line.contains("|") {
                 // Set index n with r g b from string n|r|g|b
-                let mut xs: [u8; 4] = [0; 4];
+                let mut xs: [u16; 4] = [0; 4];
                 let nrgb = line.split("|");
                 for (i, el) in nrgb.enumerate() {
-                    xs[i] = match el.to_string().parse::<u8>() {
+                    xs[i] = match el.to_string().parse::<u16>() {
                         Ok(el) => el,
                         Err(e) => {
                             panic!(
@@ -54,7 +54,7 @@ pub fn read_vled(manager: &mut ManagerData, file: PathBuf) -> Result<(), Box<dyn
                         }
                     };
                 }
-                led_manager::set_color(manager, xs[0], xs[1], xs[2], xs[3]);
+                led_manager::set_color(manager, xs[0], xs[1] as u8, xs[2] as u8, xs[3] as u8);
                 packets_per_second += 1;
             } else if line.contains("T") {
                 line.remove(0);

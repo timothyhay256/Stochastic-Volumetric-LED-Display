@@ -10,7 +10,7 @@ pub fn speedtest(manager: &mut ManagerData, num_led: u32, writes: u32) {
     info!("Clearing string");
 
     for n in 0..=num_led {
-        led_manager::set_color(manager, n as u8, 0, 0, 0);
+        led_manager::set_color(manager, n as u16, 0, 0, 0);
     }
 
     info!("Testing {} random writes", writes);
