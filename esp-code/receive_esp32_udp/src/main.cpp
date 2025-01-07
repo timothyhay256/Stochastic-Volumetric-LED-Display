@@ -29,7 +29,6 @@ void setup()
   Serial.begin(921600);
   Serial.println("Serial Begin");
 
-  // Change below if you don't want to use parallel strands! See top of file for more info.
   FastLED.addLeds<WS2811, LED_PIN, COLOR_ORDER>(leds, LED_COUNT);
   FastLED.setBrightness(255);
   WiFi.begin(ssid, password);
@@ -60,45 +59,36 @@ void setup()
 
 void loop()
 {
-
-  // If packet received...
   int packetSize = UDP.parsePacket();
   if (packetSize)
   {
-    // Serial.print("Received packet! Size: ");
-    // Serial.println(packetSize);
-    int len = UDP.read(packet, 12);
+    int len = UDP.read(packet, 5);
 
-    if (len > 0)
+    if (len == 4)
     {
-      packet[len] = '\0';
-    }
-    // Serial.print("Packet received: ");
-    // Serial.println(packet);
-    String packetStr(packet);
-    String n = packetStr.substring(0, 3);
-    String r = packetStr.substring(3, 6);
-    String g = packetStr.substring(6, 9);
-    String b = packetStr.substring(9, 12);
+      byte n1 = packet[0];
+      byte n2 = packet[1];
+      byte r = packet[2];
+      byte g = packet[3];
+      byte b = packet[4];
 
-    leds[n.toInt()] = CRGB(r.toInt(), g.toInt(), b.toInt());
-    if (cycle >= set_every)
-    {
-      FastLED.show();
-      cycle = 0;
-    }
-    else
-    {
-      cycle += 1;
-    }
-    Serial.println(n);
-    Serial.println(r);
-    Serial.println(g);
-    Serial.println(b);
+      int n = (n2 << 8) | n1; // Convert n1 and n2 to a uint16_t
 
-    // Send return packet (needed to prevent overtransmitting and thus missed packets)
-    UDP.beginPacket(UDP.remoteIP(), UDP.remotePort());
-    UDP.printf(reply);
-    UDP.endPacket();
+      leds[n] = CRGB(r, g, b);
+
+      if (cycle >= set_every)
+      {
+        FastLED.show();
+        cycle = 0;
+      }
+      else
+      {
+        cycle += 1;
+      }
+
+      UDP.beginPacket(UDP.remoteIP(), UDP.remotePort());
+      UDP.printf(reply);
+      UDP.endPacket();
+    }
   }
 }
