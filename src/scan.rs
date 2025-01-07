@@ -631,7 +631,7 @@ pub fn manual_calibrate(
             ),
         )
         .unwrap();
-        led_manager::set_color(manager, led_index as u8, 255, 255, 255);
+        led_manager::set_color(manager, led_index as u16, 255, 255, 255);
         let mut frame = Mat::default();
         {
             let mut cam = cam.lock().unwrap();
