@@ -128,7 +128,7 @@ pub fn get_events(
                 println!("{msg}");
                 // Clear color of index `EN`
                 msg.remove(0);
-                let index = match msg.to_string().parse::<u16>() {
+                let index = match msg.to_string().parse::<u8>() {
                     Ok(index) => index,
                     Err(e) => {
                         panic!(
@@ -140,10 +140,10 @@ pub fn get_events(
                 led_manager::set_color(manager, index, 0, 0, 0);
             } else if msg.contains("|") {
                 // Set index n with r g b from string n|r|g|b
-                let mut xs: [u16; 4] = [0; 4];
+                let mut xs: [u8; 4] = [0; 4];
                 let nrgb = msg.trim_matches(char::is_control).split("|");
                 for (i, el) in nrgb.enumerate() {
-                    xs[i] = match el.parse::<u16>() {
+                    xs[i] = match el.parse::<u8>() {
                         Ok(el) => el,
                         Err(e) => {
                             panic!(
@@ -154,7 +154,7 @@ pub fn get_events(
                     };
                 }
                 // println!("NRGB: {}|{}|{}|{}", xs[0], xs[1], xs[2], xs[3]);
-                led_manager::set_color(manager, xs[0], xs[1] as u8, xs[2] as u8, xs[3] as u8);
+                led_manager::set_color(manager, xs[0], xs[1], xs[2], xs[3]);
             } else {
                 error!("Unity packet was malformed! Packet: {}", msg);
             }
