@@ -2,9 +2,8 @@ use chrono::Local;
 use inquire;
 use log::{debug, error, info, warn};
 use opencv::{
-    core::{self, flip, min_max_loc, no_array, Point, Scalar},
-    highgui,
-    highgui::{EVENT_LBUTTONDOWN, EVENT_LBUTTONUP, EVENT_MOUSEMOVE},
+    core::{self, flip, get_default_algorithm_hint, min_max_loc, no_array, Point, Scalar},
+    highgui::{self, EVENT_LBUTTONDOWN, EVENT_LBUTTONUP, EVENT_MOUSEMOVE},
     imgproc::{self, COLOR_BGR2GRAY, LINE_8},
     prelude::*,
     videoio, Result,
@@ -397,7 +396,7 @@ pub fn crop(config: &Config) -> Result<(i32, i32, i32, i32), Box<dyn Error>> {
 }
 
 pub fn get_brightest_pos(mut frame: Mat) -> (f64, f64, Point) {
-    imgproc::cvt_color(&frame.clone(), &mut frame, COLOR_BGR2GRAY, 0).unwrap(); // Greyscales frame
+    imgproc::cvt_color(&frame.clone(), &mut frame, COLOR_BGR2GRAY, 0, get_default_algorithm_hint().unwrap()).unwrap(); // Greyscales frame
     imgproc::gaussian_blur(
         // Blur frame to increase accuracy of min_max_loc
         &frame.clone(),
@@ -406,6 +405,7 @@ pub fn get_brightest_pos(mut frame: Mat) -> (f64, f64, Point) {
         0.0,
         0.0,
         0,
+        get_default_algorithm_hint().unwrap()
     )
     .unwrap();
 
@@ -631,7 +631,7 @@ pub fn manual_calibrate(
             ),
         )
         .unwrap();
-        led_manager::set_color(manager, led_index as u16, 255, 255, 255);
+        led_manager::set_color(manager, led_index as u8, 255, 255, 255);
         let mut frame = Mat::default();
         {
             let mut cam = cam.lock().unwrap();
