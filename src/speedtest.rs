@@ -9,7 +9,7 @@ pub fn speedtest(manager: &mut ManagerData, num_led: u32, writes: u32) {
     let mut rng = rand::thread_rng();
     info!("Clearing string");
 
-    for n in 0..=num_led {
+    for n in 0..num_led {
         led_manager::set_color(manager, n as u16, 0, 0, 0);
     }
 
@@ -19,7 +19,7 @@ pub fn speedtest(manager: &mut ManagerData, num_led: u32, writes: u32) {
     for _n in 0..=writes {
         led_manager::set_color(
             manager,
-            rng.gen_range(0..num_led.try_into().unwrap()),
+            rng.gen_range(0..(num_led as u16) - 1),
             rng.gen_range(0..255),
             rng.gen_range(0..255),
             rng.gen_range(0..255),
