@@ -9,7 +9,10 @@ use std::{
 #[cfg(feature = "gui")]
 use svled::gui;
 
-use svled::{driver_wizard, read_vled, scan, speedtest, unity, utils, ManagerData};
+#[cfg(feature = "scan")]
+use svled::scan;
+
+use svled::{driver_wizard, read_vled, speedtest, unity, utils, ManagerData};
 
 #[derive(Debug, Options)]
 struct MyOptions {
@@ -39,6 +42,7 @@ enum Command {
     #[options(help = "play back a vled file")]
     ReadVled(ReadvledOptions),
 
+    #[cfg(feature = "scan")]
     #[options(help = "calibrate a svled container")]
     Calibrate(CalibrateOptions),
 
@@ -61,6 +65,7 @@ struct ReadvledOptions {
     vled_file: PathBuf,
 }
 
+#[cfg(feature = "scan")]
 #[derive(Debug, Options)]
 struct CalibrateOptions {}
 
@@ -101,10 +106,6 @@ fn main() {
         info!("Performing speedtest...");
 
         speedtest::speedtest(&mut manager, config_holder.num_led, 750);
-    } else if let Some(Command::Calibrate(ref _calibrate_options)) = opts.command {
-        info!("Performing calibrating");
-
-        scan::scan(config_holder.clone(), &mut manager).expect("failure");
     } else if let Some(Command::ReadVled(ref readvled_options)) = opts.command {
         if !readvled_options.vled_file.is_file() {
             error!("You must pass a valid vled file with --vled-file!");
@@ -231,6 +232,12 @@ fn main() {
     #[cfg(feature = "gui")]
     if let Some(Command::Gui(ref _gui_options)) = opts.command {
         gui::main(config_holder).unwrap();
+    }
+
+    #[cfg(feature = "scan")]
+    if let Some(Command::Calibrate(ref _calibrate_options)) = opts.command {
+        info!("Performing calibrating");
+        scan::scan(config_holder.clone(), &mut manager).expect("failure");
     }
 
     // led_manager::set_color(&mut manager, 1, 255, 255, 255);
