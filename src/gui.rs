@@ -3,8 +3,8 @@
 
 use crate::scan;
 use crate::speedtest::speedtest;
-use crate::Config;
-use crate::ManagerData;
+use crate::utils::Config;
+use crate::utils::ManagerData;
 use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::thread;
