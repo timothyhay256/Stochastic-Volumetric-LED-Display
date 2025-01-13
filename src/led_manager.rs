@@ -196,7 +196,7 @@ pub fn set_color(manager: &mut ManagerData, n: u16, r: u8, g: u8, b: u8) {
         }
         if let Some(serial_port) = manager.serial_port.as_mut() {
             let mut msg: [u8; 7] = [0; 7];
-            msg[2..3].copy_from_slice(&n.to_le_bytes());
+            msg[2..4].copy_from_slice(&n.to_be_bytes());
             msg = [0xFF, 0xBB, msg[2], msg[3], r, g, b]; // 0xFF & 0xBB indicate a start of packet.
 
             match serial_port.write_all(&msg) {
@@ -216,7 +216,10 @@ pub fn set_color(manager: &mut ManagerData, n: u16, r: u8, g: u8, b: u8) {
 
                 match read_result {
                     Ok(_size) => {
-                        info!("print_send_back returned {:?}", serial_buf);
+                        info!(
+                            "print_send_back returned {:?}",
+                            String::from_utf8_lossy(&serial_buf)
+                        );
                     }
                     Err(e) => {
                         error!("print_send_back could not read serial port: {}", e);
