@@ -8,7 +8,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::ManagerData;
+use crate::utils::ManagerData;
 
 pub fn set_color(manager: &mut ManagerData, n: u16, r: u8, g: u8, b: u8) {
     let record_data;
@@ -39,7 +39,7 @@ pub fn set_color(manager: &mut ManagerData, n: u16, r: u8, g: u8, b: u8) {
     if record_data || record_esp_data {
         if record_data && manager.data_file_buf.is_none() {
             manager.data_file_buf = Some(BufWriter::new(
-                match crate::check_and_create_file(&manager.record_data_file) {
+                match crate::utils::check_and_create_file(&manager.record_data_file) {
                     Ok(file) => file,
                     Err(e) => {
                         panic!(
@@ -52,7 +52,7 @@ pub fn set_color(manager: &mut ManagerData, n: u16, r: u8, g: u8, b: u8) {
             ));
         } else if record_esp_data && manager.esp_data_file_buf.is_none() {
             manager.esp_data_file_buf = Some(BufWriter::new(
-                match crate::check_and_create_file(&manager.record_esp_data_file) {
+                match crate::utils::check_and_create_file(&manager.record_esp_data_file) {
                     Ok(file) => file,
                     Err(e) => {
                         panic!(
