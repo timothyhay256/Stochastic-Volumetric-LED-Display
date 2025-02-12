@@ -1,11 +1,12 @@
+#define FASTLED_ESP32_I2S true // For up to 24 pin paralellism
 #include <Arduino.h>
 #include <FastLED.h>
 // Manually set pins inside of setup(), and set LED_COUNT_PER_STRIP and NUM_STRIPS. This FastLED setup section can also be used for any other scripts.
 // ESP8266: WS2811_PORTA - pins 12, 13, 14 and 15 (or pins 6,7,5 and 8 on the NodeMCU boards/pin layout).   From FastLED wiki
 // ESP32: Manually set pins
 
-#define LED_COUNT_PER_STRIP 50
-#define NUM_STRIPS 2
+#define LED_COUNT_PER_STRIP 100
+#define NUM_STRIPS 1
 #define COLOR_ORDER GRB // Assuming the LED strip color order is GRB
 bool sendBack = false;  // Should I send back what instructions I just carried out? For debugging.
 
@@ -27,19 +28,28 @@ void setup()
 
     // For ESP32
     FastLED.addLeds<WS2811, 27, GRB>(leds, LED_COUNT_PER_STRIP);
-    FastLED.addLeds<WS2811, 13, GRB>(leds + LED_COUNT_PER_STRIP, LED_COUNT_PER_STRIP);
+    // FastLED.addLeds<WS2811, 13, GRB>(leds + LED_COUNT_PER_STRIP, LED_COUNT_PER_STRIP);
     // FastLED.addLeds<WS2811, 13, RGB>(leds, LED_COUNT_PER_STRIP, LED_COUNT_PER_STRIP);
     // FastLED.addLeds<WS2811, 14, RGB>(leds, 2 * LED_COUNT_PER_STRIP, LED_COUNT_PER_STRIP);
     // FastLED.addLeds<WS2811, 26, RGB>(leds, 3 * LED_COUNT_PER_STRIP, LED_COUNT_PER_STRIP);
 
-    FastLED.setBrightness(255);
-    FastLED.clear();
-    FastLED.show();
+    // FastLED.setBrightness(255);
+    // fill_solid(leds, LED_COUNT_PER_STRIP * NUM_STRIPS, CRGB::Red);
+    // FastLED.show();
+    for (int i = 0; i < 3; i++)
+    {
+        leds[0] = CRGB::White;
+        FastLED.show();
+        delay(100);
+        leds[0] = CRGB::Black;
+        FastLED.show();
+        delay(100);
+    }
 }
 
 void loop()
 {
-    if (Serial.available() >= 6)
+    if (Serial.available() >= 7)
     { // Wait for start of packet bytes to be available
         if (Serial.read() == 0xFF)
         {
@@ -58,7 +68,7 @@ void loop()
 
                 if (sendBack)
                 {
-                    String message = String(n) + "|" + String(r) + "|" + String(g) + "|" + String(b);
+                    String message = String(n) + "|" + String(r) + "|" + String(g) + "|" + String(b) + "EOI";
 
                     // Print the message via Serial
                     Serial.println(message);
