@@ -6,6 +6,7 @@ use std::{
     io::prelude::*,
     net::{Ipv4Addr, TcpStream, UdpSocket},
     str,
+    sync::{Arc, Mutex},
     time::Duration,
 };
 
@@ -103,13 +104,18 @@ pub fn send_pos(unity: UnityOptions) -> std::io::Result<()> {
 }
 
 pub fn get_events(
-    manager: &mut ManagerData,
+    manager: Arc<Mutex<ManagerData>>,
     ip: Ipv4Addr,
     port: i32,
 ) -> Result<(), Box<dyn Error>> {
     let socket = UdpSocket::bind(format!("{}:{}", ip, port))?;
 
-    if manager.keepalive {
+    let keepalive;
+    {
+        keepalive = manager.lock().unwrap().keepalive;
+    }
+
+    if keepalive {
         loop {
             let mut buf = [0; 16];
             socket.recv_from(&mut buf)?;
@@ -137,7 +143,7 @@ pub fn get_events(
                         )
                     }
                 };
-                led_manager::set_color(manager, index, 0, 0, 0);
+                led_manager::set_color(&manager, index, 0, 0, 0);
             } else if msg.contains("|") {
                 // Set index n with r g b from string n|r|g|b
                 let mut xs: [u16; 4] = [0; 4];
@@ -154,7 +160,7 @@ pub fn get_events(
                     };
                 }
                 // println!("NRGB: {}|{}|{}|{}", xs[0], xs[1], xs[2], xs[3]);
-                led_manager::set_color(manager, xs[0], xs[1] as u8, xs[2] as u8, xs[3] as u8);
+                led_manager::set_color(&manager, xs[0], xs[1] as u8, xs[2] as u8, xs[3] as u8);
             } else {
                 error!("Unity packet was malformed! Packet: {}", msg);
             }

@@ -5,6 +5,7 @@ use {
     std::fs::File,
     std::io::{self, BufRead},
     std::path::{Path, PathBuf},
+    std::sync::{Arc, Mutex},
     std::thread,
     std::time,
     time::Instant,
@@ -13,7 +14,7 @@ use {
 use crate::led_manager;
 use crate::ManagerData;
 
-pub fn read_vled(manager: &mut ManagerData, file: PathBuf) -> Result<(), Box<dyn Error>> {
+pub fn read_vled(manager: &Arc<Mutex<ManagerData>>, file: PathBuf) -> Result<(), Box<dyn Error>> {
     if file.extension().and_then(OsStr::to_str) != Some("vled") {
         // Only doing this check because I feel like people are gonna try using bvled files with this function
         warn!("File extension is not a vled file, it may not be read correctly");

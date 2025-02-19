@@ -1,11 +1,14 @@
 use log::info;
 use rand::Rng;
-use std::time::Instant;
+use std::{
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 
 use crate::led_manager;
 use crate::ManagerData;
 
-pub fn speedtest(manager: &mut ManagerData, num_led: u32, writes: u32) {
+pub fn speedtest(manager: &Arc<Mutex<ManagerData>>, num_led: u32, writes: u32) {
     let mut rng = rand::thread_rng();
     info!("Clearing string");
 
