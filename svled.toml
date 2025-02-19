@@ -1,8 +1,8 @@
-num_led = 104                                  # Number of LEDS
-communication_mode = 2                         # 1 indicates UDP, 2 indicates serial
+num_led = 100                                  # Number of LEDS
+communication_mode = 2                        # 1 indicates UDP, 2 indicates serial
 host = "192.168.86.53"                        # UDP host
 port = 8888                                    # UDP port (Default is 8888)
-serial_port_path = "/dev/ttyUSB0"              # Serial port
+serial_port_path = "/dev/ttyUSB1"              # Serial port
 baud_rate = 921600                             # Serial baud rate (Default is 921600)
 serial_read_timeout = 20                       # Serial read timeout in ms
 record_data = true                            # If true, all commands will be recorded during the session
@@ -11,8 +11,10 @@ unity_controls_recording = true                # If true, above two will be igno
 record_data_file = "record_data.vled"          # File to record vled data to
 record_esp_data_file = "record_esp_data.bvled" # File to record bvled data to
 print_send_back = false                         # Debugging only: Prints what the ESP received when using Serial
-udp_read_timeout = 100                         # How long to wait for a response from ESP when using UDP 
-camera_index = 2
+udp_read_timeout = 100                         # How long to wait for a response from ESP when using UDP
+multi_camera = true 
+camera_index_1 = 2
+camer_index_2 = 3
 con_fail_limit = 50
 
 [unity_options]
