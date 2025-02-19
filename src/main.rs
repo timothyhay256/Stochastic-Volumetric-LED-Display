@@ -3,7 +3,9 @@ use log::{error, info}; // TODO: Depreceate unity export byte data
 use std::{
     env,
     path::{Path, PathBuf},
-    process, thread,
+    process,
+    sync::{Arc, Mutex},
+    thread,
     time::SystemTime,
 };
 #[cfg(feature = "gui")]
@@ -94,10 +96,18 @@ fn main() {
         config_path = Path::new(&opts.config);
     }
 
-    let (mut manager, unity_options, config_holder) = utils::load_validate_conf(config_path);
+    let config_load_result = utils::load_validate_conf(config_path);
+
+    let (manager, unity_options, config_holder) = (
+        Arc::new(Mutex::new(config_load_result.0)),
+        config_load_result.1,
+        config_load_result.2,
+    );
+
+    let handler_manager = Arc::clone(&manager);
 
     ctrlc::set_handler(move || {
-        manager.keepalive = false;
+        handler_manager.lock().unwrap().keepalive = false;
         process::exit(0);
     })
     .expect("Error setting Ctrl-C handler");
@@ -105,7 +115,7 @@ fn main() {
     if let Some(Command::Speedtest(ref _speedtest_options)) = opts.command {
         info!("Performing speedtest...");
 
-        speedtest::speedtest(&mut manager, config_holder.num_led, 750);
+        speedtest::speedtest(&manager, config_holder.num_led, 4000);
     } else if let Some(Command::ReadVled(ref readvled_options)) = opts.command {
         if !readvled_options.vled_file.is_file() {
             error!("You must pass a valid vled file with --vled-file!");
@@ -113,9 +123,11 @@ fn main() {
         } else {
             info!("Playing back {}!", readvled_options.vled_file.display());
 
-            manager.record_data = false;
-            manager.record_esp_data = false;
-            match read_vled::read_vled(&mut manager, readvled_options.vled_file.clone()) {
+            {
+                manager.lock().unwrap().record_data = false;
+                manager.lock().unwrap().record_esp_data = false;
+            }
+            match read_vled::read_vled(&manager, readvled_options.vled_file.clone()) {
                 Ok(_) => {}
                 Err(e) => {
                     panic!(
@@ -170,19 +182,20 @@ fn main() {
         info!("Spawning listening threads");
 
         for i in 0..unity_options.num_container {
-            let mut owned_manager = ManagerData {
+            let owned_manager = Arc::new(Mutex::new(ManagerData {
                 num_led: config_holder.num_led,
+                num_strips: config_holder.num_strips,
                 communication_mode: config_holder.communication_mode,
                 host: config_holder.host,
                 port: config_holder.port,
-                serial_port_path: manager.serial_port_path.clone(),
+                serial_port_paths: manager.lock().unwrap().serial_port_paths.clone(),
                 baud_rate: config_holder.baud_rate,
-                serial_read_timeout: manager.serial_read_timeout,
-                record_data: manager.record_data,
-                record_data_file: manager.record_data_file.clone(),
-                record_esp_data: manager.record_esp_data,
-                unity_controls_recording: manager.unity_controls_recording,
-                record_esp_data_file: manager.record_esp_data_file.clone(),
+                serial_read_timeout: manager.lock().unwrap().serial_read_timeout,
+                record_data: manager.lock().unwrap().record_data,
+                record_data_file: manager.lock().unwrap().record_data_file.clone(),
+                record_esp_data: manager.lock().unwrap().record_esp_data,
+                unity_controls_recording: manager.lock().unwrap().unity_controls_recording,
+                record_esp_data_file: manager.lock().unwrap().record_esp_data_file.clone(),
                 failures: 0,
                 con_fail_limit: config_holder.con_fail_limit,
                 print_send_back: config_holder.print_send_back,
@@ -192,15 +205,15 @@ fn main() {
                 data_file_buf: None,
                 esp_data_file_buf: None,
                 udp_socket: None,
-                serial_port: None,
+                serial_port: Vec::new(),
                 keepalive: true,
-            };
+            }));
 
             let owned_options = unity_options.clone();
 
             children.push(thread::spawn(move || {
                 match unity::get_events(
-                    &mut owned_manager,
+                    owned_manager,
                     owned_options.unity_ip,
                     owned_options.unity_ports.clone()[i as usize]
                         .try_into()
@@ -231,16 +244,16 @@ fn main() {
 
     #[cfg(feature = "gui")]
     if let Some(Command::Gui(ref _gui_options)) = opts.command {
-        gui::main(config_holder).unwrap();
+        gui::main(config_holder.clone()).unwrap();
     }
 
     #[cfg(feature = "scan")]
     if let Some(Command::Calibrate(ref _calibrate_options)) = opts.command {
         info!("Performing calibrating");
-        scan::scan(config_holder.clone(), &mut manager).expect("failure");
+        scan::scan(config_holder.clone(), &manager).expect("failure");
     }
 
     // led_manager::set_color(&mut manager, 1, 255, 255, 255);
 
-    utils::flush_data(&mut manager);
+    utils::flush_data(manager);
 }
