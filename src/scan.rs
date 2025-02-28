@@ -42,12 +42,17 @@ type ScanResult = Result<(i32, i32, Option<i32>, Option<i32>), Box<dyn Error>>;
 type PosEntry = Vec<(String, (i32, i32), Option<(i32, i32)>)>;
 
 pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>) -> Result<()> {
-    let manager = &mut manager_guard.lock().unwrap();
     let mut led_pos = vec![("UNCALIBRATED".to_string(), (0, 0), Some((0, 0))); config.num_led as usize];
+    let num_led;
+    {
+        num_led = manager_guard.lock().unwrap().num_led;
+    }
     info!("Clearing strip");
-    for i in 0..=manager.num_led {
+    for i in 0..=num_led {
         led_manager::set_color(manager_guard, i.try_into().unwrap(), 0, 0, 0);
     }
+
+    let manager = &mut manager_guard.lock().unwrap();
     let mut pos = match crop(&config) {
         Ok(pos) => pos,
         Err(e) => {
@@ -404,6 +409,7 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
             #[allow(non_snake_case)]
             // EVENT_LBUTTONDOWN is defined in the OpenCV crate, so I can't change it.
             EVENT_LBUTTONDOWN => {
+                debug!("lbuttondown");
                 actively_cropping = true;
                 if *camera_active_guard.lock().unwrap() == 0 {
                     *x1_start_guard.lock().unwrap() = x;
@@ -415,6 +421,7 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
             }
             #[allow(non_snake_case)]
             EVENT_LBUTTONUP => {
+                debug!("lbuttonup");
                 actively_cropping = false;
                 if *camera_active_guard.lock().unwrap() == 0 {
                     *x1_end_guard.lock().unwrap() = x;
@@ -426,6 +433,7 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
             }
             #[allow(non_snake_case)]
             EVENT_MOUSEMOVE => {
+                debug!("mousemove");
                 if actively_cropping {
                     if *camera_active_guard.lock().unwrap() == 0 {
                         *x1_end_guard.lock().unwrap() = x;
@@ -459,12 +467,13 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
     let mut y2_start = None;
     let mut y2_end = None;
 
+    debug!("starting crop_loop for first camera.");
     (x_start, x_end, y_start, y_end) = match crop_loop(cam, x1_start.clone(), y1_start.clone(), x1_end.clone(), y1_end.clone(), window, "Please drag the mouse around the container. Press any key to continue".to_string()) {
         Ok((x_start, x_end, y_start, y_end)) => (x_start, x_end, y_start, y_end),
         Err(e) => panic!("Something went wrong during cropping: {e}")
     };
-
     if let Some(index) = config.camera_index_2 {
+        debug!("Cropping second camera");
         *camera_active.lock().unwrap() = 1;
         let cam = videoio::VideoCapture::new(index, videoio::CAP_ANY)?; // 0 is the default camera
         match videoio::VideoCapture::is_opened(&cam)? {
@@ -474,6 +483,7 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
                 index
             )}
         };
+        highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
         let loop_out = crop_loop(cam, x1_start, y1_start, x1_end, y1_end, window, "Please drag the mouse around the second container. Press any key to continue".to_string()).unwrap();
         (x2_start, x2_end, y2_start, y2_end) = (
             Some(loop_out.0),
@@ -481,6 +491,8 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
             Some(loop_out.2),
             Some(loop_out.3));
     }
+
+    debug!("crop finished");
 
     Ok(CropPos {
         x1_start: x_start,
@@ -501,6 +513,7 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
 
 pub fn crop_loop(mut cam: VideoCapture, x_start: Arc<Mutex<i32>>, y_start: Arc<Mutex<i32>>, x_end: Arc<Mutex<i32>>, y_end: Arc<Mutex<i32>>, window: &str, msg: String) -> Result<(i32, i32, i32, i32), Box<dyn Error>> {
     info!("{msg}");
+    debug!("window: {}, title: {}", window, msg);
     highgui::set_window_title(
         window,
         &msg,
@@ -534,6 +547,8 @@ pub fn crop_loop(mut cam: VideoCapture, x_start: Arc<Mutex<i32>>, y_start: Arc<M
 
         if frame.size()?.width > 0 {
             highgui::imshow(window, &frame)?;
+        } else {
+            warn!("frame is too small!");
         }
         let key = highgui::wait_key(10)?;
         if key > 0 && key != 255 {

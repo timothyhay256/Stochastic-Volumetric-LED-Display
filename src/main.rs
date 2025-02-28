@@ -115,7 +115,7 @@ fn main() {
     if let Some(Command::Speedtest(ref _speedtest_options)) = opts.command {
         info!("Performing speedtest...");
 
-        speedtest::speedtest(&manager, config_holder.num_led, 4000);
+        speedtest::speedtest(&manager, config_holder.num_led, 10000);
     } else if let Some(Command::ReadVled(ref readvled_options)) = opts.command {
         if !readvled_options.vled_file.is_file() {
             error!("You must pass a valid vled file with --vled-file!");
@@ -238,8 +238,6 @@ fn main() {
     } else if let Some(Command::DriverWizard(ref _driver_wizard_options)) = opts.command {
         info!("Starting driver configuration wizard!");
         driver_wizard::wizard();
-    } else {
-        error!("No valid command was passed.");
     }
 
     #[cfg(feature = "gui")]
