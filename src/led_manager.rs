@@ -4,7 +4,7 @@ use std::{
     io::{BufWriter, ErrorKind::WouldBlock, Write},
     net::UdpSocket,
     path::{Path, PathBuf},
-    process,
+    process, str,
     sync::{Arc, Mutex},
     time::{Duration, SystemTime},
 };
@@ -286,9 +286,9 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
                     let mut failures = 0;
                     let mut serial_buf: Vec<u8> = vec![0; 1];
 
-                    while serial_buf != [0x01] {
+                    loop {
                         match serial_port.read_exact(serial_buf.as_mut_slice()) {
-                            Ok(_) => {}
+                            Ok(_) => break,
                             Err(e) => {
                                 error!(
                                     "Could not read from {}: {}",
@@ -307,9 +307,10 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
                             break;
                         }
                     }
+                    // info!("queue length is {}", serial_buf[0]);
                 }
             }
         }
-        // };
     }
+    // };
 }
