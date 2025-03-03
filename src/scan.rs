@@ -52,7 +52,8 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>) -> Result<(
         led_manager::set_color(manager_guard, i.try_into().unwrap(), 0, 0, 0);
     }
 
-    let manager = &mut manager_guard.lock().unwrap();
+    
+    // let manager = &mut manager_guard.lock().unwrap();
     let mut pos = match crop(&config) {
         Ok(pos) => pos,
         Err(e) => {
@@ -75,7 +76,6 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>) -> Result<(
             cam_guard.lock().unwrap().read(&mut frame).unwrap();
             thread::sleep(Duration::from_millis(1)); // Give us a chance to grab the lock
         }
-
     });
 
     (pos.cam_1_brightest, pos.cam_1_darkest) = match brightest_darkest(&cam, &config, manager_guard, pos.x1_start, pos.y1_start, pos.x1_end, pos.y1_end) {
@@ -86,6 +86,8 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>) -> Result<(
     };
     
     if config.multi_camera {
+        highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
+        
         cam2 = Some(Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_2.unwrap(), videoio::CAP_ANY)?)));
 
         cam2_guard = Arc::clone(cam2.as_ref().unwrap());
@@ -114,6 +116,8 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>) -> Result<(
             }),
         );
     }
+
+    highgui::destroy_all_windows().unwrap();
 
     let data = Arc::new(Mutex::new(ScanData {
         pos,
@@ -196,59 +200,28 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>) -> Result<(
         )?;
     }
 
-    if failures == 0 {
-        info!("Please rotate the container 90 degrees to calibrate Z. Press any key to continue.");
-        highgui::set_window_title(
-            window,
-            "Please rotate the container 90 degrees to calibrate Z. Press any key to continue.",
-        )?;
-    }
-    match wait(data.clone(), &cam, window) {
-        Ok(_) => {}
-        Err(e) => {
-            panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
-        }
-    }
-    info!("Scan Z");
-
-    {
-        data.lock().unwrap().invert = false;
-        data.lock().unwrap().depth = true;
-    }
-
-    let (success, failures, success_cam_2, failures_cam_2) = match scan_area(
-        manager_guard,
-        &config,
-        &cam,
-        cam2.as_ref(),
-        &mut led_pos,
-        data.clone(),
-    ) {
-        Ok((cam_1_success, cam_1_failures, cam_2_success, cam_2_failures)) => (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures),
-        Err(e) => {
-            panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
-        }
-    };
-
     if !config.multi_camera {
-        info!("{success} succesful calibrations, {failures} failed calibrations");
-    } else {
-        info!("First camera: {success} succesful calibrations, {failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.", success_cam_2.unwrap(), failures_cam_2.unwrap());
-    }
-
-    if failures > 0 {
-        {
-            data.lock().unwrap().invert = true;
+        if failures == 0 {
+            info!("Please rotate the container 90 degrees to calibrate Z. Press any key to continue.");
+            highgui::set_window_title(
+                window,
+                "Please rotate the container 90 degrees to calibrate Z. Press any key to continue.",
+            )?;
         }
-        info!("Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.");
-        highgui::set_window_title(window, "Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.")?;
         match wait(data.clone(), &cam, window) {
             Ok(_) => {}
             Err(e) => {
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
             }
         }
-        let (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures) = match scan_area(
+
+        info!("Scan Z");
+        {
+            data.lock().unwrap().invert = false;
+            data.lock().unwrap().depth = true;
+        }
+
+        let (success, failures, success_cam_2, failures_cam_2) = match scan_area(
             manager_guard,
             &config,
             &cam,
@@ -261,30 +234,65 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>) -> Result<(
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
             }
         };
+
         if !config.multi_camera {
-            info!("{cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations");
+            info!("{success} succesful calibrations, {failures} failed calibrations");
         } else {
-            info!("First camera: {cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.", cam_2_success.unwrap(), cam_2_failures.unwrap());
+            info!("First camera: {success} succesful calibrations, {failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.", success_cam_2.unwrap(), failures_cam_2.unwrap());
         }
+
         if failures > 0 {
-            info!("Entering manual calibration mode!");
-            match manual_calibrate(
-                manager_guard,
-                &config,
-                window,
-                &cam,
-                &mut led_pos,
-                &data.clone(),
-            ) {
+            {
+                data.lock().unwrap().invert = true;
+            }
+            info!("Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.");
+            highgui::set_window_title(window, "Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.")?;
+            match wait(data.clone(), &cam, window) {
                 Ok(_) => {}
                 Err(e) => {
-                    panic!("Something went wrong during manual calibration: {}", e);
+                    panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
+                }
+            }
+            let (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures) = match scan_area(
+                manager_guard,
+                &config,
+                &cam,
+                cam2.as_ref(),
+                &mut led_pos,
+                data.clone(),
+            ) {
+                Ok((cam_1_success, cam_1_failures, cam_2_success, cam_2_failures)) => (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures),
+                Err(e) => {
+                    panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
+                }
+            };
+            if !config.multi_camera {
+                info!("{cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations");
+            } else {
+                info!("First camera: {cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.", cam_2_success.unwrap(), cam_2_failures.unwrap());
+            }
+            if failures > 0 {
+                info!("Entering manual calibration mode!");
+                match manual_calibrate(
+                    manager_guard,
+                    &config,
+                    window,
+                    &cam,
+                    &mut led_pos,
+                    &data.clone(),
+                ) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        panic!("Something went wrong during manual calibration: {}", e);
+                    }
                 }
             }
         }
     }
     highgui::destroy_all_windows().unwrap();
-    post_process(&mut led_pos, manager.num_led);
+    {
+        post_process(&mut led_pos, manager_guard.lock().unwrap().num_led);
+    }
     loop {
         let date = Local::now();
         let name = inquire::Text::new(&format!(
@@ -328,7 +336,7 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>) -> Result<(
 }
 
 pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manager: &Arc<Mutex<ManagerData>>, x_start: i32, y_start: i32, x_end: i32, y_end: i32) -> Result<(f64, f64), Box<dyn Error>>  {
-    
+    debug!("Getting brightest and darkest points");
     let mut cam = cam.lock().unwrap();
     match videoio::VideoCapture::is_opened(&cam)? {
         true => {},
@@ -341,6 +349,7 @@ pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manage
     info!("Collecting brightest and darkest points, please wait...");
     led_manager::set_color(manager, 5, 255, 255, 255);
 
+    debug!("getting frame");
     let mut frame = Mat::default();
     cam.read(&mut frame)?;
     let frame = Mat::roi(
@@ -457,18 +466,18 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
             config.camera_index_1
         )}
     };
-    let x_start;
-    let x_end;
-    let y_start;
-    let y_end;
+    let x_start_result;
+    let x_end_result;
+    let y_start_result;
+    let y_end_result;
 
-    let mut x2_start = None;
-    let mut x2_end = None;
-    let mut y2_start = None;
-    let mut y2_end = None;
+    let mut x2_start_result = None;
+    let mut x2_end_result = None;
+    let mut y2_start_result = None;
+    let mut y2_end_result = None;
 
     debug!("starting crop_loop for first camera.");
-    (x_start, x_end, y_start, y_end) = match crop_loop(cam, x1_start.clone(), y1_start.clone(), x1_end.clone(), y1_end.clone(), window, "Please drag the mouse around the container. Press any key to continue".to_string()) {
+    (x_start_result, x_end_result, y_start_result, y_end_result) = match crop_loop(cam, x1_start.clone(), y1_start.clone(), x1_end.clone(), y1_end.clone(), window, "Please drag the mouse around the container. Press any key to continue".to_string()) {
         Ok((x_start, x_end, y_start, y_end)) => (x_start, x_end, y_start, y_end),
         Err(e) => panic!("Something went wrong during cropping: {e}")
     };
@@ -483,9 +492,8 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
                 index
             )}
         };
-        highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
-        let loop_out = crop_loop(cam, x1_start, y1_start, x1_end, y1_end, window, "Please drag the mouse around the second container. Press any key to continue".to_string()).unwrap();
-        (x2_start, x2_end, y2_start, y2_end) = (
+        let loop_out = crop_loop(cam, x2_start, y2_start, x2_end, y2_end, window, "Please drag the mouse around the second container. Press any key to continue".to_string()).unwrap();
+        (x2_start_result, x2_end_result, y2_start_result, y2_end_result) = (
             Some(loop_out.0),
             Some(loop_out.1),
             Some(loop_out.2),
@@ -495,14 +503,14 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
     debug!("crop finished");
 
     Ok(CropPos {
-        x1_start: x_start,
-        y1_start: y_start,
-        x1_end: x_end,
-        y1_end: y_end,
-        x2_start,
-        y2_start,
-        x2_end,
-        y2_end,
+        x1_start: x_start_result,
+        y1_start: y_start_result,
+        x1_end: x_end_result,
+        y1_end: y_end_result,
+        x2_start: x2_start_result,
+        y2_start: y2_start_result,
+        x2_end: x2_end_result,
+        y2_end: y2_end_result,
         cam_1_brightest: None,
         cam_1_darkest: None,
         cam_2_brightest: None,
@@ -553,7 +561,7 @@ pub fn crop_loop(mut cam: VideoCapture, x_start: Arc<Mutex<i32>>, y_start: Arc<M
         let key = highgui::wait_key(10)?;
         if key > 0 && key != 255 {
             if x_start_guard != 0 && x_end_guard != 0 {
-                highgui::destroy_all_windows().unwrap();
+                // highgui::destroy_all_windows().unwrap();
                 break Ok((x_start_guard, x_end_guard, y_start_guard, y_end_guard))
             } else {
                 error!("Please select a valid are for the crop");
@@ -605,6 +613,12 @@ pub fn scan_area(
 
     let cam_1_window = "Camera 1";
     let cam_2_window = "Camera 2";
+
+    highgui::named_window(&cam_1_window, highgui::WINDOW_AUTOSIZE)?;
+
+    if config.multi_camera {
+        highgui::named_window(&cam_2_window, highgui::WINDOW_AUTOSIZE)?;
+    }
     
     let mut success = 0;
     let mut failures = 0;
@@ -690,7 +704,7 @@ pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, cam: Option<&Arc<Mutex
             LINE_8,
             0,
         )?;
-        if scan_data.depth {
+        if scan_data.depth || second_cam {
             led_pos[i as usize] = (
                 "SUCCESS-Z".to_string(),
                 led_pos[i as usize].1,
