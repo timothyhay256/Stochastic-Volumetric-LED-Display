@@ -108,6 +108,7 @@ pub fn get_events(
     ip: Ipv4Addr,
     port: i32,
 ) -> Result<(), Box<dyn Error>> {
+    debug!("get_events active on {}:{}", ip, port);
     let socket = UdpSocket::bind(format!("{}:{}", ip, port))?;
 
     let keepalive;

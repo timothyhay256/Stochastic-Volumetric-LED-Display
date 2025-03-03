@@ -33,6 +33,7 @@ pub struct Config {
     pub camera_index_1: i32,
     pub camera_index_2: Option<i32>,
     pub con_fail_limit: u32,
+    pub no_controller: bool,
     pub unity_options: UnityOptions,
 }
 
@@ -72,6 +73,8 @@ pub struct ManagerData {
     pub udp_socket: Option<UdpSocket>, // The second option reduces clutter, and barely reduces performance, so we do that.
     pub serial_port: Vec<Box<dyn SerialPort>>,
     pub keepalive: bool, // Should our threads stay alive?
+    pub queue_lengths: Vec<u8>,
+    pub no_controller: bool, // For debugging. Should the set_color function do everything EXCEPT actually attempt to set the color?
 }
 
 pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Config) {
@@ -111,18 +114,22 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
 
     let print_send_back = config_holder.print_send_back;
 
+    let no_controller = config_holder.no_controller;
+
     // Validate config and inform user of settings
 
-    if communication_mode == 2 {
-        for path in serial_port_paths.iter() {
-            if Path::new(path).exists() {
-                info!("Using serial for communication on {}!", path);
-            } else {
-                panic!("Serial port {} does not exist!", path);
+    if !no_controller {
+        if communication_mode == 2 {
+            for path in serial_port_paths.iter() {
+                if Path::new(path).exists() {
+                    info!("Using serial for communication on {}!", path);
+                } else {
+                    panic!("Serial port {} does not exist!", path);
+                }
             }
+        } else if communication_mode == 1 {
+            info!("Using udp for communication at {} on port {}", host, port);
         }
-    } else if communication_mode == 1 {
-        info!("Using udp for communication at {} on port {}", host, port);
     }
 
     if unity_controls_recording || record_data || record_esp_data {
@@ -185,6 +192,8 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
             udp_socket: None,
             serial_port: Vec::new(),
             keepalive: true,
+            queue_lengths: Vec::new(),
+            no_controller,
         },
         config_holder.unity_options.clone(),
         config_holder,
