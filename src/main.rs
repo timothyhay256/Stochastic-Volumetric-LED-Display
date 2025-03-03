@@ -1,5 +1,5 @@
 use gumdrop::Options;
-use log::{error, info}; // TODO: Depreceate unity export byte data
+use log::{debug, error, info}; // TODO: Depreceate unity export byte data
 use std::{
     env,
     path::{Path, PathBuf},
@@ -104,13 +104,11 @@ fn main() {
         config_load_result.2,
     );
 
-    let handler_manager = Arc::clone(&manager);
-
-    ctrlc::set_handler(move || {
-        handler_manager.lock().unwrap().keepalive = false;
-        process::exit(0);
-    })
-    .expect("Error setting Ctrl-C handler");
+    // ctrlc::set_handler(move || {
+    //     handler_manager.lock().unwrap().keepalive = false;
+    //     process::exit(0);
+    // })
+    // .expect("Error setting Ctrl-C handler");
 
     if let Some(Command::Speedtest(ref _speedtest_options)) = opts.command {
         info!("Performing speedtest...");
@@ -182,36 +180,46 @@ fn main() {
         info!("Spawning listening threads");
 
         for i in 0..unity_options.num_container {
-            let owned_manager = Arc::new(Mutex::new(ManagerData {
-                num_led: config_holder.num_led,
-                num_strips: config_holder.num_strips,
-                communication_mode: config_holder.communication_mode,
-                host: config_holder.host,
-                port: config_holder.port,
-                serial_port_paths: manager.lock().unwrap().serial_port_paths.clone(),
-                baud_rate: config_holder.baud_rate,
-                serial_read_timeout: manager.lock().unwrap().serial_read_timeout,
-                record_data: manager.lock().unwrap().record_data,
-                record_data_file: manager.lock().unwrap().record_data_file.clone(),
-                record_esp_data: manager.lock().unwrap().record_esp_data,
-                unity_controls_recording: manager.lock().unwrap().unity_controls_recording,
-                record_esp_data_file: manager.lock().unwrap().record_esp_data_file.clone(),
-                failures: 0,
-                con_fail_limit: config_holder.con_fail_limit,
-                print_send_back: config_holder.print_send_back,
-                udp_read_timeout: config_holder.udp_read_timeout,
-                first_run: true,
-                call_time: SystemTime::now(),
-                data_file_buf: None,
-                esp_data_file_buf: None,
-                udp_socket: None,
-                serial_port: Vec::new(),
-                keepalive: true,
-            }));
+            debug!("Spawning listening thread.");
+
+            let owned_manager;
+
+            {
+                let manager = manager.lock().unwrap();
+                owned_manager = Arc::new(Mutex::new(ManagerData {
+                    num_led: config_holder.num_led,
+                    num_strips: config_holder.num_strips,
+                    communication_mode: config_holder.communication_mode,
+                    host: config_holder.host,
+                    port: config_holder.port,
+                    serial_port_paths: manager.serial_port_paths.clone(),
+                    baud_rate: config_holder.baud_rate,
+                    serial_read_timeout: manager.serial_read_timeout,
+                    record_data: manager.record_data,
+                    record_data_file: manager.record_data_file.clone(),
+                    record_esp_data: manager.record_esp_data,
+                    unity_controls_recording: manager.unity_controls_recording,
+                    record_esp_data_file: manager.record_esp_data_file.clone(),
+                    failures: 0,
+                    con_fail_limit: config_holder.con_fail_limit,
+                    print_send_back: config_holder.print_send_back,
+                    udp_read_timeout: config_holder.udp_read_timeout,
+                    first_run: true,
+                    call_time: SystemTime::now(),
+                    data_file_buf: None,
+                    esp_data_file_buf: None,
+                    udp_socket: None,
+                    serial_port: Vec::new(),
+                    keepalive: true,
+                    queue_lengths: Vec::new(),
+                    no_controller: config_holder.no_controller,
+                }));
+            }
 
             let owned_options = unity_options.clone();
-
+            debug!("huh");
             children.push(thread::spawn(move || {
+                debug!("inside thread");
                 match unity::get_events(
                     owned_manager,
                     owned_options.unity_ip,
@@ -219,7 +227,9 @@ fn main() {
                         .try_into()
                         .unwrap(),
                 ) {
-                    Ok(_) => {}
+                    Ok(_) => {
+                        debug!("thread exited??")
+                    }
                     Err(e) => {
                         panic!("get_events thread crashed with error: {}", e)
                     }

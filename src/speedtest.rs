@@ -29,12 +29,23 @@ pub fn speedtest(manager: &Arc<Mutex<ManagerData>>, num_led: u32, writes: u32) {
         );
     }
 
+    let queue_lengths = manager.lock().unwrap().queue_lengths.clone();
+
     let end = start.elapsed();
+
+    let mut queue_total_lengths: u32 = 0;
+    for n in 0..=queue_lengths.len() - 1 {
+        queue_total_lengths += queue_lengths[n] as u32;
+    }
 
     info!("{:.2?} seconds.", end);
     info!("{:.5?} seconds per LED", end / writes);
     info!(
         "{:.3} LEDs per second",
         (writes as f64 / (end.as_millis() as f64)) * 1000.0
+    );
+    info!(
+        "Average queue length: {}",
+        queue_total_lengths / queue_lengths.len() as u32
     );
 }

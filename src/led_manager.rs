@@ -4,7 +4,7 @@ use std::{
     io::{BufWriter, ErrorKind::WouldBlock, Write},
     net::UdpSocket,
     path::{Path, PathBuf},
-    process, str,
+    process,
     sync::{Arc, Mutex},
     time::{Duration, SystemTime},
 };
@@ -138,176 +138,179 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
         manager.serial_read_timeout,
     ); // Needed because in the match we are borrowing as mut, so we can't borrow as immutable later
 
-    if manager.communication_mode == 1 {
-        if manager.udp_socket.is_none() {
-            debug!("Binding to 0.0.0.0:{}", manager.port);
-            manager.udp_socket = Some(match UdpSocket::bind(format!("0.0.0.0:{}", manager.port)) {
-                Ok(socket) => socket,
-                Err(e) => {
-                    panic!("Could not bind to 0.0.0.0:{}: {}", manager.port, e);
-                }
-            });
-        }
+    if !manager.no_controller {
+        if manager.communication_mode == 1 {
+            if manager.udp_socket.is_none() {
+                debug!("Binding to 0.0.0.0:{}", manager.port);
+                manager.udp_socket =
+                    Some(match UdpSocket::bind(format!("0.0.0.0:{}", manager.port)) {
+                        Ok(socket) => socket,
+                        Err(e) => {
+                            panic!("Could not bind to 0.0.0.0:{}: {}", manager.port, e);
+                        }
+                    });
+            }
 
-        match manager.udp_socket.as_mut() {
-            Some(udp_socket) => {
-                udp_socket
-                    .set_read_timeout(Some(Duration::new(0, udp_read_timeout * 1000000)))
-                    .expect("set_read_timeout call failed");
+            match manager.udp_socket.as_mut() {
+                Some(udp_socket) => {
+                    udp_socket
+                        .set_read_timeout(Some(Duration::new(0, udp_read_timeout * 1000000)))
+                        .expect("set_read_timeout call failed");
 
-                let mut bytes: [u8; 5] = [0; 5];
-                bytes[0..2].copy_from_slice(&n.to_le_bytes());
-                bytes = [bytes[0], bytes[1], r, g, b];
-                // debug!("Sending {:?}", bytes);
-                match udp_socket.send_to(&bytes, format!("{}:{}", host, port)) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        error!(
+                    let mut bytes: [u8; 5] = [0; 5];
+                    bytes[0..2].copy_from_slice(&n.to_le_bytes());
+                    bytes = [bytes[0], bytes[1], r, g, b];
+                    // debug!("Sending {:?}", bytes);
+                    match udp_socket.send_to(&bytes, format!("{}:{}", host, port)) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            error!(
                             "Could not write bytes to UDP socket: {}, trying to continue anyway",
                             e
                         )
-                    }
-                }
-                let mut buf = [0; 3];
-                let udp_result = udp_socket.recv(&mut buf);
-
-                match udp_result {
-                    Ok(_size) => {
-                        manager.failures = 0; // Reset consecutive failure count
-                    }
-                    Err(ref e) if e.kind() == WouldBlock => {
-                        if failures >= con_fail_limit {
-                            error!("Too many consecutive communication failures, exiting.");
-                            process::exit(1);
                         }
-                        warn!(
+                    }
+                    let mut buf = [0; 3];
+                    let udp_result = udp_socket.recv(&mut buf);
+
+                    match udp_result {
+                        Ok(_size) => {
+                            manager.failures = 0; // Reset consecutive failure count
+                        }
+                        Err(ref e) if e.kind() == WouldBlock => {
+                            if failures >= con_fail_limit {
+                                error!("Too many consecutive communication failures, exiting.");
+                                process::exit(1);
+                            }
+                            warn!(
                             "UDP timeout reached! Will resend packet, but won't wait for response!"
                         );
-                        match udp_socket.send_to(&bytes, format!("{}:{}", host, port)) {
-                            Ok(_) => {}
-                            Err(e) => {
-                                error!("Could not write bytes to UDP socket: {}, trying to continue anyway", e)
+                            match udp_socket.send_to(&bytes, format!("{}:{}", host, port)) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    error!("Could not write bytes to UDP socket: {}, trying to continue anyway", e)
+                                }
                             }
-                        }
-                        manager.failures += 1
-                    }
-                    Err(e) => {
-                        error!("An error occurred sending data: {}", e);
-                    }
-                }
-
-                if buf == [42, 41, 44] {
-                    // "BAD" - indicates the remote device reported a malformed packet
-                    warn!("ESP reported a malformed packet!"); // TODO: Should we resend packet and not wait?
-                    manager.failures += 1
-                }
-            }
-            None => panic!("Could not send packet as manager.udp_socket does not exist!"),
-        };
-    } else if manager.communication_mode == 2 {
-        if manager.serial_port.is_empty() {
-            for path in serial_port_paths.iter() {
-                let baud_rate = manager.baud_rate;
-                let serial_read_timeout = manager.serial_read_timeout;
-                manager.serial_port.push(
-                    match serialport::new(path, baud_rate)
-                        .timeout(Duration::from_millis(serial_read_timeout.into()))
-                        .open()
-                    {
-                        Ok(port) => port,
-                        Err(e) => panic!("Could not open {}: {}", path, e),
-                    },
-                );
-            }
-        }
-        // if let Some(serial_port) = manager.serial_port.as_mut() {
-
-        let leds_per_strip = manager.num_led / manager.num_strips;
-        for index in 1..manager.num_strips + 1 {
-            debug!(
-                "n: {n}, leds_per_strip: {leds_per_strip}, max: {}, min: {}",
-                index * leds_per_strip,
-                (index - 1) * leds_per_strip
-            );
-            if (n as u32) < index * leds_per_strip && n as u32 >= (index - 1) * leds_per_strip {
-                // Determines which strip to send the index instruction to.
-                let n_real;
-                if index > 1 {
-                    debug!(
-                        "index is {index}, leds_per_strip is {leds_per_strip}, subtracting {}",
-                        (leds_per_strip * (index - 1))
-                    );
-                    n_real = n - (leds_per_strip * (index - 1)) as u16;
-                } else {
-                    n_real = n;
-                }
-                debug!("n is {n}, n_real is {n_real}");
-                let serial_port = &mut manager.serial_port[(index - 1) as usize];
-                debug!(
-                    "using serial_port {}",
-                    serial_port_paths[(index - 1) as usize]
-                );
-
-                debug!(
-                    "Sending following sequence: {n_real}|{r}|{g}|{b} to {}",
-                    serial_port_paths[(index - 1) as usize]
-                );
-                let mut msg: [u8; 7] = [0; 7];
-                msg[2..4].copy_from_slice(&n_real.to_le_bytes());
-                msg = [0xFF, 0xBB, msg[2], msg[3], r, g, b]; // 0xFF & 0xBB indicate a start of packet.
-                match serial_port.write_all(&msg) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        panic!(
-                            "Could not write bytes to {}:{}",
-                            manager.serial_port_paths[(index - 1) as usize],
-                            e
-                        )
-                    }
-                }
-
-                if print_send_back {
-                    let mut serial_buf: Vec<u8> = vec![0; 7];
-
-                    let read_result = serial_port.read(serial_buf.as_mut_slice());
-
-                    match read_result {
-                        Ok(_size) => {
-                            info!(
-                                "print_send_back returned {:?}",
-                                String::from_utf8_lossy(&serial_buf)
-                            );
+                            manager.failures += 1
                         }
                         Err(e) => {
-                            error!("print_send_back could not read serial port: {}", e);
+                            error!("An error occurred sending data: {}", e);
                         }
-                    };
-                } else {
-                    let mut failures = 0;
-                    let mut serial_buf: Vec<u8> = vec![0; 1];
+                    }
 
-                    loop {
-                        match serial_port.read_exact(serial_buf.as_mut_slice()) {
-                            Ok(_) => break,
-                            Err(e) => {
-                                error!(
-                                    "Could not read from {}: {}",
-                                    serial_port_paths[(index - 1) as usize],
-                                    e
-                                )
+                    if buf == [42, 41, 44] {
+                        // "BAD" - indicates the remote device reported a malformed packet
+                        warn!("ESP reported a malformed packet!"); // TODO: Should we resend packet and not wait?
+                        manager.failures += 1
+                    }
+                }
+                None => panic!("Could not send packet as manager.udp_socket does not exist!"),
+            };
+        } else if manager.communication_mode == 2 {
+            if manager.serial_port.is_empty() {
+                for path in serial_port_paths.iter() {
+                    let baud_rate = manager.baud_rate;
+                    let serial_read_timeout = manager.serial_read_timeout;
+                    manager.serial_port.push(
+                        match serialport::new(path, baud_rate)
+                            .timeout(Duration::from_millis(serial_read_timeout.into()))
+                            .open()
+                        {
+                            Ok(port) => port,
+                            Err(e) => panic!("Could not open {}: {}", path, e),
+                        },
+                    );
+                }
+            }
+            // if let Some(serial_port) = manager.serial_port.as_mut() {
+
+            let leds_per_strip = manager.num_led / manager.num_strips;
+            for index in 1..manager.num_strips + 1 {
+                debug!(
+                    "n: {n}, leds_per_strip: {leds_per_strip}, max: {}, min: {}",
+                    index * leds_per_strip,
+                    (index - 1) * leds_per_strip
+                );
+                if (n as u32) < index * leds_per_strip && n as u32 >= (index - 1) * leds_per_strip {
+                    // Determines which strip to send the index instruction to.
+                    let n_real;
+                    if index > 1 {
+                        debug!(
+                            "index is {index}, leds_per_strip is {leds_per_strip}, subtracting {}",
+                            (leds_per_strip * (index - 1))
+                        );
+                        n_real = n - (leds_per_strip * (index - 1)) as u16;
+                    } else {
+                        n_real = n;
+                    }
+                    debug!("n is {n}, n_real is {n_real}");
+                    let serial_port = &mut manager.serial_port[(index - 1) as usize];
+                    debug!(
+                        "using serial_port {}",
+                        serial_port_paths[(index - 1) as usize]
+                    );
+
+                    debug!(
+                        "Sending following sequence: {n_real}|{r}|{g}|{b} to {}",
+                        serial_port_paths[(index - 1) as usize]
+                    );
+                    let mut msg: [u8; 7] = [0; 7];
+                    msg[2..4].copy_from_slice(&n_real.to_le_bytes());
+                    msg = [0xFF, 0xBB, msg[2], msg[3], r, g, b]; // 0xFF & 0xBB indicate a start of packet.
+                    match serial_port.write_all(&msg) {
+                        Ok(_) => {}
+                        Err(e) => {
+                            panic!(
+                                "Could not write bytes to {}:{}",
+                                manager.serial_port_paths[(index - 1) as usize],
+                                e
+                            )
+                        }
+                    }
+
+                    if print_send_back {
+                        let mut serial_buf: Vec<u8> = vec![0; 7];
+
+                        let read_result = serial_port.read(serial_buf.as_mut_slice());
+
+                        match read_result {
+                            Ok(_size) => {
+                                info!(
+                                    "print_send_back returned {:?}",
+                                    String::from_utf8_lossy(&serial_buf)
+                                );
                             }
-                        }
-                        failures += 1;
+                            Err(e) => {
+                                error!("print_send_back could not read serial port: {}", e);
+                            }
+                        };
+                    } else {
+                        let mut failures = 0;
+                        let mut serial_buf: Vec<u8> = vec![0; 1];
 
-                        if failures >= serial_read_timeout {
-                            error!(
+                        loop {
+                            match serial_port.read_exact(serial_buf.as_mut_slice()) {
+                                Ok(_) => break,
+                                Err(e) => {
+                                    error!(
+                                        "Could not read from {}: {}",
+                                        serial_port_paths[(index - 1) as usize],
+                                        e
+                                    )
+                                }
+                            }
+                            failures += 1;
+
+                            if failures >= serial_read_timeout {
+                                error!(
                                 "Did not receive confirmation byte after {}ms! Continuing anyway!",
                                 manager.serial_read_timeout
                             );
-                            break;
+                                break;
+                            }
                         }
+                        manager.queue_lengths.push(serial_buf[0]);
                     }
-                    // info!("queue length is {}", serial_buf[0]);
                 }
             }
         }
