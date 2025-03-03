@@ -258,7 +258,7 @@ fn main() {
     #[cfg(feature = "scan")]
     if let Some(Command::Calibrate(ref _calibrate_options)) = opts.command {
         info!("Performing calibrating");
-        scan::scan(config_holder.clone(), &manager).expect("failure");
+        scan::scan(config_holder.clone(), &manager, false).expect("failure");
     }
 
     // led_manager::set_color(&mut manager, 1, 255, 255, 255);
