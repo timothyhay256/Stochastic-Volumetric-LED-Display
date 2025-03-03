@@ -5,11 +5,11 @@
 #include <WiFiUdp.h>
 
 // Change variables below!
-#define LED_PIN 27
+#define LED_PIN 2
 #define LED_COUNT 50
 #define COLOR_ORDER GRB
-const char *ssid = "SSID";         // Network SSID
-const char *password = "PASSWORD"; // Network password
+const char *ssid = "STN";            // Network SSID
+const char *password = "88bb6b7054"; // Network password
 // Change variables above!
 
 int port = 8888;

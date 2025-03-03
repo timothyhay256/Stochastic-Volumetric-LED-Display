@@ -7,6 +7,7 @@ use std::{
     io::{BufWriter, Read, Write},
     net::{Ipv4Addr, UdpSocket},
     path::{Path, PathBuf},
+    sync::{Arc, Mutex},
     time::SystemTime,
 };
 
@@ -14,10 +15,11 @@ use std::{
 pub struct Config {
     // TODO: All of these should also be passable via commandline
     pub num_led: u32,
+    pub num_strips: u32,
     pub communication_mode: i8,
     pub host: Ipv4Addr,
     pub port: i32,
-    pub serial_port_path: String,
+    pub serial_port_paths: Vec<String>,
     pub baud_rate: u32,
     pub serial_read_timeout: u32,
     pub record_data: bool,
@@ -27,8 +29,11 @@ pub struct Config {
     pub record_esp_data_file: PathBuf,
     pub print_send_back: bool,
     pub udp_read_timeout: u32,
-    pub camera_index: i32,
+    pub multi_camera: bool,
+    pub camera_index_1: i32,
+    pub camera_index_2: Option<i32>,
     pub con_fail_limit: u32,
+    pub no_controller: bool,
     pub unity_options: UnityOptions,
 }
 
@@ -45,10 +50,11 @@ pub struct UnityOptions {
 pub struct ManagerData {
     // Used to persist data through led_manager::set_color.
     pub num_led: u32,
+    pub num_strips: u32,
     pub communication_mode: i8,
     pub host: Ipv4Addr,
     pub port: i32,
-    pub serial_port_path: String,
+    pub serial_port_paths: Vec<String>,
     pub baud_rate: u32,
     pub serial_read_timeout: u32,
     pub record_data: bool,
@@ -65,8 +71,10 @@ pub struct ManagerData {
     pub data_file_buf: Option<BufWriter<File>>, // On the first run that requires writing to disk, this will be initialized.
     pub esp_data_file_buf: Option<BufWriter<File>>, // We could either add two new variables to track each ones init state, or we could just init both when either one needs to.
     pub udp_socket: Option<UdpSocket>, // The second option reduces clutter, and barely reduces performance, so we do that.
-    pub serial_port: Option<Box<dyn SerialPort>>,
+    pub serial_port: Vec<Box<dyn SerialPort>>,
     pub keepalive: bool, // Should our threads stay alive?
+    pub queue_lengths: Vec<u8>,
+    pub no_controller: bool, // For debugging. Should the set_color function do everything EXCEPT actually attempt to set the color?
 }
 
 pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Config) {
@@ -86,10 +94,11 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
         .expect("The config file was not formatted properly and could not be read.");
 
     let num_led = config_holder.num_led;
+    let num_strips = config_holder.num_strips;
     let communication_mode = config_holder.communication_mode;
     let host = config_holder.host;
     let port = config_holder.port;
-    let serial_port_path = config_holder.serial_port_path.clone();
+    let serial_port_paths = config_holder.serial_port_paths.clone();
     let baud_rate = config_holder.baud_rate;
     let serial_read_timeout = config_holder.serial_read_timeout;
 
@@ -101,21 +110,26 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
     let udp_read_timeout = config_holder.udp_read_timeout;
     let con_fail_limit = config_holder.con_fail_limit;
 
+    let multi_camera = config_holder.multi_camera;
+
     let print_send_back = config_holder.print_send_back;
+
+    let no_controller = config_holder.no_controller;
 
     // Validate config and inform user of settings
 
-    if num_led > 255 {
-        panic!("You currently cannot use over 255 LEDs do to how the driver delivers packets. This will be changed soon.")
-    }
-    if communication_mode == 2 {
-        if Path::new(&serial_port_path).exists() {
-            info!("Using serial for communication on {}!", serial_port_path);
-        } else {
-            panic!("Serial port {} does not exist!", serial_port_path);
+    if !no_controller {
+        if communication_mode == 2 {
+            for path in serial_port_paths.iter() {
+                if Path::new(path).exists() {
+                    info!("Using serial for communication on {}!", path);
+                } else {
+                    panic!("Serial port {} does not exist!", path);
+                }
+            }
+        } else if communication_mode == 1 {
+            info!("Using udp for communication at {} on port {}", host, port);
         }
-    } else if communication_mode == 1 {
-        info!("Using udp for communication at {} on port {}", host, port);
     }
 
     if unity_controls_recording || record_data || record_esp_data {
@@ -148,13 +162,18 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
         warn!("No bVLED or VLED data will be recorded!");
     }
 
+    if multi_camera {
+        info!("Using multiple cameras!");
+    }
+
     (
         ManagerData {
             num_led,
+            num_strips,
             communication_mode,
             host,
             port,
-            serial_port_path: serial_port_path.clone(), // So we can create new ManagerDatas
+            serial_port_paths: serial_port_paths.clone(), // So we can create new ManagerDatas
             baud_rate,
             serial_read_timeout,
             record_data,
@@ -171,8 +190,10 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
             data_file_buf: None,
             esp_data_file_buf: None,
             udp_socket: None,
-            serial_port: None,
+            serial_port: Vec::new(),
             keepalive: true,
+            queue_lengths: Vec::new(),
+            no_controller,
         },
         config_holder.unity_options.clone(),
         config_holder,
@@ -201,7 +222,8 @@ pub fn check_and_create_file(file: &PathBuf) -> Result<File, Box<dyn Error>> {
     Ok(data_file)
 }
 
-pub fn flush_data(manager: &mut ManagerData) {
+pub fn flush_data(manager_guard: Arc<Mutex<ManagerData>>) {
+    let mut manager = manager_guard.lock().unwrap();
     // Flush our BufWriters
     if manager.data_file_buf.is_some() {
         if let Some(data_file_buf) = manager.data_file_buf.as_mut() {

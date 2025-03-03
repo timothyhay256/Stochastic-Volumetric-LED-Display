@@ -6,11 +6,11 @@ use opencv::{
     highgui::{self, EVENT_LBUTTONDOWN, EVENT_LBUTTONUP, EVENT_MOUSEMOVE},
     imgproc::{self, COLOR_BGR2GRAY, LINE_8},
     prelude::*,
-    videoio, Result,
+    videoio::{self, VideoCapture}, Result,
 };
 use std::{
     cmp::{max, min}, error::Error, fs::File, io::Write, path::Path, process, sync::{Arc, Mutex}, thread, time::Duration
-}; // This will be used for more things in the future, so it's not bloat
+};
 
 use crate::led_manager;
 use crate::Config;
@@ -18,26 +18,44 @@ use crate::ManagerData;
 
 #[derive(Clone, Debug)]
 pub struct ScanData {
-    x_start: i32,
-    y_start: i32,
-    x_end: i32,
-    y_end: i32,
-    darkest: f64,
-    brightest: f64,
+    pos: CropPos,
     invert: bool,
     depth: bool,
 }
+
+#[derive(Clone, Debug)]
+pub struct CropPos {
+    x1_start: i32,
+    y1_start: i32,
+    x1_end: i32,
+    y1_end: i32,
+    x2_start: Option<i32>,
+    y2_start: Option<i32>,
+    x2_end: Option<i32>,
+    y2_end: Option<i32>,
+    cam_1_brightest: Option<f64>,
+    cam_2_brightest: Option<f64>,
+    cam_1_darkest: Option<f64>,
+    cam_2_darkest: Option<f64>
+}
+type ScanResult = Result<(i32, i32, Option<i32>, Option<i32>), Box<dyn Error>>;
 type PosEntry = Vec<(String, (i32, i32), Option<(i32, i32)>)>;
 
-pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
-    let mut led_pos: PosEntry =
-        vec![("UNCALIBRATED".to_string(), (0, 0), Some((0, 0))); config.num_led as usize];
-    info!("Clearing strip");
-    for i in 0..=manager.num_led {
-        led_manager::set_color(manager, i.try_into().unwrap(), 0, 0, 0);
+pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>) -> Result<()> {
+    let mut led_pos = vec![("UNCALIBRATED".to_string(), (0, 0), Some((0, 0))); config.num_led as usize];
+    let num_led;
+    {
+        num_led = manager_guard.lock().unwrap().num_led;
     }
-    let (x_start, y_start, x_end, y_end) = match crop(&config) {
-        Ok((x_start, y_start, x_end, y_end)) => (x_start, y_start, x_end, y_end),
+    info!("Clearing strip");
+    for i in 0..=num_led {
+        led_manager::set_color(manager_guard, i.try_into().unwrap(), 0, 0, 0);
+    }
+
+    
+    // let manager = &mut manager_guard.lock().unwrap();
+    let mut pos = match crop(&config) {
+        Ok(pos) => pos,
         Err(e) => {
             panic!("There was a problem while trying to crop: {}", e)
         }
@@ -46,94 +64,93 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
     let window = "Please wait...";
     highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
 
-    let cam = Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index, videoio::CAP_ANY)?)); // We need to constantly poll this in the background to get the most recent frame due to OpenCV bug(?)
+    let cam = Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_1, videoio::CAP_ANY)?)); // We need to constantly poll this in the background to get the most recent frame due to OpenCV bug(?)
+    let mut cam2: Option<Arc<Mutex<VideoCapture>>> = None;
 
     let cam_guard = Arc::clone(&cam);
-    
+    let cam2_guard;
+
     thread::spawn(move || {
         loop {
             let mut frame = Mat::default();
             cam_guard.lock().unwrap().read(&mut frame).unwrap();
             thread::sleep(Duration::from_millis(1)); // Give us a chance to grab the lock
         }
-
     });
-    let brightest;
-    let darkest;
-    {
-        let mut cam = cam.lock().unwrap();
-        let opened = videoio::VideoCapture::is_opened(&cam)?;
-        if !opened {
-            panic!(
-                "Unable to open camera {}! Please select another.",
-                config.camera_index
-            );
+
+    (pos.cam_1_brightest, pos.cam_1_darkest) = match brightest_darkest(&cam, &config, manager_guard, pos.x1_start, pos.y1_start, pos.x1_end, pos.y1_end) {
+        Ok((brightest, darkest)) => (Some(brightest), Some(darkest)),
+        Err(e) => {
+            panic!("There was an issue trying to get the darkest and brightest values: {e}")
         }
+    };
+    
+    if config.multi_camera {
+        highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
+        
+        cam2 = Some(Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_2.unwrap(), videoio::CAP_ANY)?)));
 
-        info!("Collecting brightest and darkest points, please wait...");
-        debug!("Get brightest");
-        led_manager::set_color(manager, 5, 255, 255, 255);
+        cam2_guard = Arc::clone(cam2.as_ref().unwrap());
+        
+        thread::spawn(move || {
+            loop {
+                let mut frame = Mat::default();
+                cam2_guard.lock().unwrap().read(&mut frame).unwrap();
+                thread::sleep(Duration::from_millis(1)); // Give us a chance to grab the lock
+            }
 
-        let mut frame = Mat::default();
-        cam.read(&mut frame)?;
-        let frame = Mat::roi(
-            &frame,
-            opencv::core::Rect {
-                x: x_start,
-                y: y_start,
-                width: x_end - x_start,
-                height: y_end - y_start,
-            },
-        )?;
-        (_, brightest, _) = get_brightest_pos(frame.try_clone()?);
-
-        debug!("get darkest");
-        led_manager::set_color(manager, 5, 0, 0, 0);
-
-        let mut frame = Mat::default();
-        cam.read(&mut frame)?;
-        let frame = Mat::roi(
-            &frame,
-            opencv::core::Rect {
-                x: x_start,
-                y: y_start,
-                width: x_end - x_start,
-                height: y_end - y_start,
-            },
-        )?;
-        (_, darkest, _) = get_brightest_pos(frame.try_clone()?);
+        });
+        let initial_cal_var = brightest_darkest(cam2.as_ref().unwrap(), &config, manager_guard, pos.x1_start, pos.y1_start, pos.x1_end, pos.y1_end);
+        (pos.cam_2_brightest, pos.cam_2_darkest) = (
+            Some(match initial_cal_var {
+                Ok(brightest) => brightest.0,
+                Err(e) => {
+                    panic!("There was an issue trying to get the darkest and brightest values: {e}");
+                }
+            }),
+            Some(match initial_cal_var {
+                Ok(darkest) => darkest.1,
+                Err(e) => {
+                    panic!("There was an issue trying to get the darkest and brightest values: {e}");
+                }
+            }),
+        );
     }
 
-    let mut data = ScanData {
-        x_start,
-        y_start,
-        x_end,
-        y_end,
-        darkest,
-        brightest,
+    highgui::destroy_all_windows().unwrap();
+
+    let data = Arc::new(Mutex::new(ScanData {
+        pos,
         invert: false,
         depth: false,
-    };
+    }));
+    
     info!("Scan XY");
-    let (success, failures) = match scan_area(
-        manager,
+    let (success, failures, success_cam_2, failures_cam_2) = match scan_area(
+        manager_guard,
         &config,
-        window,
         &cam,
+        cam2.as_ref(),
         &mut led_pos,
         data.clone(),
     ) {
-        Ok((success, failures)) => (success, failures),
+        Ok((success, failures, success_cam_2, failures_cam_2)) => (success, failures, success_cam_2, failures_cam_2),
         Err(e) => {
             panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
         }
     };
 
-    info!("{success} succesful calibrations, {failures} failed calibrations");
+    if !config.multi_camera {
+        info!("{success} succesful calibrations, {failures} failed calibrations");
+    } else {
+        info!("First camera: {success} succesful calibrations, {failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.", success_cam_2.unwrap(), failures_cam_2.unwrap());
+    }
 
     if failures > 0 {
         // Rescan XY from the back if there are failures
-        data.invert = true;
+        {
+            data.lock().unwrap().invert = true;
+        }
         info!("Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.");
         highgui::set_window_title(window, "Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.")?;
         match wait(data.clone(), &cam, window) {
@@ -142,29 +159,33 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
             }
         }
-        let (success, failures) = match scan_area(
-            manager,
+        let (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures) = match scan_area(
+            manager_guard,
             &config,
-            window,
             &cam,
+            cam2.as_ref(),
             &mut led_pos,
             data.clone(),
         ) {
-            Ok((success, failures)) => (success, failures),
+            Ok((cam_1_success, cam_1_failures, cam_2_success, cam_2_failures)) => (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures),
             Err(e) => {
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
             }
         };
-        info!("{success} succesful calibrations, {failures} failed calibrations");
+        if !config.multi_camera {
+            info!("{cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations");
+        } else {
+            info!("First camera: {cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.", cam_2_success.unwrap(), cam_2_failures.unwrap());
+        }
         if failures > 0 {
             info!("Entering manual calibration mode!");
             match manual_calibrate(
-                manager,
+                manager_guard,
                 &config,
                 window,
                 &cam,
                 &mut led_pos,
-                data.clone(),
+                &data,
             ) {
                 Ok(_) => {}
                 Err(e) => {
@@ -179,82 +200,99 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
         )?;
     }
 
-    if failures == 0 {
-        info!("Please rotate the container 90 degrees to calibrate Z. Press any key to continue.");
-        highgui::set_window_title(
-            window,
-            "Please rotate the container 90 degrees to calibrate Z. Press any key to continue.",
-        )?;
-    }
-    match wait(data.clone(), &cam, window) {
-        Ok(_) => {}
-        Err(e) => {
-            panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
+    if !config.multi_camera {
+        if failures == 0 {
+            info!("Please rotate the container 90 degrees to calibrate Z. Press any key to continue.");
+            highgui::set_window_title(
+                window,
+                "Please rotate the container 90 degrees to calibrate Z. Press any key to continue.",
+            )?;
         }
-    }
-    info!("Scan Z");
-
-    data.invert = false;
-    data.depth = true;
-    let (success, failures) = match scan_area(
-        manager,
-        &config,
-        window,
-        &cam,
-        &mut led_pos,
-        data.clone(),
-    ) {
-        Ok((success, failures)) => (success, failures),
-        Err(e) => {
-            panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
-        }
-    };
-
-    info!("{success} succesful calibrations, {failures} failed calibrations");
-
-    if failures > 0 {
-        data.invert = true;
-        info!("Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.");
-        highgui::set_window_title(window, "Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.")?;
         match wait(data.clone(), &cam, window) {
             Ok(_) => {}
             Err(e) => {
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
             }
         }
-        let (success, failures) = match scan_area(
-            manager,
+
+        info!("Scan Z");
+        {
+            data.lock().unwrap().invert = false;
+            data.lock().unwrap().depth = true;
+        }
+
+        let (success, failures, success_cam_2, failures_cam_2) = match scan_area(
+            manager_guard,
             &config,
-            window,
             &cam,
+            cam2.as_ref(),
             &mut led_pos,
             data.clone(),
         ) {
-            Ok((success, failures)) => (success, failures),
+            Ok((cam_1_success, cam_1_failures, cam_2_success, cam_2_failures)) => (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures),
             Err(e) => {
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
             }
         };
-        info!("{success} succesful calibrations, {failures} failed calibrations");
+
+        if !config.multi_camera {
+            info!("{success} succesful calibrations, {failures} failed calibrations");
+        } else {
+            info!("First camera: {success} succesful calibrations, {failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.", success_cam_2.unwrap(), failures_cam_2.unwrap());
+        }
+
         if failures > 0 {
-            info!("Entering manual calibration mode!");
-            match manual_calibrate(
-                manager,
+            {
+                data.lock().unwrap().invert = true;
+            }
+            info!("Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.");
+            highgui::set_window_title(window, "Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.")?;
+            match wait(data.clone(), &cam, window) {
+                Ok(_) => {}
+                Err(e) => {
+                    panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
+                }
+            }
+            let (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures) = match scan_area(
+                manager_guard,
                 &config,
-                window,
                 &cam,
+                cam2.as_ref(),
                 &mut led_pos,
                 data.clone(),
             ) {
-                Ok(_) => {}
+                Ok((cam_1_success, cam_1_failures, cam_2_success, cam_2_failures)) => (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures),
                 Err(e) => {
-                    panic!("Something went wrong during manual calibration: {}", e);
+                    panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
+                }
+            };
+            if !config.multi_camera {
+                info!("{cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations");
+            } else {
+                info!("First camera: {cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.", cam_2_success.unwrap(), cam_2_failures.unwrap());
+            }
+            if failures > 0 {
+                info!("Entering manual calibration mode!");
+                match manual_calibrate(
+                    manager_guard,
+                    &config,
+                    window,
+                    &cam,
+                    &mut led_pos,
+                    &data.clone(),
+                ) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        panic!("Something went wrong during manual calibration: {}", e);
+                    }
                 }
             }
         }
     }
     highgui::destroy_all_windows().unwrap();
-    post_process(&mut led_pos, manager.num_led);
+    {
+        post_process(&mut led_pos, manager_guard.lock().unwrap().num_led);
+    }
     loop {
         let date = Local::now();
         let name = inquire::Text::new(&format!(
@@ -297,42 +335,122 @@ pub fn scan(config: Config, manager: &mut ManagerData) -> Result<()> {
     Ok(())
 }
 
-pub fn crop(config: &Config) -> Result<(i32, i32, i32, i32), Box<dyn Error>> {
+pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manager: &Arc<Mutex<ManagerData>>, x_start: i32, y_start: i32, x_end: i32, y_end: i32) -> Result<(f64, f64), Box<dyn Error>>  {
+    debug!("Getting brightest and darkest points");
+    let mut cam = cam.lock().unwrap();
+    match videoio::VideoCapture::is_opened(&cam)? {
+        true => {},
+        false => {panic!(
+            "Unable to open camera {}! Please select another.",
+            config.camera_index_1
+        )}
+    };
+
+    info!("Collecting brightest and darkest points, please wait...");
+    led_manager::set_color(manager, 5, 255, 255, 255);
+
+    debug!("getting frame");
+    let mut frame = Mat::default();
+    cam.read(&mut frame)?;
+    let frame = Mat::roi(
+        &frame,
+        opencv::core::Rect {
+            x: x_start,
+            y: y_start,
+            width: x_end - x_start,
+            height: y_end - y_start,
+        },
+    )?;
+    let (_, brightest, _) = get_brightest_cam_1_pos(frame.try_clone()?);
+
+    debug!("get darkest_cam_1");
+    led_manager::set_color(manager, 5, 0, 0, 0);
+
+    let mut frame = Mat::default();
+    cam.read(&mut frame)?;
+    let frame = Mat::roi(
+        &frame,
+        opencv::core::Rect {
+            x: x_start,
+            y: y_start,
+            width: x_end - x_start,
+            height: y_end - y_start,
+        },
+    )?;
+    let (_, darkest, _) = get_brightest_cam_1_pos(frame.try_clone()?);
+
+    Ok((brightest, darkest))
+    
+}
+
+pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
     let window = "Calibration";
-    let x_start = Arc::new(Mutex::new(0));
-    let y_start = Arc::new(Mutex::new(0));
-    let x_end = Arc::new(Mutex::new(0));
-    let y_end = Arc::new(Mutex::new(0));
 
-    highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
+    let x1_start = Arc::new(Mutex::new(0));
+    let y1_start = Arc::new(Mutex::new(0));
+    let x1_end = Arc::new(Mutex::new(0));
+    let y1_end = Arc::new(Mutex::new(0));
 
-    let x_start_guard = Arc::clone(&x_start);
-    let y_start_guard = Arc::clone(&y_start);
-    let x_end_guard = Arc::clone(&x_end);
-    let y_end_guard = Arc::clone(&y_end);
+    let x2_start = Arc::new(Mutex::new(0));
+    let y2_start = Arc::new(Mutex::new(0));
+    let x2_end = Arc::new(Mutex::new(0));
+    let y2_end = Arc::new(Mutex::new(0));
+
+    let camera_active = Arc::new(Mutex::new(0)); // 0 for first, 1 for second.
+
+    let x1_start_guard = Arc::clone(&x1_start);
+    let y1_start_guard = Arc::clone(&y1_start);
+    let x1_end_guard = Arc::clone(&x1_end);
+    let y1_end_guard = Arc::clone(&y1_end);
+
+    let x2_start_guard = Arc::clone(&x2_start);
+    let y2_start_guard = Arc::clone(&y2_start);
+    let x2_end_guard = Arc::clone(&x2_end);
+    let y2_end_guard = Arc::clone(&y2_end);
+
+    let camera_active_guard = Arc::clone(&camera_active);
     let mut actively_cropping = false;
 
+    highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
     highgui::set_mouse_callback(
         window,
         Some(Box::new(move |event, x, y, _flag| match event {
             #[allow(non_snake_case)]
             // EVENT_LBUTTONDOWN is defined in the OpenCV crate, so I can't change it.
             EVENT_LBUTTONDOWN => {
+                debug!("lbuttondown");
                 actively_cropping = true;
-                *x_start_guard.lock().unwrap() = x;
-                *y_start_guard.lock().unwrap() = y;
+                if *camera_active_guard.lock().unwrap() == 0 {
+                    *x1_start_guard.lock().unwrap() = x;
+                    *y1_start_guard.lock().unwrap() = y;
+                } else if *camera_active_guard.lock().unwrap() == 1 {
+                    *x2_start_guard.lock().unwrap() = x;
+                    *y2_start_guard.lock().unwrap() = y;
+                }
             }
             #[allow(non_snake_case)]
             EVENT_LBUTTONUP => {
+                debug!("lbuttonup");
                 actively_cropping = false;
-                *x_end_guard.lock().unwrap() = x;
-                *y_end_guard.lock().unwrap() = y;
+                if *camera_active_guard.lock().unwrap() == 0 {
+                    *x1_end_guard.lock().unwrap() = x;
+                    *y1_end_guard.lock().unwrap() = y;
+                } else if *camera_active_guard.lock().unwrap() == 1 {
+                    *x2_end_guard.lock().unwrap() = x;
+                    *y2_end_guard.lock().unwrap() = y;
+                }
             }
             #[allow(non_snake_case)]
             EVENT_MOUSEMOVE => {
+                debug!("mousemove");
                 if actively_cropping {
-                    *x_end_guard.lock().unwrap() = x;
-                    *y_end_guard.lock().unwrap() = y;
+                    if *camera_active_guard.lock().unwrap() == 0 {
+                        *x1_end_guard.lock().unwrap() = x;
+                        *y1_end_guard.lock().unwrap() = y;
+                    } else if *camera_active_guard.lock().unwrap() == 1 {
+                        *x2_end_guard.lock().unwrap() = x;
+                        *y2_end_guard.lock().unwrap() = y;
+                    }
                 }
             }
 
@@ -340,21 +458,76 @@ pub fn crop(config: &Config) -> Result<(i32, i32, i32, i32), Box<dyn Error>> {
         })),
     )?;
 
-    let mut cam = videoio::VideoCapture::new(config.camera_index, videoio::CAP_ANY)?; // 0 is the default camera
-    let opened = videoio::VideoCapture::is_opened(&cam)?;
-    if !opened {
-        panic!(
+    let cam = videoio::VideoCapture::new(config.camera_index_1, videoio::CAP_ANY)?; // 0 is the default camera
+    match videoio::VideoCapture::is_opened(&cam)? {
+        true => {},
+        false => {panic!(
             "Unable to open camera {}! Please select another.",
-            config.camera_index
-        );
+            config.camera_index_1
+        )}
+    };
+    let x_start_result;
+    let x_end_result;
+    let y_start_result;
+    let y_end_result;
+
+    let mut x2_start_result = None;
+    let mut x2_end_result = None;
+    let mut y2_start_result = None;
+    let mut y2_end_result = None;
+
+    debug!("starting crop_loop for first camera.");
+    (x_start_result, x_end_result, y_start_result, y_end_result) = match crop_loop(cam, x1_start.clone(), y1_start.clone(), x1_end.clone(), y1_end.clone(), window, "Please drag the mouse around the container. Press any key to continue".to_string()) {
+        Ok((x_start, x_end, y_start, y_end)) => (x_start, x_end, y_start, y_end),
+        Err(e) => panic!("Something went wrong during cropping: {e}")
+    };
+    if let Some(index) = config.camera_index_2 {
+        debug!("Cropping second camera");
+        *camera_active.lock().unwrap() = 1;
+        let cam = videoio::VideoCapture::new(index, videoio::CAP_ANY)?; // 0 is the default camera
+        match videoio::VideoCapture::is_opened(&cam)? {
+            true => {},
+            false => {panic!(
+                "Unable to open camera {}! Please select another.",
+                index
+            )}
+        };
+        let loop_out = crop_loop(cam, x2_start, y2_start, x2_end, y2_end, window, "Please drag the mouse around the second container. Press any key to continue".to_string()).unwrap();
+        (x2_start_result, x2_end_result, y2_start_result, y2_end_result) = (
+            Some(loop_out.0),
+            Some(loop_out.1),
+            Some(loop_out.2),
+            Some(loop_out.3));
     }
-    info!("Please drag the mouse around the container. Press any key to continue");
+
+    debug!("crop finished");
+
+    Ok(CropPos {
+        x1_start: x_start_result,
+        y1_start: y_start_result,
+        x1_end: x_end_result,
+        y1_end: y_end_result,
+        x2_start: x2_start_result,
+        y2_start: y2_start_result,
+        x2_end: x2_end_result,
+        y2_end: y2_end_result,
+        cam_1_brightest: None,
+        cam_1_darkest: None,
+        cam_2_brightest: None,
+        cam_2_darkest: None,
+    })
+
+}
+
+pub fn crop_loop(mut cam: VideoCapture, x_start: Arc<Mutex<i32>>, y_start: Arc<Mutex<i32>>, x_end: Arc<Mutex<i32>>, y_end: Arc<Mutex<i32>>, window: &str, msg: String) -> Result<(i32, i32, i32, i32), Box<dyn Error>> {
+    info!("{msg}");
+    debug!("window: {}, title: {}", window, msg);
     highgui::set_window_title(
         window,
-        "Please drag the mouse around the container. Press any key to continue",
+        &msg,
     )
     .unwrap();
-    Ok(loop {
+    loop {
         let mut frame = Mat::default();
         cam.read(&mut frame)?;
 
@@ -382,20 +555,22 @@ pub fn crop(config: &Config) -> Result<(i32, i32, i32, i32), Box<dyn Error>> {
 
         if frame.size()?.width > 0 {
             highgui::imshow(window, &frame)?;
+        } else {
+            warn!("frame is too small!");
         }
         let key = highgui::wait_key(10)?;
         if key > 0 && key != 255 {
             if x_start_guard != 0 && x_end_guard != 0 {
-                highgui::destroy_all_windows().unwrap();
-                break (x_start_guard, y_start_guard, x_end_guard, y_end_guard);
+                // highgui::destroy_all_windows().unwrap();
+                break Ok((x_start_guard, x_end_guard, y_start_guard, y_end_guard))
             } else {
                 error!("Please select a valid are for the crop");
             }
         }
-    })
+    }
 }
 
-pub fn get_brightest_pos(mut frame: Mat) -> (f64, f64, Point) {
+pub fn get_brightest_cam_1_pos(mut frame: Mat) -> (f64, f64, Point) {
     imgproc::cvt_color(&frame.clone(), &mut frame, COLOR_BGR2GRAY, 0, get_default_algorithm_hint().unwrap()).unwrap(); // Greyscales frame
     imgproc::gaussian_blur(
         // Blur frame to increase accuracy of min_max_loc
@@ -427,18 +602,30 @@ pub fn get_brightest_pos(mut frame: Mat) -> (f64, f64, Point) {
 }
 
 pub fn scan_area(
-    manager: &mut ManagerData,
+    manager: &Arc<Mutex<ManagerData>>,
     config: &Config,
-    window: &str,
     cam: &Arc<Mutex<videoio::VideoCapture>>,
+    cam2: Option<&Arc<Mutex<videoio::VideoCapture>>>,
     led_pos: &mut PosEntry,
-    scan_data: ScanData,
-) -> Result<(i32, i32), Box<dyn Error>> {
+    scan_data: Arc<Mutex<ScanData>>,
+) -> ScanResult {
+    let scan_data = &mut *scan_data.lock().unwrap();
 
-    let capture_frames = 3; // Increase me if calibration appears scrambled to ensure the video buffer is empty.
+    let cam_1_window = "Camera 1";
+    let cam_2_window = "Camera 2";
+
+    highgui::named_window(&cam_1_window, highgui::WINDOW_AUTOSIZE)?;
+
+    if config.multi_camera {
+        highgui::named_window(&cam_2_window, highgui::WINDOW_AUTOSIZE)?;
+    }
     
     let mut success = 0;
     let mut failures = 0;
+
+    let mut cam_2_success = None;
+    let mut cam_2_failures = None;
+
     for i in 0..config.num_led {
         let valid_cycle = if scan_data.depth {
             led_pos[i as usize].0 != "SUCCESS-Z"
@@ -447,87 +634,119 @@ pub fn scan_area(
         };
 
         if valid_cycle {
-            debug!("valid_cycle: {}", i);
-            led_manager::set_color(manager, i.try_into().unwrap(), 255, 255, 255);
-            let mut frame = Mat::default();
-            {
-                let mut cam = cam.lock().unwrap();
-                for _ in 0..capture_frames { // This is still needed unfortunately. It may need to be increased if you continue to encounter issues
-                    cam.read(&mut frame)?;
-                }
+            if config.multi_camera {
+                let scan_area_result = scan_area_cycle(manager, cam2, scan_data, led_pos, i, true, cam_2_window).unwrap();
+                (cam_2_success, cam_2_failures) = (Some(scan_area_result.0), Some(scan_area_result.1));
             }
-            let mut frame = Mat::roi(
-                &frame,
-                opencv::core::Rect {
-                    x: scan_data.x_start,
-                    y: scan_data.y_start,
-                    width: scan_data.x_end - scan_data.x_start,
-                    height: scan_data.y_end - scan_data.y_start,
-                },
-            )?
-            .try_clone()?;
-            if scan_data.invert {
-                flip(&frame.clone(), &mut frame, 1).unwrap();
-            }
-            let (_, max_val, pos) = get_brightest_pos(frame.try_clone()?);
 
-            if max_val >= scan_data.darkest + ((scan_data.brightest - scan_data.darkest) * 0.5) {
-                debug!("Succesful xy calibration: {:?} on index: {}", pos, i);
-                success += 1;
-                imgproc::circle(
-                    &mut frame,
-                    pos,
-                    20,
-                    Scalar::new(0.0, 255.0, 0.0, 255.0),
-                    2,
-                    LINE_8,
-                    0,
-                )?;
-                if scan_data.depth {
-                    led_pos[i as usize] = (
-                        "SUCCESS-Z".to_string(),
-                        led_pos[i as usize].1,
-                        Some((pos.x, pos.y)),
-                    );
-                } else {
-                    led_pos[i as usize] = (
-                        "SUCCESS-XY".to_string(),
-                        (pos.x, pos.y),
-                        led_pos[i as usize].2,
-                    );
-                }
-            } else {
-                debug!("Failed xy calibration: {:?} on index: {}", pos, i);
-                failures += 1;
-                imgproc::circle(
-                    &mut frame,
-                    pos,
-                    20,
-                    Scalar::new(0.0, 0.0, 255.0, 255.0),
-                    2,
-                    LINE_8,
-                    0,
-                )?;
-                if scan_data.depth {
-                    led_pos[i as usize] = (
-                        "RECALIBRATE-Z".to_string(),
-                        led_pos[i as usize].1,
-                        Some((pos.x, pos.y)),
-                    );
-                } else {
-                    led_pos[i as usize] = (
-                        "RECALIBRATE-XY".to_string(),
-                        (pos.x, pos.y),
-                        led_pos[i as usize].2,
-                    );
-                }
-            }
-            highgui::set_window_title(window, &("LED index: ".to_owned() + &i.to_string()))?;
-            highgui::imshow(window, &frame)?;
-            highgui::wait_key(1)?;
-            led_manager::set_color(manager, i.try_into().unwrap(), 0, 0, 0);
+            debug!("valid_cycle: {}", i);
+            (success, failures) = scan_area_cycle(manager, Some(cam), scan_data, led_pos, i, false, cam_1_window).unwrap();
         }
     }
+    Ok((success, failures, cam_2_success, cam_2_failures))
+}
+
+pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, cam: Option<&Arc<Mutex<VideoCapture>>>, scan_data: &mut ScanData, led_pos: &mut PosEntry, i: u32, second_cam: bool, window:&str) -> Result<(i32, i32), Box<dyn Error>> {
+    let capture_frames = 1; // Increase me if calibration appears scrambled to ensure the video buffer is empty.
+
+    let mut success = 0;
+    let mut failures = 0;
+
+    let x_start;
+    let x_end;
+    let y_start;
+    let y_end;
+
+    if !second_cam {
+        x_start = scan_data.pos.x1_start;
+        x_end = scan_data.pos.x1_end;
+        y_start = scan_data.pos.y1_start;
+        y_end = scan_data.pos.y1_end;
+    } else {
+        x_start = scan_data.pos.x2_start.unwrap();
+        x_end = scan_data.pos.x2_end.unwrap();
+        y_start = scan_data.pos.y2_start.unwrap();
+        y_end = scan_data.pos.y2_end.unwrap();
+    }
+
+    led_manager::set_color(manager, i.try_into().unwrap(), 255, 255, 255);
+    let mut frame = Mat::default();
+    {
+        let mut cam = cam.unwrap().lock().unwrap();
+        for _ in 0..capture_frames { // This is still needed unfortunately. It may need to be increased if you continue to encounter issues
+            cam.read(&mut frame)?;
+        }
+    }
+    let mut frame = Mat::roi(
+        &frame,
+        opencv::core::Rect {
+            x: x_start,
+            y: y_start,
+            width: x_end - x_start,
+            height: y_end - y_start,
+        },
+    )?
+    .try_clone()?;
+    if scan_data.invert {
+        flip(&frame.clone(), &mut frame, 1).unwrap();
+    }
+    let (_, max_val, pos) = get_brightest_cam_1_pos(frame.try_clone()?);
+
+    if max_val >= scan_data.pos.cam_1_darkest.unwrap() + ((scan_data.pos.cam_1_brightest.unwrap() - scan_data.pos.cam_1_darkest.unwrap()) * 0.5) {
+        debug!("Succesful xy calibration: {:?} on index: {}", pos, i);
+        success += 1;
+        imgproc::circle(
+            &mut frame,
+            pos,
+            20,
+            Scalar::new(0.0, 255.0, 0.0, 255.0),
+            2,
+            LINE_8,
+            0,
+        )?;
+        if scan_data.depth || second_cam {
+            led_pos[i as usize] = (
+                "SUCCESS-Z".to_string(),
+                led_pos[i as usize].1,
+                Some((pos.x, pos.y)),
+            );
+        } else {
+            led_pos[i as usize] = (
+                "SUCCESS-XY".to_string(),
+                (pos.x, pos.y),
+                led_pos[i as usize].2,
+            );
+        }
+    } else {
+        debug!("Failed xy calibration: {:?} on index: {}", pos, i);
+        failures += 1;
+        imgproc::circle(
+            &mut frame,
+            pos,
+            20,
+            Scalar::new(0.0, 0.0, 255.0, 255.0),
+            2,
+            LINE_8,
+            0,
+        )?;
+        if scan_data.depth {
+            led_pos[i as usize] = (
+                "RECALIBRATE-Z".to_string(),
+                led_pos[i as usize].1,
+                Some((pos.x, pos.y)),
+            );
+        } else {
+            led_pos[i as usize] = (
+                "RECALIBRATE-XY".to_string(),
+                (pos.x, pos.y),
+                led_pos[i as usize].2,
+            );
+        }
+    }
+    highgui::set_window_title(window, &("LED index: ".to_owned() + &i.to_string()))?;
+    highgui::imshow(window, &frame)?;
+    highgui::wait_key(1)?;
+    led_manager::set_color(manager, i.try_into().unwrap(), 0, 0, 0);
     Ok((success, failures))
 }
 
@@ -548,10 +767,11 @@ pub fn failed_calibration(led_pos: PosEntry) -> String {
 }
 
 pub fn wait(
-    scan_data: ScanData,
+    scan_data_lock: Arc<Mutex<ScanData>>,
     cam: &Arc<Mutex<videoio::VideoCapture>>,
     window: &str,
 ) -> Result<(), Box<dyn Error>> {
+    let scan_data = scan_data_lock.lock().unwrap();
     loop {
         let mut frame = Mat::default();
         {
@@ -562,10 +782,10 @@ pub fn wait(
         let cropped_image = Mat::roi(
             &frame,
             opencv::core::Rect {
-                x: scan_data.x_start,
-                y: scan_data.y_start,
-                width: scan_data.x_end - scan_data.x_start,
-                height: scan_data.y_end - scan_data.y_start,
+                x: scan_data.pos.x1_start,
+                y: scan_data.pos.y1_start,
+                width: scan_data.pos.x1_end - scan_data.pos.x1_start,
+                height: scan_data.pos.y1_end - scan_data.pos.y1_start,
             },
         )
         .unwrap();
@@ -583,13 +803,15 @@ pub fn wait(
 }
 
 pub fn manual_calibrate(
-    manager: &mut ManagerData,
+    manager_guard: &Arc<Mutex<ManagerData>>,
     config: &Config,
     window: &str,
     cam: &Arc<Mutex<videoio::VideoCapture>>,
     led_pos: &mut PosEntry,
-    scan_data: ScanData,
+    scan_data_guard: &Arc<Mutex<ScanData>>,
 ) -> Result<()> {
+    let scan_data = scan_data_guard.lock().unwrap();
+
     debug!("scan_data: {:?}", scan_data);
     info!("You are entering manual calibration mode. \n
     This is to manually calibrate all LEDs that failed to properly calibrate, and to make sure all LEDs did calibrate properly. The controls are:\n
@@ -631,7 +853,7 @@ pub fn manual_calibrate(
             ),
         )
         .unwrap();
-        led_manager::set_color(manager, led_index as u16, 255, 255, 255);
+        led_manager::set_color(manager_guard, led_index as u16, 255, 255, 255);
         let mut frame = Mat::default();
         {
             let mut cam = cam.lock().unwrap();
@@ -643,10 +865,10 @@ pub fn manual_calibrate(
         let mut frame = Mat::roi(
             &frame,
             opencv::core::Rect {
-                x: scan_data.x_start,
-                y: scan_data.y_start,
-                width: scan_data.x_end - scan_data.x_start,
-                height: scan_data.y_end - scan_data.y_start,
+                x: scan_data.pos.x1_start,
+                y: scan_data.pos.y1_start,
+                width: scan_data.pos.x1_end - scan_data.pos.x1_start,
+                height: scan_data.pos.y1_end - scan_data.pos.y1_start,
             },
         )
         .unwrap()
@@ -706,7 +928,7 @@ pub fn manual_calibrate(
             if key == 114 {
                 debug!("got R");
                 if led_index + 1 < config.num_led.try_into().unwrap() {
-                    led_manager::set_color(manager, led_index.try_into().unwrap(), 0, 0, 0);
+                    led_manager::set_color(manager_guard, led_index.try_into().unwrap(), 0, 0, 0);
                     led_index += 1;
                 } else {
                     warn!("At end of LEDs!");
@@ -714,7 +936,7 @@ pub fn manual_calibrate(
                 break;
             } else if key == 101 {
                 debug!("got E");
-                led_manager::set_color(manager, led_index.try_into().unwrap(), 0, 0, 0);
+                led_manager::set_color(manager_guard, led_index.try_into().unwrap(), 0, 0, 0);
                 if led_index - 1 > 0 {
                     led_index -= 1;
                 } else {
@@ -723,7 +945,7 @@ pub fn manual_calibrate(
                 break;
             } else if key == 102 {
                 debug!("got F");
-                led_manager::set_color(manager, led_index.try_into().unwrap(), 0, 0, 0);
+                led_manager::set_color(manager_guard, led_index.try_into().unwrap(), 0, 0, 0);
                 let led_begin = led_index; // Needed because of clippy::mut_range_bound
                 for _ in led_begin..config.num_led.try_into().unwrap() {
                     led_index += 1;
