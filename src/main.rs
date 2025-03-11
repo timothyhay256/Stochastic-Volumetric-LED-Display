@@ -217,7 +217,6 @@ fn main() {
             }
 
             let owned_options = unity_options.clone();
-            debug!("huh");
             children.push(thread::spawn(move || {
                 debug!("inside thread");
                 match unity::get_events(
