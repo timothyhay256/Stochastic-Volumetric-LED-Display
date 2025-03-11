@@ -41,7 +41,7 @@ pub struct CropPos {
 type ScanResult = Result<(i32, i32, Option<i32>, Option<i32>), Box<dyn Error>>;
 type PosEntry = Vec<(String, (i32, i32), Option<(i32, i32)>)>;
 
-pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>) -> Result<()> {
+pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined: bool) -> Result<()> { // streamlined skips cropping and ALL prompts, thus requiring multiple cameras to function
     let mut led_pos = vec![("UNCALIBRATED".to_string(), (0, 0), Some((0, 0))); config.num_led as usize];
     let num_led;
     {
@@ -52,15 +52,6 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>) -> Result<(
         led_manager::set_color(manager_guard, i.try_into().unwrap(), 0, 0, 0);
     }
 
-    
-    // let manager = &mut manager_guard.lock().unwrap();
-    let mut pos = match crop(&config) {
-        Ok(pos) => pos,
-        Err(e) => {
-            panic!("There was a problem while trying to crop: {}", e)
-        }
-    };
-
     let window = "Please wait...";
     highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
 
@@ -68,7 +59,7 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>) -> Result<(
     let mut cam2: Option<Arc<Mutex<VideoCapture>>> = None;
 
     let cam_guard = Arc::clone(&cam);
-    let cam2_guard;
+    let cam2_guard: Arc<Mutex<VideoCapture>>;
 
     thread::spawn(move || {
         loop {
@@ -77,6 +68,43 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>) -> Result<(
             thread::sleep(Duration::from_millis(1)); // Give us a chance to grab the lock
         }
     });
+
+    let mut pos = CropPos { // Needed because of possible uninitialization in the else bracket of the streamlined check below
+        x1_start: 0,
+        y1_start: 0,
+        x1_end: 0,
+        y1_end: 0,
+        x2_start: None,
+        y2_start: None,
+        x2_end: None,
+        y2_end: None,
+        cam_1_brightest: None,
+        cam_2_brightest: None,
+        cam_1_darkest: None,
+        cam_2_darkest: None 
+    };
+
+    if !streamlined {
+        pos = match crop(&config) {
+            Ok(pos) => pos,
+            Err(e) => {
+                panic!("There was a problem while trying to crop: {}", e)
+            }
+        };
+    } else {
+        pos.x1_start = 0;
+        pos.y1_start = 0;
+
+        pos.x1_end = cam.lock().unwrap().get(opencv::videoio::CAP_PROP_FRAME_WIDTH).unwrap() as i32; // TODO: Real error handling
+        pos.y1_end = cam.lock().unwrap().get(opencv::videoio::CAP_PROP_FRAME_HEIGHT).unwrap() as i32;
+        
+        if config.multi_camera {
+            cam2 = Some(Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_2.unwrap(), videoio::CAP_ANY)?)));
+
+            pos.x2_end = Some(cam2.as_ref().unwrap().lock().unwrap().get(opencv::videoio::CAP_PROP_FRAME_WIDTH).unwrap() as i32);
+            pos.y2_end = Some(cam2.as_ref().unwrap().lock().unwrap().get(opencv::videoio::CAP_PROP_FRAME_HEIGHT).unwrap() as i32);
+        }
+    }
 
     (pos.cam_1_brightest, pos.cam_1_darkest) = match brightest_darkest(&cam, &config, manager_guard, pos.x1_start, pos.y1_start, pos.x1_end, pos.y1_end) {
         Ok((brightest, darkest)) => (Some(brightest), Some(darkest)),
@@ -87,8 +115,6 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>) -> Result<(
     
     if config.multi_camera {
         highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
-        
-        cam2 = Some(Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_2.unwrap(), videoio::CAP_ANY)?)));
 
         cam2_guard = Arc::clone(cam2.as_ref().unwrap());
         
@@ -146,7 +172,7 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>) -> Result<(
         info!("First camera: {success} succesful calibrations, {failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.", success_cam_2.unwrap(), failures_cam_2.unwrap());
     }
 
-    if failures > 0 {
+    if failures > 0 && !streamlined {
         // Rescan XY from the back if there are failures
         {
             data.lock().unwrap().invert = true;
@@ -201,7 +227,7 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>) -> Result<(
     }
 
     if !config.multi_camera {
-        if failures == 0 {
+        if failures == 0 && !streamlined{
             info!("Please rotate the container 90 degrees to calibrate Z. Press any key to continue.");
             highgui::set_window_title(
                 window,
@@ -293,47 +319,75 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>) -> Result<(
     {
         post_process(&mut led_pos, manager_guard.lock().unwrap().num_led);
     }
-    loop {
-        let date = Local::now();
-        let name = inquire::Text::new(&format!(
-            "File name:({}-ledpos.json)",
-            date.format("%Y-%m-%d-%H:%M:%S")
-        ))
-        .prompt();
+    
+    if !streamlined {
+        loop {
+            let date = Local::now();
+            let name = inquire::Text::new(&format!(
+                "File name:({}-ledpos.json)",
+                date.format("%Y-%m-%d-%H:%M:%S")
+            ))
+            .prompt();
+    
+            match name {
+                Ok(mut name) => {
+                    if name.is_empty(){
+                        name = format!("{}-ledpos.json", date.format("%Y-%m-%d-%H:%M:%S"));
+                    }
+                    let json = serde_json::to_string_pretty(&led_pos).expect("Unable to serialize metadata!");
+                    let mut file = match File::create(Path::new(&name)) {
+                        Ok(file) => file,
+                        Err(e) => {
+                            error!(
+                                "Unable to write temp-pos to {name}"
+                            );
+                            println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}", failed_calibration(led_pos.clone()), e);
+                            process::exit(1);
+                        }
+                    };
+                    
+                    match file.write_all(json.as_bytes()) {
+                        Ok(_) => {},
+                        Err(e) => {
+                            error!(
+                                "Unable to write temp-pos to {name}"
+                            );
+                            println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}", failed_calibration(led_pos.clone()), e);
+                        }
+                    }
+                    break;
+                }
+                Err(_) => println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}.", failed_calibration(led_pos.clone())),
+            };
+        }
+    } else {
+        let name = "streamlined.json";
 
-        match name {
-            Ok(mut name) => {
-                if name.is_empty(){
-                    name = format!("{}-ledpos.json", date.format("%Y-%m-%d-%H:%M:%S"));
-                }
-                let json = serde_json::to_string_pretty(&led_pos).expect("Unable to serialize metadata!");
-                let mut file = match File::create(Path::new(&name)) {
-                    Ok(file) => file,
-                    Err(e) => {
-                        error!(
-                            "Unable to write temp-pos to {name}"
-                        );
-                        println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}", failed_calibration(led_pos.clone()), e);
-                        process::exit(1);
-                    }
-                };
-                
-                match file.write_all(json.as_bytes()) {
-                    Ok(_) => {},
-                    Err(e) => {
-                        error!(
-                            "Unable to write temp-pos to {name}"
-                        );
-                        println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}", failed_calibration(led_pos.clone()), e);
-                    }
-                }
-                break;
+        let json = serde_json::to_string_pretty(&led_pos).expect("Unable to serialize metadata!");
+        let mut file = match File::create(Path::new(&name)) {
+            Ok(file) => file,
+            Err(e) => {
+                error!(
+                    "Unable to write temp-pos to {name}"
+                );
+                println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}", failed_calibration(led_pos.clone()), e);
+                process::exit(1);
             }
-            Err(_) => println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}.", failed_calibration(led_pos.clone())),
         };
+        
+        match file.write_all(json.as_bytes()) {
+            Ok(_) => {},
+            Err(e) => {
+                error!(
+                    "Unable to write temp-pos to {name}"
+                );
+                println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}", failed_calibration(led_pos.clone()), e);
+            }
+        }
     }
     Ok(())
 }
+
 
 pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manager: &Arc<Mutex<ManagerData>>, x_start: i32, y_start: i32, x_end: i32, y_end: i32) -> Result<(f64, f64), Box<dyn Error>>  {
     debug!("Getting brightest and darkest points");
@@ -614,10 +668,10 @@ pub fn scan_area(
     let cam_1_window = "Camera 1";
     let cam_2_window = "Camera 2";
 
-    highgui::named_window(&cam_1_window, highgui::WINDOW_AUTOSIZE)?;
+    highgui::named_window(cam_1_window, highgui::WINDOW_AUTOSIZE)?;
 
     if config.multi_camera {
-        highgui::named_window(&cam_2_window, highgui::WINDOW_AUTOSIZE)?;
+        highgui::named_window(cam_2_window, highgui::WINDOW_AUTOSIZE)?;
     }
     
     let mut success = 0;
