@@ -217,7 +217,6 @@ fn main() {
             }
 
             let owned_options = unity_options.clone();
-            debug!("huh");
             children.push(thread::spawn(move || {
                 debug!("inside thread");
                 match unity::get_events(
@@ -258,7 +257,7 @@ fn main() {
     #[cfg(feature = "scan")]
     if let Some(Command::Calibrate(ref _calibrate_options)) = opts.command {
         info!("Performing calibrating");
-        scan::scan(config_holder.clone(), &manager).expect("failure");
+        scan::scan(config_holder.clone(), &manager, false).expect("failure");
     }
 
     // led_manager::set_color(&mut manager, 1, 255, 255, 255);
