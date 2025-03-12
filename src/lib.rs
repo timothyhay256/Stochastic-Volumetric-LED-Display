@@ -21,5 +21,5 @@ pub use driver_wizard::wizard;
 pub use led_manager::set_color;
 pub use read_vled::read_vled;
 pub use speedtest::speedtest;
-pub use unity::{get_events, send_pos};
+pub use unity::{get_events, send_pos, signal_restart};
 pub use utils::*;
