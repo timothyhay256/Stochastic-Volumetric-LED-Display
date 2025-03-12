@@ -14,6 +14,25 @@ use crate::led_manager;
 use crate::ManagerData;
 use crate::UnityOptions;
 
+pub fn signal_restart(unity_ip: Ipv4Addr, unity_port: u32) {
+    let mut stream = match TcpStream::connect(format!("{}:{}", unity_ip, unity_port)) {
+        Ok(stream) => stream,
+        Err(e) => {
+            panic!("Could not establish connection on {unity_ip}:{unity_port} with Unity: {e}")
+        }
+    };
+    stream
+        .set_read_timeout(Some(Duration::new(0, 1000000000)))
+        .unwrap();
+
+    match stream.write_all("RESTART".as_bytes()) {
+        Ok(_) => {}
+        Err(e) => {
+            panic!("Could not signal restart: {e}")
+        }
+    };
+}
+
 pub fn send_pos(unity: UnityOptions) -> std::io::Result<()> {
     type JsonEntry = Vec<(String, (f32, f32), (f32, f32))>;
     for mut i in 1..=unity.num_container {
