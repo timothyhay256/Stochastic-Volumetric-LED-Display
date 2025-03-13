@@ -95,10 +95,14 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
         pos.x1_start = 0;
         pos.y1_start = 0;
 
+        pos.x2_start = Some(0);
+        pos.y2_start = Some(0);
+
         pos.x1_end = cam.lock().unwrap().get(opencv::videoio::CAP_PROP_FRAME_WIDTH).unwrap() as i32; // TODO: Real error handling
         pos.y1_end = cam.lock().unwrap().get(opencv::videoio::CAP_PROP_FRAME_HEIGHT).unwrap() as i32;
         
         if config.multi_camera {
+            debug!("Getting second cam limits");
             cam2 = Some(Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_2.unwrap(), videoio::CAP_ANY)?)));
 
             pos.x2_end = Some(cam2.as_ref().unwrap().lock().unwrap().get(opencv::videoio::CAP_PROP_FRAME_WIDTH).unwrap() as i32);
