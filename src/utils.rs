@@ -35,6 +35,11 @@ pub struct Config {
     pub con_fail_limit: u32,
     pub no_controller: bool,
     pub unity_options: UnityOptions,
+    pub scan_mode: u32, // 0 is default, 1 filters by color first (Useful when you aren't scanning in perfect conditions)
+    pub filter_color: Option<u32>, // 0 for red, 1 for green, 2 for blue
+    pub hsv_red_override: Option<Vec<f32>>, // Override the filter band for the red color when using a color filter. Should be formatted like <upper_h, upper_s, upper_v, lower_h, lower_s, lower_v>
+    pub hsv_green_override: Option<Vec<f32>>,
+    pub hsv_blue_override: Option<Vec<f32>>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -75,6 +80,11 @@ pub struct ManagerData {
     pub keepalive: bool, // Should our threads stay alive?
     pub queue_lengths: Vec<u8>,
     pub no_controller: bool, // For debugging. Should the set_color function do everything EXCEPT actually attempt to set the color?
+    pub scan_mode: u32,
+    pub filter_color: Option<u32>,
+    pub hsv_red_override: Option<Vec<f32>>, // Override the filter band for the red color when using a color filter. Should be formatted like <upper_h, upper_s, upper_v, lower_h, lower_s, lower_v>
+    pub hsv_green_override: Option<Vec<f32>>,
+    pub hsv_blue_override: Option<Vec<f32>>,
 }
 
 pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Config) {
@@ -115,6 +125,13 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
     let print_send_back = config_holder.print_send_back;
 
     let no_controller = config_holder.no_controller;
+
+    let scan_mode = config_holder.scan_mode;
+    let filter_color = config_holder.filter_color;
+
+    let hsv_red_override = config_holder.hsv_red_override.clone();
+    let hsv_green_override = config_holder.hsv_green_override.clone();
+    let hsv_blue_override = config_holder.hsv_blue_override.clone();
 
     // Validate config and inform user of settings
 
@@ -194,6 +211,11 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
             keepalive: true,
             queue_lengths: Vec::new(),
             no_controller,
+            scan_mode,
+            filter_color,
+            hsv_red_override: hsv_red_override.clone(),
+            hsv_green_override: hsv_green_override.clone(),
+            hsv_blue_override: hsv_blue_override.clone(),
         },
         config_holder.unity_options.clone(),
         config_holder,
