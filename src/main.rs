@@ -14,7 +14,9 @@ use svled::gui;
 #[cfg(feature = "scan")]
 use svled::scan;
 
-use svled::{driver_wizard, read_vled, speedtest, unity, utils, ManagerData};
+use svled::{
+    driver_wizard, led_manager::set_color, read_vled, speedtest, unity, utils, ManagerData,
+};
 
 #[derive(Debug, Options)]
 struct MyOptions {
@@ -56,6 +58,9 @@ enum Command {
 
     #[options(help = "interactively create a ino/cpp file for your LED driver")]
     DriverWizard(DriverWizardOptions),
+
+    #[options(help = "set a single led's color")]
+    SetColor(SetColorOptions),
 }
 
 #[derive(Debug, Options)]
@@ -65,6 +70,18 @@ struct SpeedtestOptions {}
 struct ReadvledOptions {
     #[options(help = "vled file to read")]
     vled_file: PathBuf,
+}
+
+#[derive(Debug, Options)]
+struct SetColorOptions {
+    #[options(help = "index of LED")]
+    n: u16,
+    #[options(help = "R value to set")]
+    r: u8,
+    #[options(help = "G value to set")]
+    g: u8,
+    #[options(help = "B value to set")]
+    b: u8,
 }
 
 #[cfg(feature = "scan")]
@@ -213,6 +230,11 @@ fn main() {
                     keepalive: true,
                     queue_lengths: Vec::new(),
                     no_controller: config_holder.no_controller,
+                    scan_mode: config_holder.scan_mode,
+                    filter_color: config_holder.filter_color,
+                    hsv_red_override: config_holder.hsv_red_override.clone(),
+                    hsv_green_override: config_holder.hsv_green_override.clone(),
+                    hsv_blue_override: config_holder.hsv_blue_override.clone(),
                 }));
             }
 
@@ -247,6 +269,19 @@ fn main() {
     } else if let Some(Command::DriverWizard(ref _driver_wizard_options)) = opts.command {
         info!("Starting driver configuration wizard!");
         driver_wizard::wizard();
+    } else if let Some(Command::SetColor(ref set_color_options)) = opts.command {
+        info!(
+            "Setting LED {} to RGB: {}, {}, {}",
+            set_color_options.n, set_color_options.r, set_color_options.g, set_color_options.b
+        );
+
+        set_color(
+            &manager,
+            set_color_options.n,
+            set_color_options.r,
+            set_color_options.g,
+            set_color_options.b,
+        );
     }
 
     #[cfg(feature = "gui")]
@@ -257,7 +292,7 @@ fn main() {
     #[cfg(feature = "scan")]
     if let Some(Command::Calibrate(ref _calibrate_options)) = opts.command {
         info!("Performing calibrating");
-        scan::scan(config_holder.clone(), &manager, false).expect("failure");
+        scan::scan(config_holder.clone(), &manager, true).expect("failure");
     }
 
     // led_manager::set_color(&mut manager, 1, 255, 255, 255);

@@ -1,5 +1,5 @@
-use chrono::Local;
-use inquire;
+use chrono::Local; // TODO: Integrate a way to select target HSV when using color filter mode.
+use inquire; // TODO: Fix colour specific mode
 use log::{debug, error, info, warn};
 use opencv::{
     core::{self, flip, get_default_algorithm_hint, min_max_loc, no_array, Point, Scalar},
@@ -44,12 +44,27 @@ type PosEntry = Vec<(String, (i32, i32), Option<(i32, i32)>)>;
 pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined: bool) -> Result<()> { // streamlined skips cropping and ALL prompts, thus requiring multiple cameras to function
     let mut led_pos = vec![("UNCALIBRATED".to_string(), (0, 0), Some((0, 0))); config.num_led as usize];
     let num_led;
+    let scan_mode;
+    let filter_color;
     {
         num_led = manager_guard.lock().unwrap().num_led;
+        scan_mode = manager_guard.lock().unwrap().scan_mode;
+        filter_color = manager_guard.lock().unwrap().filter_color;
     }
     info!("Clearing strip");
     for i in 0..=num_led {
         led_manager::set_color(manager_guard, i.try_into().unwrap(), 0, 0, 0);
+    }
+
+    if scan_mode != 0 {
+        if filter_color.unwrap() == 0 {
+            debug!("Using red filter");
+        } else if filter_color.unwrap() == 1 {
+            debug!("Using green filter");
+        } else if filter_color.unwrap() == 2 {
+            debug!("Using blue filter");
+
+        }
     }
 
     let window = "Please wait...";
@@ -404,12 +419,32 @@ pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manage
         )}
     };
 
+    let filter_color = manager.lock().unwrap().filter_color.unwrap();
+    let scan_mode = manager.lock().unwrap().scan_mode;
+
+    if scan_mode == 1 {
+        debug!("using color filter for brightest darkest");
+        if filter_color == 0 {
+            led_manager::set_color(manager, 5, 255, 0, 0);
+        } else if filter_color == 1 {
+            led_manager::set_color(manager, 5, 0, 255, 0);
+        } else if filter_color == 2 {
+            led_manager::set_color(manager, 5, 0, 0, 55);
+        }
+    } else {
+        led_manager::set_color(manager, 5, 255, 255, 255);
+    }
+
     info!("Collecting brightest and darkest points, please wait...");
-    led_manager::set_color(manager, 5, 255, 255, 255);
 
     debug!("getting frame");
     let mut frame = Mat::default();
     cam.read(&mut frame)?;
+
+    if scan_mode == 1 {
+        filter(&mut frame, &filter_color, manager);
+    }
+
     let frame = Mat::roi(
         &frame,
         opencv::core::Rect {
@@ -419,13 +454,18 @@ pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manage
             height: y_end - y_start,
         },
     )?;
-    let (_, brightest, _) = get_brightest_cam_1_pos(frame.try_clone()?);
+
+    let (_, brightest, _) = get_brightest_cam_1_pos(frame.try_clone()?, config.scan_mode);
 
     debug!("get darkest_cam_1");
     led_manager::set_color(manager, 5, 0, 0, 0);
 
     let mut frame = Mat::default();
     cam.read(&mut frame)?;
+    if scan_mode == 1 {
+        filter(&mut frame, &filter_color, manager);
+    }
+    
     let frame = Mat::roi(
         &frame,
         opencv::core::Rect {
@@ -435,7 +475,7 @@ pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manage
             height: y_end - y_start,
         },
     )?;
-    let (_, darkest, _) = get_brightest_cam_1_pos(frame.try_clone()?);
+    let (_, darkest, _) = get_brightest_cam_1_pos(frame.try_clone()?, config.scan_mode);
 
     Ok((brightest, darkest))
     
@@ -628,19 +668,22 @@ pub fn crop_loop(mut cam: VideoCapture, x_start: Arc<Mutex<i32>>, y_start: Arc<M
     }
 }
 
-pub fn get_brightest_cam_1_pos(mut frame: Mat) -> (f64, f64, Point) {
+pub fn get_brightest_cam_1_pos(mut frame: Mat, scan_mode: u32) -> (f64, f64, Point) { 
+    debug!("Frame channels: {}", frame.channels());
+    if scan_mode == 0 { // We don't run the blur since it should be a very small and accurate area that is the filtered color, and nowhere else. 
+        imgproc::gaussian_blur(
+            // Blur frame to increase accuracy of min_max_loc
+            &frame.clone(),
+            &mut frame,
+            core::Size::new(41, 41),
+            0.0,
+            0.0,
+            0,
+            get_default_algorithm_hint().unwrap()
+        )
+        .unwrap();
+    }
     imgproc::cvt_color(&frame.clone(), &mut frame, COLOR_BGR2GRAY, 0, get_default_algorithm_hint().unwrap()).unwrap(); // Greyscales frame
-    imgproc::gaussian_blur(
-        // Blur frame to increase accuracy of min_max_loc
-        &frame.clone(),
-        &mut frame,
-        core::Size::new(41, 41),
-        0.0,
-        0.0,
-        0,
-        get_default_algorithm_hint().unwrap()
-    )
-    .unwrap();
 
     let mut min_val = 0.0;
     let mut max_val = 0.0;
@@ -704,6 +747,101 @@ pub fn scan_area(
     Ok((success, failures, cam_2_success, cam_2_failures))
 }
 
+// TODO: WIP
+// fn dim_until_no_white(mut frame: &mut Mat) {
+//     let mut gray_frame = Mat::default();
+//     let mut frame = frame.clone();
+
+//     // Step 1: Convert the frame to grayscale
+//     imgproc::cvt_color(&frame, &mut gray_frame, imgproc::COLOR_BGR2GRAY, 0, get_default_algorithm_hint().unwrap()).unwrap();
+
+//     // Step 2: Threshold the image to detect "white" regions
+//     let mut white_mask = Mat::default();
+//     imgproc::threshold(&gray_frame, &mut white_mask, 240.0, 255.0, imgproc::THRESH_BINARY).unwrap();
+
+//     // Step 3: Start dimming process
+//     let mut brightness_factor = 1.0;
+
+//     while !white_mask.empty() {
+//         // Reduce brightness gradually by multiplying with a factor
+//         let mut dimmed = Mat::default();
+//         frame.convert_to(&mut dimmed, -1, brightness_factor, 0.0).unwrap();
+        
+//         // Update frame with the dimmed image
+//         frame = dimmed.clone();
+        
+//         // Update the white mask with the new dimmed image
+//         imgproc::cvt_color(&frame, &mut gray_frame, imgproc::COLOR_BGR2GRAY, 0, get_default_algorithm_hint().unwrap()).unwrap();
+//         imgproc::threshold(&gray_frame, &mut white_mask, 240.0, 255.0, imgproc::THRESH_BINARY).unwrap();
+
+//         // Reduce the brightness factor further
+//         brightness_factor -= 0.05;
+        
+//         // If the brightness_factor is too low, stop the loop to avoid making it too dark.
+//         if brightness_factor <= 0.05 {
+//             break;
+//         }
+//     }
+// }
+
+pub fn filter(mut frame: &mut Mat, filter_color: &u32, manager: &Arc<Mutex<ManagerData>>) { 
+    let manager = manager.lock().unwrap();
+    // Filters frame for color
+    let lowerb;
+    let upperb;
+
+    let tmp_array_lower: Vec<f32>;
+    let tmp_array_upper: Vec<f32>;
+
+    if *filter_color == 0 {
+        if let Some(tmp_override) = &manager.hsv_red_override {
+            tmp_array_lower = vec![tmp_override[0], tmp_override[1], tmp_override[2]];
+            tmp_array_upper = vec![tmp_override[3], tmp_override[4], tmp_override[5]];
+
+            lowerb = Mat::from_slice(&tmp_array_lower);
+            upperb = Mat::from_slice(&tmp_array_upper);
+        } else {
+            lowerb = Mat::from_slice(&[0, 100, 100]);
+            upperb = Mat::from_slice(&[5, 255, 255]);
+        }
+    } else if *filter_color == 1 {
+        if let Some(tmp_override) = &manager.hsv_green_override {
+            tmp_array_lower = vec![tmp_override[0], tmp_override[1], tmp_override[2]];
+            tmp_array_upper = vec![tmp_override[3], tmp_override[4], tmp_override[5]];
+
+            lowerb = Mat::from_slice(&tmp_array_lower);
+            upperb = Mat::from_slice(&tmp_array_upper);
+        } else {
+            lowerb = Mat::from_slice(&[35, 100, 100]);  
+            upperb = Mat::from_slice(&[85, 255, 255]);
+        }
+    } else if *filter_color == 2 {
+        if let Some(tmp_override) = &manager.hsv_blue_override {
+            tmp_array_lower = vec![tmp_override[0], tmp_override[1], tmp_override[2]];
+            tmp_array_upper = vec![tmp_override[3], tmp_override[4], tmp_override[5]];
+
+            lowerb = Mat::from_slice(&tmp_array_lower);
+            upperb = Mat::from_slice(&tmp_array_upper);
+        } else {
+            lowerb = Mat::from_slice(&[120, 150, 150]);
+        upperb = Mat::from_slice(&[140, 255, 255]);
+        }
+    } else {
+        panic!("Invalid filter_color selected: {filter_color}");
+    }
+
+    let mut hsv_frame = Mat::default();
+    imgproc::cvt_color(frame, &mut hsv_frame, imgproc::COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap();
+    
+    let mut mask = Mat::default();
+    core::in_range(&hsv_frame, &lowerb.unwrap(), &upperb.unwrap(), &mut mask).unwrap();
+    
+    let mut mask_color = Mat::default();
+    imgproc::cvt_color(&mask, &mut mask_color, imgproc::COLOR_GRAY2BGR, 0, get_default_algorithm_hint().unwrap()).unwrap();
+
+    core::add_weighted(&frame.clone(), 0.5, &mask_color, 0.7, 0.0, &mut frame, -1).unwrap();
+}
+
 pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, cam: Option<&Arc<Mutex<VideoCapture>>>, scan_data: &mut ScanData, led_pos: &mut PosEntry, i: u32, second_cam: bool, window:&str) -> Result<(i32, i32), Box<dyn Error>> {
     let capture_frames = 1; // Increase me if calibration appears scrambled to ensure the video buffer is empty.
 
@@ -727,7 +865,22 @@ pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, cam: Option<&Arc<Mutex
         y_end = scan_data.pos.y2_end.unwrap();
     }
 
-    led_manager::set_color(manager, i.try_into().unwrap(), 255, 255, 255);
+    let filter_color = manager.lock().unwrap().filter_color.unwrap();
+    let scan_mode = manager.lock().unwrap().scan_mode;
+
+    if scan_mode == 1 {
+        debug!("using color filter");
+        if filter_color == 0 {
+            led_manager::set_color(manager, i.try_into().unwrap(), 255, 0, 0);
+        } else if filter_color == 1 {
+            led_manager::set_color(manager, i.try_into().unwrap(), 0, 255, 0);
+        } else if filter_color == 2 {
+            led_manager::set_color(manager, i.try_into().unwrap(), 0, 0, 55);
+        }
+    } else {
+        led_manager::set_color(manager, i.try_into().unwrap(), 255, 255, 255);
+    }
+
     let mut frame = Mat::default();
     {
         let mut cam = cam.unwrap().lock().unwrap();
@@ -748,7 +901,11 @@ pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, cam: Option<&Arc<Mutex
     if scan_data.invert {
         flip(&frame.clone(), &mut frame, 1).unwrap();
     }
-    let (_, max_val, pos) = get_brightest_cam_1_pos(frame.try_clone()?);
+
+    if scan_mode == 1 {
+        filter(&mut frame, &filter_color, manager);
+    }
+    let (_, max_val, pos) = get_brightest_cam_1_pos(frame.try_clone()?, scan_mode);
 
     if max_val >= scan_data.pos.cam_1_darkest.unwrap() + ((scan_data.pos.cam_1_brightest.unwrap() - scan_data.pos.cam_1_darkest.unwrap()) * 0.5) {
         debug!("Succesful xy calibration: {:?} on index: {}", pos, i);
