@@ -334,6 +334,12 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
             }
         }
     }
+    {
+        cam.lock().unwrap().release().unwrap();
+        if config.multi_camera {
+            cam2.unwrap().lock().unwrap().release().unwrap();
+        }
+    }
     highgui::destroy_all_windows().unwrap();
     {
         post_process(&mut led_pos, manager_guard.lock().unwrap().num_led);
