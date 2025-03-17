@@ -41,6 +41,7 @@ pub struct CropPos {
 type ScanResult = Result<(i32, i32, Option<i32>, Option<i32>), Box<dyn Error>>;
 type PosEntry = Vec<(String, (i32, i32), Option<(i32, i32)>)>;
 type CropData = Option<((i32, i32, i32, i32), (i32, i32, i32, i32))>;
+type CallbackResult = (i32, i32, Option<i32>, Option<i32>);
 
 pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined: bool, crop_data: CropData) -> Result<()> { // streamlined skips cropping and ALL prompts, thus requiring multiple cameras to function
     let mut led_pos = vec![("UNCALIBRATED".to_string(), (0, 0), Some((0, 0))); config.num_led as usize];
@@ -139,7 +140,7 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
         }
     }
 
-    (pos.cam_1_brightest, pos.cam_1_darkest) = match brightest_darkest(&cam, &config, manager_guard, pos.x1_start, pos.y1_start, pos.x1_end, pos.y1_end) {
+    (pos.cam_1_brightest, pos.cam_1_darkest) = match brightest_darkest(&cam, &config, manager_guard, pos.x1_start, pos.y1_start, pos.x1_end, pos.y1_end, !streamlined) {
         Ok((brightest, darkest)) => (Some(brightest), Some(darkest)),
         Err(e) => {
             panic!("There was an issue trying to get the darkest and brightest values: {e}")
@@ -159,7 +160,7 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
             }
 
         });
-        let initial_cal_var = brightest_darkest(cam2.as_ref().unwrap(), &config, manager_guard, pos.x1_start, pos.y1_start, pos.x1_end, pos.y1_end);
+        let initial_cal_var = brightest_darkest(cam2.as_ref().unwrap(), &config, manager_guard, pos.x1_start, pos.y1_start, pos.x1_end, pos.y1_end, !streamlined);
         (pos.cam_2_brightest, pos.cam_2_darkest) = (
             Some(match initial_cal_var {
                 Ok(brightest) => brightest.0,
@@ -428,16 +429,8 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
 }
 
 
-pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manager: &Arc<Mutex<ManagerData>>, x_start: i32, y_start: i32, x_end: i32, y_end: i32) -> Result<(f64, f64), Box<dyn Error>>  {
+pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manager: &Arc<Mutex<ManagerData>>, x_start: i32, y_start: i32, x_end: i32, y_end: i32, prompt: bool) -> Result<(f64, f64), Box<dyn Error>>  {
     debug!("Getting brightest and darkest points");
-    let mut cam = cam.lock().unwrap();
-    match videoio::VideoCapture::is_opened(&cam)? {
-        true => {},
-        false => {panic!(
-            "Unable to open camera {}! Please select another.",
-            config.camera_index_1
-        )}
-    };
 
     let filter_color = manager.lock().unwrap().filter_color.unwrap();
     let scan_mode = manager.lock().unwrap().scan_mode;
@@ -459,29 +452,42 @@ pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manage
 
     debug!("getting frame");
     let mut frame = Mat::default();
-    cam.read(&mut frame)?;
+    cam.lock().unwrap().read(&mut frame)?;
 
     if scan_mode == 1 {
         filter(&mut frame, &filter_color, manager);
     }
 
-    let frame = Mat::roi(
-        &frame,
-        opencv::core::Rect {
-            x: x_start,
-            y: y_start,
-            width: x_end - x_start,
-            height: y_end - y_start,
-        },
-    )?;
+    let brightest;
 
-    let (_, brightest, _) = get_brightest_cam_1_pos(frame.try_clone()?, config.scan_mode);
+    if !prompt {
+        let frame = Mat::roi(
+            &frame,
+            opencv::core::Rect {
+                x: x_start,
+                y: y_start,
+                width: x_end - x_start,
+                height: y_end - y_start,
+            },
+        )?;
+
+        (_, brightest, _) = get_brightest_cam_1_pos(frame.try_clone()?, config.scan_mode);
+    } else {
+        let select_brightest_result = select_brightest(cam).unwrap();
+        let brightest_pos = Point::new(select_brightest_result.0, select_brightest_result.1);
+
+        imgproc::cvt_color(&frame.clone(), &mut frame, COLOR_BGR2GRAY, 0, get_default_algorithm_hint().unwrap()).unwrap();
+
+        brightest = *frame.at_2d::<f64>(brightest_pos.x, brightest_pos.y).unwrap();
+
+        debug!("brightest from manual select is {brightest}");
+    }
 
     debug!("get darkest_cam_1");
     led_manager::set_color(manager, 5, 0, 0, 0);
 
     let mut frame = Mat::default();
-    cam.read(&mut frame)?;
+    cam.lock().unwrap().read(&mut frame)?;
     if scan_mode == 1 {
         filter(&mut frame, &filter_color, manager);
     }
@@ -499,6 +505,39 @@ pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manage
 
     Ok((brightest, darkest))
     
+}
+
+pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>) -> Result<(i32, i32), Box<dyn Error>> {
+    let x1 = Arc::new(Mutex::new(0));
+    let y1 = Arc::new(Mutex::new(0));
+
+    let x1_guard = Arc::clone(&x1);
+    let y1_guard = Arc::clone(&y1);
+
+    let window = "Color Calibration";
+
+    highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
+    highgui::set_mouse_callback(
+        window,
+        Some(Box::new(move |event, x, y, _flag| if event == EVENT_LBUTTONUP {
+            debug!("lbuttonup");
+            *x1_guard.lock().unwrap() = x;
+            *y1_guard.lock().unwrap() = y;
+        })),
+    )?;
+
+    let x_result;
+    let y_result;
+
+    debug!("starting callback_loop for first camera.");
+    (x_result, y_result, _, _) = match callback_loop(cam, x1.clone(), y1.clone(), None, None, window, "Please select the illuminated LED. Press any key to continue".to_string(), false) {
+        Ok((x_start, x_end, y_start, y_end)) => (x_start, x_end, y_start, y_end),
+        Err(e) => panic!("Something went wrong during cropping: {e}")
+    };
+
+    debug!("select_brightest finished");
+
+    Ok((x_result, y_result))
 }
 
 pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
@@ -576,8 +615,9 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
         })),
     )?;
 
-    let cam = videoio::VideoCapture::new(config.camera_index_1, videoio::CAP_ANY)?; // 0 is the default camera
-    match videoio::VideoCapture::is_opened(&cam)? {
+    let cam_guard = Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_1, videoio::CAP_ANY)?)); // callback_loop only accepts a Arc<Mutex<VideoCapture>> 
+    
+    match videoio::VideoCapture::is_opened(&cam_guard.lock().unwrap())? {
         true => {},
         false => {panic!(
             "Unable to open camera {}! Please select another.",
@@ -594,15 +634,15 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
     let mut y2_start_result = None;
     let mut y2_end_result = None;
 
-    debug!("starting crop_loop for first camera.");
-    (x_start_result, x_end_result, y_start_result, y_end_result) = match crop_loop(cam, x1_start.clone(), y1_start.clone(), x1_end.clone(), y1_end.clone(), window, "Please drag the mouse around the container. Press any key to continue".to_string()) {
+    debug!("starting callback_loop for first camera.");
+    (x_start_result, x_end_result, y_start_result, y_end_result) = match callback_loop(&cam_guard, x1_start.clone(), y1_start.clone(), Some(x1_end.clone()), Some(y1_end.clone()), window, "Please drag the mouse around the container. Press any key to continue".to_string(), true) {
         Ok((x_start, x_end, y_start, y_end)) => (x_start, x_end, y_start, y_end),
         Err(e) => panic!("Something went wrong during cropping: {e}")
     };
     if let Some(index) = config.camera_index_2 {
         debug!("Cropping second camera");
         *camera_active.lock().unwrap() = 1;
-        let cam = videoio::VideoCapture::new(index, videoio::CAP_ANY)?; // 0 is the default camera
+        let cam = videoio::VideoCapture::new(index, videoio::CAP_ANY)?; 
         match videoio::VideoCapture::is_opened(&cam)? {
             true => {},
             false => {panic!(
@@ -610,7 +650,7 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
                 index
             )}
         };
-        let loop_out = crop_loop(cam, x2_start, y2_start, x2_end, y2_end, window, "Please drag the mouse around the second container. Press any key to continue".to_string()).unwrap();
+        let loop_out = callback_loop(&cam_guard, x2_start, y2_start, Some(x2_end), Some(y2_end), window, "Please drag the mouse around the second container. Press any key to continue".to_string(), true).unwrap();
         (x2_start_result, x2_end_result, y2_start_result, y2_end_result) = (
             Some(loop_out.0),
             Some(loop_out.1),
@@ -622,13 +662,13 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
 
     Ok(CropPos {
         x1_start: x_start_result,
-        y1_start: y_start_result,
+        y1_start: y_start_result.unwrap(),
         x1_end: x_end_result,
-        y1_end: y_end_result,
+        y1_end: y_end_result.unwrap(),
         x2_start: x2_start_result,
-        y2_start: y2_start_result,
+        y2_start: y2_start_result.unwrap(),
         x2_end: x2_end_result,
-        y2_end: y2_end_result,
+        y2_end: y2_end_result.unwrap(),
         cam_1_brightest: None,
         cam_1_darkest: None,
         cam_2_brightest: None,
@@ -637,52 +677,81 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
 
 }
 
-pub fn crop_loop(mut cam: VideoCapture, x_start: Arc<Mutex<i32>>, y_start: Arc<Mutex<i32>>, x_end: Arc<Mutex<i32>>, y_end: Arc<Mutex<i32>>, window: &str, msg: String) -> Result<(i32, i32, i32, i32), Box<dyn Error>> {
+pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, x_start: Arc<Mutex<i32>>, y_start: Arc<Mutex<i32>>, x_end: Option<Arc<Mutex<i32>>>, y_end: Option<Arc<Mutex<i32>>>, window: &str, msg: String, crop: bool) -> Result<CallbackResult, Box<dyn Error>> {
     info!("{msg}");
     debug!("window: {}, title: {}", window, msg);
+    let mut cam = cam.lock().unwrap();
     highgui::set_window_title(
         window,
         &msg,
     )
     .unwrap();
+    let x_end = x_end.unwrap();
+    let y_end = y_end.unwrap();
+    
     loop {
         let mut frame = Mat::default();
         cam.read(&mut frame)?;
+        if !crop {
+            let x_end_guard = *x_end.lock().unwrap();
+            let y_end_guard = *y_end.lock().unwrap();
+            let x_start_guard = *x_start.lock().unwrap();
+            let y_start_guard = *y_start.lock().unwrap();
 
-        let x_end_guard = *x_end.lock().unwrap();
-        let y_end_guard = *y_end.lock().unwrap();
-        let x_start_guard = *x_start.lock().unwrap();
-        let y_start_guard = *y_start.lock().unwrap();
+            let rect = core::Rect::new(
+                x_start_guard,
+                y_start_guard,
+                x_end_guard - x_start_guard,
+                y_end_guard - y_start_guard,
+            );
 
-        let rect = core::Rect::new(
-            x_start_guard,
-            y_start_guard,
-            x_end_guard - x_start_guard,
-            y_end_guard - y_start_guard,
-        );
+            imgproc::rectangle(
+                &mut frame,
+                rect,
+                core::Scalar::new(255.0, 0.0, 0.0, 0.0),
+                3,
+                8,
+                0,
+            )
+            .expect("Could not draw a rectangle");
 
-        imgproc::rectangle(
-            &mut frame,
-            rect,
-            core::Scalar::new(255.0, 0.0, 0.0, 0.0),
-            3,
-            8,
-            0,
-        )
-        .expect("tf bro erroring on a rectangle?");
-
-        if frame.size()?.width > 0 {
-            highgui::imshow(window, &frame)?;
-        } else {
-            warn!("frame is too small!");
-        }
-        let key = highgui::wait_key(10)?;
-        if key > 0 && key != 255 {
-            if x_start_guard != 0 && x_end_guard != 0 {
-                // highgui::destroy_all_windows().unwrap();
-                break Ok((x_start_guard, x_end_guard, y_start_guard, y_end_guard))
+            if frame.size()?.width > 0 {
+                highgui::imshow(window, &frame)?;
             } else {
-                error!("Please select a valid are for the crop");
+                warn!("frame is too small!");
+            }
+            let key = highgui::wait_key(10)?;
+            if key > 0 && key != 255 {
+                if x_start_guard != 0 && x_end_guard != 0 {
+                    // highgui::destroy_all_windows().unwrap();
+                    break Ok((x_start_guard, x_end_guard, Some(y_start_guard), Some(y_end_guard)))
+                } else {
+                    error!("Please select a valid are for the crop");
+                }
+            }
+        } else {
+            let x_guard = *x_start.lock().unwrap();
+            let y_guard = *y_start.lock().unwrap();
+
+            let pos = Point::new(x_guard, y_guard);
+
+            imgproc::circle(
+                &mut frame,
+                pos,
+                20,
+                Scalar::new(0.0, 255.0, 0.0, 255.0),
+                2,
+                LINE_8,
+                0,
+            )?;
+
+            let key = highgui::wait_key(10)?;
+            if key > 0 && key != 255 {
+                if x_guard != 0 && y_guard != 0 {
+                    break Ok((x_guard, y_guard, None, None))
+                } else {
+                    error!("Please select a valid area!");
+                }
             }
         }
     }
