@@ -40,8 +40,9 @@ pub struct CropPos {
 }
 type ScanResult = Result<(i32, i32, Option<i32>, Option<i32>), Box<dyn Error>>;
 type PosEntry = Vec<(String, (i32, i32), Option<(i32, i32)>)>;
+type CropData = Option<((i32, i32, i32, i32), (i32, i32, i32, i32))>;
 
-pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined: bool, crop_data: Option<((i32, i32, i32, i32), (i32, i32, i32, i32))>) -> Result<()> { // streamlined skips cropping and ALL prompts, thus requiring multiple cameras to function
+pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined: bool, crop_data: CropData) -> Result<()> { // streamlined skips cropping and ALL prompts, thus requiring multiple cameras to function
     let mut led_pos = vec![("UNCALIBRATED".to_string(), (0, 0), Some((0, 0))); config.num_led as usize];
     let num_led;
     let scan_mode;
