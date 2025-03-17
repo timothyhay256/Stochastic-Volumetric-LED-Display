@@ -41,7 +41,7 @@ pub struct CropPos {
 type ScanResult = Result<(i32, i32, Option<i32>, Option<i32>), Box<dyn Error>>;
 type PosEntry = Vec<(String, (i32, i32), Option<(i32, i32)>)>;
 
-pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined: bool) -> Result<()> { // streamlined skips cropping and ALL prompts, thus requiring multiple cameras to function
+pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined: bool, crop_data: Option<((i32, i32, i32, i32), (i32, i32, i32, i32))>) -> Result<()> { // streamlined skips cropping and ALL prompts, thus requiring multiple cameras to function
     let mut led_pos = vec![("UNCALIBRATED".to_string(), (0, 0), Some((0, 0))); config.num_led as usize];
     let num_led;
     let scan_mode;
@@ -107,14 +107,27 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
             }
         };
     } else {
-        pos.x1_start = 0;
-        pos.y1_start = 0;
+        if crop_data.is_none() {
+            pos.x1_start = 0;
+            pos.y1_start = 0;
 
-        pos.x2_start = Some(0);
-        pos.y2_start = Some(0);
+            pos.x2_start = Some(0);
+            pos.y2_start = Some(0);
 
-        pos.x1_end = cam.lock().unwrap().get(opencv::videoio::CAP_PROP_FRAME_WIDTH).unwrap() as i32; // TODO: Real error handling
-        pos.y1_end = cam.lock().unwrap().get(opencv::videoio::CAP_PROP_FRAME_HEIGHT).unwrap() as i32;
+            pos.x1_end = cam.lock().unwrap().get(opencv::videoio::CAP_PROP_FRAME_WIDTH).unwrap() as i32; // TODO: Real error handling
+            pos.y1_end = cam.lock().unwrap().get(opencv::videoio::CAP_PROP_FRAME_HEIGHT).unwrap() as i32;
+        } else {
+            let crop_data = crop_data.unwrap();
+            pos.x1_start = crop_data.0.0;
+            pos.x1_end = crop_data.0.1;
+            pos.y1_start = crop_data.0.2;
+            pos.y1_end = crop_data.0.3;
+
+            pos.x2_start = Some(crop_data.1.0);
+            pos.x2_end = Some(crop_data.1.1);
+            pos.y2_start = Some(crop_data.1.2);
+            pos.y2_end = Some(crop_data.1.3);
+        }
         
         if config.multi_camera {
             debug!("Getting second cam limits");
