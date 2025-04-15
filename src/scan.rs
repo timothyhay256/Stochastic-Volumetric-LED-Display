@@ -1,10 +1,10 @@
 use chrono::Local; // TODO: Integrate a way to select target HSV when using color filter mode.
 use inquire; // TODO: Fix colour specific mode
-use log::{debug, error, info, warn};
+use log::{debug, error, info, warn}; // TODO: When selecting brightest point, respect crop
 use opencv::{
     core::{self, flip, get_default_algorithm_hint, min_max_loc, no_array, Point, Scalar},
     highgui::{self, EVENT_LBUTTONDOWN, EVENT_LBUTTONUP, EVENT_MOUSEMOVE},
-    imgproc::{self, COLOR_BGR2GRAY, LINE_8},
+    imgproc::{self, COLOR_BGR2GRAY, COLOR_BGR2HSV, LINE_8},
     prelude::*,
     videoio::{self, VideoCapture}, Result,
 };
@@ -72,20 +72,6 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
     let window = "Please wait...";
     highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
 
-    let cam = Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_1, videoio::CAP_ANY)?)); // We need to constantly poll this in the background to get the most recent frame due to OpenCV bug(?)
-    let mut cam2: Option<Arc<Mutex<VideoCapture>>> = None;
-
-    let cam_guard = Arc::clone(&cam);
-    let cam2_guard: Arc<Mutex<VideoCapture>>;
-
-    thread::spawn(move || {
-        loop {
-            let mut frame = Mat::default();
-            cam_guard.lock().unwrap().read(&mut frame).unwrap();
-            thread::sleep(Duration::from_millis(1)); // Give us a chance to grab the lock
-        }
-    });
-
     let mut pos = CropPos { // Needed because of possible uninitialization in the else bracket of the streamlined check below
         x1_start: 0,
         y1_start: 0,
@@ -102,13 +88,38 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
     };
 
     if !streamlined {
+        info!("Starting crop");
         pos = match crop(&config) {
             Ok(pos) => pos,
             Err(e) => {
                 panic!("There was a problem while trying to crop: {}", e)
             }
         };
-    } else {
+    }
+
+    let cam = Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_1, videoio::CAP_ANY)?)); // We need to constantly poll this in the background to get the most recent frame due to OpenCV bug(?)
+    let mut cam2: Option<Arc<Mutex<VideoCapture>>> = None;
+
+    let cam_guard = Arc::clone(&cam);
+    let cam2_guard: Arc<Mutex<VideoCapture>>;
+
+    match videoio::VideoCapture::is_opened(&cam_guard.lock().unwrap())? {
+        true => {},
+        false => {panic!(
+            "Unable to open camera {}! Please select another.",
+            config.camera_index_1
+        )}
+    };
+
+    thread::spawn(move || {
+        loop {
+            let mut frame = Mat::default();
+            cam_guard.lock().unwrap().read(&mut frame).unwrap();
+            thread::sleep(Duration::from_millis(1)); // Give us a chance to grab the lock
+        }
+    });
+
+   if streamlined {
         if crop_data.is_none() {
             pos.x1_start = 0;
             pos.y1_start = 0;
@@ -140,8 +151,10 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
         }
     }
 
-    (pos.cam_1_brightest, pos.cam_1_darkest) = match brightest_darkest(&cam, &config, manager_guard, pos.x1_start, pos.y1_start, pos.x1_end, pos.y1_end, !streamlined) {
-        Ok((brightest, darkest)) => (Some(brightest), Some(darkest)),
+    let hsv_brightest: core::VecN<u8, 3>;
+
+    (pos.cam_1_brightest, pos.cam_1_darkest, hsv_brightest) = match brightest_darkest(&cam, &config, manager_guard, pos.x1_start, pos.y1_start, pos.x1_end, pos.y1_end, !streamlined) {
+        Ok((brightest, darkest, hsv_brightest)) => (Some(brightest), Some(darkest), hsv_brightest),
         Err(e) => {
             panic!("There was an issue trying to get the darkest and brightest values: {e}")
         }
@@ -149,8 +162,16 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
     
     if config.multi_camera {
         highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
-
+        cam2 = Some(Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_2.unwrap(), videoio::CAP_ANY)?)));
         cam2_guard = Arc::clone(cam2.as_ref().unwrap());
+
+        match videoio::VideoCapture::is_opened(&cam2_guard.lock().unwrap())? {
+            true => {},
+            false => {panic!(
+                "Unable to open camera {}! Please select another.",
+                config.camera_index_2.unwrap()
+            )}
+        };
         
         thread::spawn(move || {
             loop {
@@ -175,6 +196,41 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
                 }
             }),
         );
+    }
+
+    if config.scan_mode == 1 {
+        debug!("Setting upper and lower bounds for LED");
+
+        let mut manager = manager_guard.lock().unwrap();
+        let filter_color = manager.filter_color.unwrap();
+        let hsv_override;
+
+        if filter_color == 0 {
+            hsv_override = manager.hsv_red_override.as_mut();
+        } else if filter_color == 1 {
+            hsv_override = manager.hsv_green_override.as_mut();
+        } else if filter_color == 2 {
+            hsv_override = manager.hsv_blue_override.as_mut();
+        } else {
+            panic!("{filter_color} is not a valid filter color");
+        }
+
+        if hsv_override.is_none() {
+            let hsv_override = hsv_override.unwrap();
+            
+            hsv_override.push(hsv_brightest.0[0]);
+            hsv_override.push(hsv_brightest.0[1]-config.filter_range.unwrap());
+            hsv_override.push(hsv_brightest.0[2]-config.filter_range.unwrap());
+            hsv_override.push(hsv_brightest.0[0]);
+            hsv_override.push(hsv_brightest.0[1]+config.filter_range.unwrap());
+            hsv_override.push(hsv_brightest.0[2]+config.filter_range.unwrap());
+
+            debug!("lower bound: HSV: {} {} {}", hsv_brightest.0[0], hsv_brightest.0[1]-config.filter_range.unwrap(), hsv_brightest.0[2]-config.filter_range.unwrap());
+            debug!("upper bound: HSV: {} {} {}", hsv_brightest.0[0], hsv_brightest.0[1]+config.filter_range.unwrap(), hsv_brightest.0[2]+config.filter_range.unwrap());
+        } else {
+            debug!("FUCK");
+        }
+    
     }
 
     highgui::destroy_all_windows().unwrap();
@@ -429,7 +485,7 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
 }
 
 
-pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manager: &Arc<Mutex<ManagerData>>, x_start: i32, y_start: i32, x_end: i32, y_end: i32, prompt: bool) -> Result<(f64, f64), Box<dyn Error>>  {
+pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manager: &Arc<Mutex<ManagerData>>, x_start: i32, y_start: i32, x_end: i32, y_end: i32, prompt: bool) -> Result<(f64, f64, core::VecN<u8, 3>), Box<dyn Error>>  {
     debug!("Getting brightest and darkest points");
 
     let filter_color = manager.lock().unwrap().filter_color.unwrap();
@@ -458,9 +514,15 @@ pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manage
         filter(&mut frame, &filter_color, manager);
     }
 
-    let brightest;
+    let brightest: u8;
+    let hsv;
+    let mut image_hsv: Mat = Default::default();
 
     if !prompt {
+        let brightest_pos;
+
+        imgproc::cvt_color(&frame, &mut image_hsv, COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap();
+
         let frame = Mat::roi(
             &frame,
             opencv::core::Rect {
@@ -471,14 +533,19 @@ pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manage
             },
         )?;
 
-        (_, brightest, _) = get_brightest_cam_1_pos(frame.try_clone()?, config.scan_mode);
+        let brightest_result = get_brightest_cam_1_pos(frame.try_clone()?, config.scan_mode);
+        (_, brightest, brightest_pos) = (brightest_result.0, brightest_result.1 as u8, brightest_result.2);
+
+        hsv = image_hsv.at_2d::<opencv::core::Vec3b>(brightest_pos.y, brightest_pos.x).unwrap();
     } else {
         let select_brightest_result = select_brightest(cam).unwrap();
         let brightest_pos = Point::new(select_brightest_result.0, select_brightest_result.1);
 
+        imgproc::cvt_color(&frame, &mut image_hsv, COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap(); // Used to get our HSV
         imgproc::cvt_color(&frame.clone(), &mut frame, COLOR_BGR2GRAY, 0, get_default_algorithm_hint().unwrap()).unwrap();
 
-        brightest = *frame.at_2d::<f64>(brightest_pos.x, brightest_pos.y).unwrap();
+        brightest = *frame.at_2d::<u8>(brightest_pos.y, brightest_pos.x).unwrap();
+        hsv = image_hsv.at_2d::<opencv::core::Vec3b>(brightest_pos.y, brightest_pos.x).unwrap();
 
         debug!("brightest from manual select is {brightest}");
     }
@@ -503,7 +570,7 @@ pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manage
     )?;
     let (_, darkest, _) = get_brightest_cam_1_pos(frame.try_clone()?, config.scan_mode);
 
-    Ok((brightest, darkest))
+    Ok((brightest as f64, darkest, *hsv))
     
 }
 
@@ -599,7 +666,7 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
             }
             #[allow(non_snake_case)]
             EVENT_MOUSEMOVE => {
-                debug!("mousemove");
+                // debug!("mousemove");
                 if actively_cropping {
                     if *camera_active_guard.lock().unwrap() == 0 {
                         *x1_end_guard.lock().unwrap() = x;
@@ -640,10 +707,10 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
         Err(e) => panic!("Something went wrong during cropping: {e}")
     };
     if let Some(index) = config.camera_index_2 {
-        debug!("Cropping second camera");
+        debug!("Cropping second camera with index {index}");
         *camera_active.lock().unwrap() = 1;
-        let cam = videoio::VideoCapture::new(index, videoio::CAP_ANY)?; 
-        match videoio::VideoCapture::is_opened(&cam)? {
+        let cam_guard = Arc::new(Mutex::new(videoio::VideoCapture::new(index, videoio::CAP_ANY)?));
+        match videoio::VideoCapture::is_opened(&cam_guard.lock().unwrap())? {
             true => {},
             false => {panic!(
                 "Unable to open camera {}! Please select another.",
@@ -686,13 +753,22 @@ pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, x_start: Arc<Mutex<i32>>, y
         &msg,
     )
     .unwrap();
-    let x_end = x_end.unwrap();
-    let y_end = y_end.unwrap();
+
+    match videoio::VideoCapture::is_opened(&cam)? {
+        true => {},
+        false => {panic!(
+            "Unable to open camera!"
+        )}
+    };
     
     loop {
         let mut frame = Mat::default();
         cam.read(&mut frame)?;
-        if !crop {
+        if crop {
+            debug!("callback_loop in crop mode");
+            let x_end = x_end.clone().unwrap();
+            let y_end = y_end.clone().unwrap();
+
             let x_end_guard = *x_end.lock().unwrap();
             let y_end_guard = *y_end.lock().unwrap();
             let x_start_guard = *x_start.lock().unwrap();
@@ -718,11 +794,12 @@ pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, x_start: Arc<Mutex<i32>>, y
             if frame.size()?.width > 0 {
                 highgui::imshow(window, &frame)?;
             } else {
-                warn!("frame is too small!");
+                warn!("frame is too small! size: {:?}", frame.size()?);
             }
             let key = highgui::wait_key(10)?;
             if key > 0 && key != 255 {
                 if x_start_guard != 0 && x_end_guard != 0 {
+                    // highgui::destroy_all_windows().unwrap();
                     // highgui::destroy_all_windows().unwrap();
                     break Ok((x_start_guard, x_end_guard, Some(y_start_guard), Some(y_end_guard)))
                 } else {
@@ -730,6 +807,7 @@ pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, x_start: Arc<Mutex<i32>>, y
                 }
             }
         } else {
+            debug!("callback_loop in brightness select");
             let x_guard = *x_start.lock().unwrap();
             let y_guard = *y_start.lock().unwrap();
 
@@ -744,10 +822,17 @@ pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, x_start: Arc<Mutex<i32>>, y
                 LINE_8,
                 0,
             )?;
+            
+            if frame.size()?.width > 0 {
+                highgui::imshow(window, &frame)?;
+            } else {
+                warn!("frame is too small!");
+            }
 
             let key = highgui::wait_key(10)?;
             if key > 0 && key != 255 {
                 if x_guard != 0 && y_guard != 0 {
+                    // highgui::destroy_all_windows().unwrap();
                     break Ok((x_guard, y_guard, None, None))
                 } else {
                     error!("Please select a valid area!");
@@ -879,8 +964,8 @@ pub fn filter(mut frame: &mut Mat, filter_color: &u32, manager: &Arc<Mutex<Manag
     let lowerb;
     let upperb;
 
-    let tmp_array_lower: Vec<f32>;
-    let tmp_array_upper: Vec<f32>;
+    let tmp_array_lower: Vec<u8>;
+    let tmp_array_upper: Vec<u8>;
 
     if *filter_color == 0 {
         if let Some(tmp_override) = &manager.hsv_red_override {
@@ -960,10 +1045,13 @@ pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, cam: Option<&Arc<Mutex
     if scan_mode == 1 {
         debug!("using color filter");
         if filter_color == 0 {
+            debug!("Using red color filter with filter range: {:?}", manager.lock().unwrap().hsv_red_override);
             led_manager::set_color(manager, i.try_into().unwrap(), 255, 0, 0);
         } else if filter_color == 1 {
+            debug!("Using green color filter with filter range: {:?}", manager.lock().unwrap().hsv_green_override);
             led_manager::set_color(manager, i.try_into().unwrap(), 0, 255, 0);
         } else if filter_color == 2 {
+            debug!("Using blue color filter with filter range: {:?}", manager.lock().unwrap().hsv_blue_override);
             led_manager::set_color(manager, i.try_into().unwrap(), 0, 0, 55);
         }
     } else {

@@ -37,9 +37,10 @@ pub struct Config {
     pub unity_options: UnityOptions,
     pub scan_mode: u32, // 0 is default, 1 filters by color first (Useful when you aren't scanning in perfect conditions)
     pub filter_color: Option<u32>, // 0 for red, 1 for green, 2 for blue
-    pub hsv_red_override: Option<Vec<f32>>, // Override the filter band for the red color when using a color filter. Should be formatted like <upper_h, upper_s, upper_v, lower_h, lower_s, lower_v>
-    pub hsv_green_override: Option<Vec<f32>>,
-    pub hsv_blue_override: Option<Vec<f32>>,
+    pub filter_range: Option<u8>, // Range for color filter
+    pub hsv_red_override: Option<Vec<u8>>, // Override the filter band for the red color when using a color filter. Should be formatted like <upper_h, upper_s, upper_v, lower_h, lower_s, lower_v>
+    pub hsv_green_override: Option<Vec<u8>>,
+    pub hsv_blue_override: Option<Vec<u8>>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -82,9 +83,10 @@ pub struct ManagerData {
     pub no_controller: bool, // For debugging. Should the set_color function do everything EXCEPT actually attempt to set the color?
     pub scan_mode: u32,
     pub filter_color: Option<u32>,
-    pub hsv_red_override: Option<Vec<f32>>, // Override the filter band for the red color when using a color filter. Should be formatted like <upper_h, upper_s, upper_v, lower_h, lower_s, lower_v>
-    pub hsv_green_override: Option<Vec<f32>>,
-    pub hsv_blue_override: Option<Vec<f32>>,
+    pub filter_range: Option<u8>,
+    pub hsv_red_override: Option<Vec<u8>>, // Override the filter band for the red color when using a color filter. Should be formatted like <upper_h, upper_s, upper_v, lower_h, lower_s, lower_v>
+    pub hsv_green_override: Option<Vec<u8>>,
+    pub hsv_blue_override: Option<Vec<u8>>,
 }
 
 pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Config) {
@@ -128,6 +130,7 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
 
     let scan_mode = config_holder.scan_mode;
     let filter_color = config_holder.filter_color;
+    let filter_range = config_holder.filter_range;
 
     let hsv_red_override = config_holder.hsv_red_override.clone();
     let hsv_green_override = config_holder.hsv_green_override.clone();
@@ -213,6 +216,7 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
             no_controller,
             scan_mode,
             filter_color,
+            filter_range,
             hsv_red_override: hsv_red_override.clone(),
             hsv_green_override: hsv_green_override.clone(),
             hsv_blue_override: hsv_blue_override.clone(),
