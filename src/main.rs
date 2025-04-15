@@ -232,6 +232,7 @@ fn main() {
                     no_controller: config_holder.no_controller,
                     scan_mode: config_holder.scan_mode,
                     filter_color: config_holder.filter_color,
+                    filter_range: config_holder.filter_range,
                     hsv_red_override: config_holder.hsv_red_override.clone(),
                     hsv_green_override: config_holder.hsv_green_override.clone(),
                     hsv_blue_override: config_holder.hsv_blue_override.clone(),

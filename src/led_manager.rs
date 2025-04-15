@@ -233,16 +233,15 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
                 );
                 if (n as u32) < index * leds_per_strip && n as u32 >= (index - 1) * leds_per_strip {
                     // Determines which strip to send the index instruction to.
-                    let n_real;
-                    if index > 1 {
+                    let n_real: u16 = if index > 1 {
                         debug!(
                             "index is {index}, leds_per_strip is {leds_per_strip}, subtracting {}",
                             (leds_per_strip * (index - 1))
                         );
-                        n_real = n - (leds_per_strip * (index - 1)) as u16;
+                        n - (leds_per_strip * (index - 1)) as u16
                     } else {
-                        n_real = n;
-                    }
+                        n
+                    };
                     debug!("n is {n}, n_real is {n_real}");
                     let serial_port = &mut manager.serial_port[(index - 1) as usize];
                     debug!(
