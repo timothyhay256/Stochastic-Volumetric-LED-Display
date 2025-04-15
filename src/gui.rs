@@ -12,7 +12,6 @@ slint::include_modules!();
 pub fn main(config: Config) -> Result<(), Box<dyn Error>> {
     let ui = AppWindow::new()?;
 
-    // Wrap ManagerData in Arc<Mutex<ManagerData>> for shared, mutable access
     // let shared_manager = Arc::new(Mutex::new(ManagerData {
     //     num_led: config.num_led,
     //     num_strips: config.num_strips,
@@ -56,7 +55,7 @@ pub fn main(config: Config) -> Result<(), Box<dyn Error>> {
     //     })
     // });
 
-    ui.run()?;
+    // ui.run()?;
 
     Ok(())
 }
