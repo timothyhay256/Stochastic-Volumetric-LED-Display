@@ -41,6 +41,7 @@ pub struct Config {
     pub hsv_red_override: Option<Vec<u8>>, // Override the filter band for the red color when using a color filter. Should be formatted like <upper_h, upper_s, upper_v, lower_h, lower_s, lower_v>
     pub hsv_green_override: Option<Vec<u8>>,
     pub hsv_blue_override: Option<Vec<u8>>,
+    pub color_bright: Option<u8>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
