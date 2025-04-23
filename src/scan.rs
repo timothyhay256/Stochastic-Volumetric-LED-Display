@@ -1,7 +1,7 @@
 use chrono::Local; // TODO: Integrate a way to select target HSV when using color filter mode.
 use inquire; // TODO: Fix colour specific mode
-use log::{debug, error, info, warn}; // TODO: When selecting brightest point, respect crop
-use opencv::{// TODO: Dim until actual color is noticable.
+use log::{debug, error, info, warn}; // TODO: Properly get HSV for each camera
+use opencv::{// TODO: Sliders to filter out LED
     core::{self, flip, get_default_algorithm_hint, min_max_loc, no_array, Point, Scalar},
     highgui::{self, EVENT_LBUTTONDOWN, EVENT_LBUTTONUP, EVENT_MOUSEMOVE},
     imgproc::{self, COLOR_BGR2GRAY, COLOR_BGR2HSV, LINE_8},
@@ -233,7 +233,7 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
             };
         
             let range = config.filter_range.unwrap();
-            let hue_range = range / 3; // Only use half range for Hue
+            let hue_range = range / 4; // Only use half range for Hue
             
             let h = hsv_brightest.0[0];
             let s = hsv_brightest.0[1];
@@ -570,7 +570,7 @@ pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manage
 
         hsv = image_hsv.at_2d::<opencv::core::Vec3b>(brightest_pos.y, brightest_pos.x).unwrap();
     } else {
-        let select_brightest_result = select_brightest(cam).unwrap();
+        let select_brightest_result = select_brightest(cam, manager, config).unwrap();
         let brightest_pos = Point::new(select_brightest_result.0, select_brightest_result.1);
 
         imgproc::cvt_color(&frame, &mut image_hsv, COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap(); // Used to get our HSV
@@ -608,12 +608,32 @@ pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manage
     
 }
 
-pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>) -> Result<(i32, i32), Box<dyn Error>> {
+pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<ManagerData>>, config: &Config) -> Result<(i32, i32), Box<dyn Error>> {
     let x1 = Arc::new(Mutex::new(0));
     let y1 = Arc::new(Mutex::new(0));
 
+    let h_lower = Arc::new(Mutex::new(0));
+    let s_lower = Arc::new(Mutex::new(0));
+    let v_lower = Arc::new(Mutex::new(0));
+
+    let h_upper = Arc::new(Mutex::new(0));
+    let s_upper = Arc::new(Mutex::new(0));
+    let v_upper = Arc::new(Mutex::new(0));
+
+    let override_active = Arc::new(Mutex::new(true)); // Have we already overidden the HSV upper and lower limits from a click?
+
     let x1_guard = Arc::clone(&x1);
     let y1_guard = Arc::clone(&y1);
+
+    let h_lower_guard = Arc::clone(&h_lower);
+    let s_lower_guard = Arc::clone(&s_lower);
+    let v_lower_guard = Arc::clone(&v_lower);
+
+    let h_upper_guard = Arc::clone(&h_upper);
+    let s_upper_guard = Arc::clone(&s_upper);
+    let v_upper_guard = Arc::clone(&v_upper);
+
+    let override_active_guard = Arc::clone(&override_active);
 
     let window = "Color Calibration";
 
@@ -622,23 +642,214 @@ pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>) -> Result<(i32, i32), Bo
         window,
         Some(Box::new(move |event, x, y, _flag| if event == EVENT_LBUTTONUP {
             debug!("lbuttonup");
+            *override_active_guard.lock().unwrap() = false;
             *x1_guard.lock().unwrap() = x;
             *y1_guard.lock().unwrap() = y;
         })),
     )?;
 
-    let x_result;
-    let y_result;
+    highgui::create_trackbar("Hue Upper Limit", window, None, 179, Some(Box::new(move |pos| {
+        if let Ok(mut v) = h_upper_guard.lock() {
+            *v = pos;
+        }
+    })))?;
 
-    debug!("starting callback_loop for first camera.");
-    (x_result, y_result, _, _) = match callback_loop(cam, x1.clone(), y1.clone(), None, None, window, "Please select the illuminated LED. Press any key to continue".to_string(), false) {
-        Ok((x_start, x_end, y_start, y_end)) => (x_start, x_end, y_start, y_end),
-        Err(e) => panic!("Something went wrong during cropping: {e}")
+    highgui::create_trackbar("Saturation Upper Limit", window, None, 255, Some(Box::new(move |pos| {
+        if let Ok(mut v) = s_upper_guard.lock() {
+            *v = pos;
+        }
+    })))?;
+
+    highgui::create_trackbar("Value Upper Limit", window, None, 255, Some(Box::new(move |pos| {
+        if let Ok(mut v) = v_upper_guard.lock() {
+            *v = pos;
+        }
+    })))?;
+
+
+    highgui::create_trackbar("Hue Lower Limit", window, None, 179, Some(Box::new(move |pos| {
+        if let Ok(mut v) = h_lower_guard.lock() {
+            *v = pos;
+        }
+    })))?;
+
+    highgui::create_trackbar("Saturation Lower Limit", window, None, 255, Some(Box::new(move |pos| {
+        if let Ok(mut v) = s_lower_guard.lock() {
+            *v = pos;
+        }
+    })))?;
+
+    highgui::create_trackbar("Value Lower Limit", window, None, 255, Some(Box::new(move |pos| {
+        if let Ok(mut v) = v_lower_guard.lock() {
+            *v = pos;
+        }
+    })))?;
+
+    debug!("Starting filter selector");
+
+    let mut cam = cam.lock().unwrap();
+    highgui::set_window_title(
+        window,
+        "Modify upper and lower bounds",
+    )
+    .unwrap();
+
+    match videoio::VideoCapture::is_opened(&cam)? {
+        true => {},
+        false => {panic!(
+            "Unable to open camera!"
+        )}
     };
+    
+    loop {
+        let mut frame = Mat::default();
+        cam.read(&mut frame)?;
+
+        // debug!("callback_loop in brightness select");
+        let x_guard = *x1.lock().unwrap();
+        let y_guard = *y1.lock().unwrap();
+
+        let pos = Point::new(x_guard, y_guard);
+
+        imgproc::circle(
+            &mut frame,
+            pos,
+            20,
+            Scalar::new(0.0, 255.0, 0.0, 255.0),
+            2,
+            LINE_8,
+            0,
+        )?;
+
+        let mut image_hsv: Mat = Default::default();
+        let brightest_pos = Point::new(x_guard, y_guard);
+
+        imgproc::cvt_color(&frame, &mut image_hsv, COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap(); // Used to get our HSV
+
+        let hsv = image_hsv.at_2d::<opencv::core::Vec3b>(brightest_pos.y, brightest_pos.x).unwrap();
+
+        debug!("hsv from manual select is {:?}", hsv);
+        debug!("pos from manual select is {:?}", brightest_pos);
+
+        // Set hsv upper and lower based on the selected area automatically
+        if !*override_active.lock().unwrap() {
+            let h = hsv.0[0];
+            let s = hsv.0[1];
+            let v = hsv.0[2];
+
+            let range = config.filter_range.unwrap();
+            let hue_range = range / 4; // Only use half range for Hue
+
+            {
+                debug!("overriding temporary hsv from selection");
+                *override_active.lock().unwrap() = true;
+
+                let mut h_lower_override = h_lower.lock().unwrap();
+                let mut s_lower_override = s_lower.lock().unwrap();
+                let mut v_lower_override = v_lower.lock().unwrap();
+
+                let mut h_upper_override = h_upper.lock().unwrap();
+                let mut s_upper_override = s_upper.lock().unwrap();
+                let mut v_upper_override = v_upper.lock().unwrap();
+                
+                // Clamp lower bounds safely
+                *h_lower_override = h.saturating_sub(hue_range).min(179) as i32;
+                *s_lower_override = s.saturating_sub(range) as i32;
+                *v_lower_override = v.saturating_sub(range) as i32;
+                
+                // Clamp upper bounds safely without overflow
+                *h_upper_override = (h + hue_range).min(179) as i32;
+                *s_upper_override = s.saturating_add(range) as i32;
+                *v_upper_override = v.saturating_add(range) as i32;
+            }
+            debug!("Setting trackbar_pos");
+            // We can't use *h_lower_override directly since the callback will try to lock it, while it's already locked and hang.
+            highgui::set_trackbar_pos("Hue Upper Limit", window, (h + hue_range).min(179) as i32).unwrap();
+            highgui::set_trackbar_pos("Saturation Upper Limit", window, s.saturating_add(range) as i32).unwrap();
+            highgui::set_trackbar_pos("Value Upper Limit", window, v.saturating_add(range) as i32).unwrap();
+
+            highgui::set_trackbar_pos("Hue Lower Limit", window, h.saturating_sub(hue_range).min(179) as i32).unwrap();
+            highgui::set_trackbar_pos("Saturation Lower Limit", window, s.saturating_sub(range) as i32).unwrap();
+            highgui::set_trackbar_pos("Value Lower Limit", window, v.saturating_sub(range) as i32).unwrap();
+        }
+        
+        // Apply HSV filter bounds
+        let h_up = *h_upper.lock().unwrap();
+        let s_up = *s_upper.lock().unwrap();
+        let v_up = *v_upper.lock().unwrap();
+        
+        let h_lo = *h_lower.lock().unwrap();
+        let s_lo = *s_lower.lock().unwrap();
+        let v_lo = *v_lower.lock().unwrap();
+        
+        // Need this so the value lives long enough
+        let upper_vals = [h_up, s_up, v_up];
+        let lower_vals = [h_lo, s_lo, v_lo];
+
+        let upperb = Mat::from_slice(&upper_vals).unwrap();
+        let lowerb = Mat::from_slice(&lower_vals).unwrap();
+
+        debug!("applying upper and lower vals in select_brightest: {:?} {:?}", upper_vals, lower_vals);
+        let mut hsv_frame = Mat::default();
+        imgproc::cvt_color(&frame, &mut hsv_frame, imgproc::COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap();
+        
+        let mut mask = Mat::default();
+        core::in_range(&hsv_frame, &lowerb, &upperb, &mut mask).unwrap();
+        
+        let mut mask_color = Mat::default();
+        imgproc::cvt_color(&mask, &mut mask_color, imgproc::COLOR_GRAY2BGR, 0, get_default_algorithm_hint().unwrap()).unwrap();
+
+        core::add_weighted(&frame.clone(), 0.5, &mask_color, 0.7, 0.0, &mut frame, -1).unwrap();
+        
+        if frame.size()?.width > 0 {
+            highgui::imshow(window, &frame)?;
+        } else {
+            warn!("frame is too small!");
+        }
+
+        let key = highgui::wait_key(10)?;
+        if key > 0 && key != 255 {
+            if x_guard != 0 && y_guard != 0 {
+                let mut manager = manager.lock().unwrap();
+                let filter_color = manager.filter_color.unwrap();
+                // let hsv_override ;
+
+                // if filter_color == 0 {
+                //     hsv_override = manager.hsv_red_override.as_mut();
+                // } else if filter_color == 1 {
+                //     hsv_override = manager.hsv_green_override.as_mut();
+                // } else if filter_color == 2 {
+                //     hsv_override = manager.hsv_blue_override.as_mut();
+                // } else {
+                //     panic!("{filter_color} is not a valid filter color");
+                // }
+
+                let override_vec = match filter_color {
+                    0 => &mut manager.hsv_red_override,
+                    1 => &mut manager.hsv_green_override,
+                    2 => &mut manager.hsv_blue_override,
+                    _ => panic!("{filter_color} is not a valid filter color"),
+                };
+
+                *override_vec = Some(vec![
+                    h_lo.try_into().unwrap(), s_lo.try_into().unwrap(), v_lo.try_into().unwrap(),
+                    h_up.try_into().unwrap(), s_up.try_into().unwrap(), v_up.try_into().unwrap(),
+                ]);
+                
+                debug!("Overriding hsv_override vec with {:?}", override_vec);
+
+                break
+            } else {
+                error!("Please select a valid area!");
+            }
+        }
+        
+    }
 
     debug!("select_brightest finished");
 
-    Ok((x_result, y_result))
+    let result = Ok((*x1.lock().unwrap(), *y1.lock().unwrap())); // Also needed to let the value live long enough
+    result
 }
 
 pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
@@ -888,19 +1099,19 @@ pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, x_start: Arc<Mutex<i32>>, y
 
 pub fn get_brightest_cam_1_pos(mut frame: Mat, scan_mode: u32) -> (f64, f64, Point) { 
     debug!("Frame channels: {}", frame.channels());
-    if scan_mode == 0 { // We don't run the blur since it should be a very small and accurate area that is the filtered color, and nowhere else. 
-        imgproc::gaussian_blur(
-            // Blur frame to increase accuracy of min_max_loc
-            &frame.clone(),
-            &mut frame,
-            core::Size::new(41, 41),
-            0.0,
-            0.0,
-            0,
-            get_default_algorithm_hint().unwrap()
-        )
-        .unwrap();
-    }
+
+    imgproc::gaussian_blur(
+        // Blur frame to increase accuracy of min_max_loc
+        &frame.clone(),
+        &mut frame,
+        core::Size::new(41, 41),
+        0.0,
+        0.0,
+        0,
+        get_default_algorithm_hint().unwrap()
+    )
+    .unwrap();
+
     imgproc::cvt_color(&frame.clone(), &mut frame, COLOR_BGR2GRAY, 0, get_default_algorithm_hint().unwrap()).unwrap(); // Greyscales frame
 
     let mut min_val = 0.0;
@@ -1048,6 +1259,8 @@ pub fn filter(mut frame: &mut Mat, filter_color: &u32, manager: &Arc<Mutex<Manag
         panic!("Invalid filter_color selected: {filter_color}");
     }
 
+    debug!("applying upper and lower vals in filter function: {:?} {:?}", upperb, lowerb);
+
     let mut hsv_frame = Mat::default();
     imgproc::cvt_color(frame, &mut hsv_frame, imgproc::COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap();
     
@@ -1126,6 +1339,7 @@ pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, config: &Config, cam: 
     }
 
     if scan_mode == 1 {
+        debug!("applying filter");
         filter(&mut frame, &filter_color, manager);
     }
     let (_, max_val, pos) = get_brightest_cam_1_pos(frame.try_clone()?, scan_mode);
