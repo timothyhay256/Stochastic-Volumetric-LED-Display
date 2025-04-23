@@ -21,6 +21,13 @@ camera_index_1 = 2
 camera_index_2 = 0
 con_fail_limit = 50
 no_controller = false
+scan_mode = 1
+filter_color = 2
+filter_range = 45
+# hsv_red_override = [] #<upper_h, upper_s, upper_v, lower_h, lower_s, lower_v>
+# hsv_green_override = []
+# hsv_blue_override = []
+color_bright = 1
 
 [unity_options]
 num_container = 1
