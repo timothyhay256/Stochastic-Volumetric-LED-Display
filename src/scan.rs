@@ -509,6 +509,8 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
                 println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}", failed_calibration(led_pos.clone()), e);
             }
         }
+
+        info!("Scan exiting!");
     }
     Ok(())
 }
