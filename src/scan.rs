@@ -120,6 +120,7 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
     });
 
    if streamlined {
+        debug!("process is streamlined");
         if crop_data.is_none() {
             pos.x1_start = 0;
             pos.y1_start = 0;
@@ -169,7 +170,7 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
     );
     
 
-    if config.multi_camera {
+    if config.multi_camera && !streamlined {
         highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
         cam2 = Some(Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_2.unwrap(), videoio::CAP_ANY)?)));
         cam2_guard = Arc::clone(cam2.as_ref().unwrap());
@@ -256,12 +257,9 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
             
             debug!("lower bound: HSV: {} {} {}", lower_h, lower_s, lower_v);
             debug!("upper bound: HSV: {} {} {}", upper_h, upper_s, upper_v);
-            
-
         } else {
             info!("Existing hsv_override found, not overriding");
         }
-    
     }
 
     highgui::destroy_all_windows().unwrap();
@@ -843,7 +841,6 @@ pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Mana
                 error!("Please select a valid area!");
             }
         }
-        
     }
 
     debug!("select_brightest finished");
