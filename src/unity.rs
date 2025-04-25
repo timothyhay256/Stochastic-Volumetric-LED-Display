@@ -1,5 +1,5 @@
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use log::{debug, error};
+use log::{debug, error, info};
 use std::{
     error::Error,
     fs::File,
@@ -135,56 +135,59 @@ pub fn get_events(
         keepalive = manager.lock().unwrap().keepalive;
     }
 
-    if keepalive {
-        loop {
-            let mut buf = [0; 16];
-            socket.recv_from(&mut buf)?;
-            let msg = match str::from_utf8(&buf) {
-                Ok(msg) => msg,
+    loop {
+        if !keepalive {
+            info!("get_events exiting.");
+            break;
+        }
+        let mut buf = [0; 16];
+        socket.recv_from(&mut buf)?;
+        let msg = match str::from_utf8(&buf) {
+            Ok(msg) => msg,
+            Err(e) => {
+                error!(
+                    "Received invalid packet from Unity:{:?} which resulted in the following: {}",
+                    buf, e
+                );
+                "FAIL"
+            }
+        };
+        let mut msg = msg.to_string();
+        if msg.contains("E") {
+            println!("{msg}");
+            // Clear color of index `EN`
+            msg.remove(0);
+            let index = match msg.to_string().parse::<u16>() {
+                Ok(index) => index,
                 Err(e) => {
-                    error!(
-                        "Received invalid packet from Unity:{:?} which resulted in the following: {}",
-                        buf, e
-                    );
-                    "FAIL"
+                    panic!(
+                        "Unity packet was malformed: Attempted to convert {} to u8: {}",
+                        msg, e
+                    )
                 }
             };
-            let mut msg = msg.to_string();
-            if msg.contains("E") {
-                println!("{msg}");
-                // Clear color of index `EN`
-                msg.remove(0);
-                let index = match msg.to_string().parse::<u16>() {
-                    Ok(index) => index,
+            led_manager::set_color(&manager, index, 0, 0, 0);
+        } else if msg.contains("|") {
+            // Set index n with r g b from string n|r|g|b
+            let mut xs: [u16; 4] = [0; 4];
+            let nrgb = msg.trim_matches(char::is_control).split("|");
+            for (i, el) in nrgb.enumerate() {
+                xs[i] = match el.parse::<u16>() {
+                    Ok(el) => el,
                     Err(e) => {
                         panic!(
                             "Unity packet was malformed: Attempted to convert {} to u8: {}",
-                            msg, e
+                            el, e
                         )
                     }
                 };
-                led_manager::set_color(&manager, index, 0, 0, 0);
-            } else if msg.contains("|") {
-                // Set index n with r g b from string n|r|g|b
-                let mut xs: [u16; 4] = [0; 4];
-                let nrgb = msg.trim_matches(char::is_control).split("|");
-                for (i, el) in nrgb.enumerate() {
-                    xs[i] = match el.parse::<u16>() {
-                        Ok(el) => el,
-                        Err(e) => {
-                            panic!(
-                                "Unity packet was malformed: Attempted to convert {} to u8: {}",
-                                el, e
-                            )
-                        }
-                    };
-                }
-                // println!("NRGB: {}|{}|{}|{}", xs[0], xs[1], xs[2], xs[3]);
-                led_manager::set_color(&manager, xs[0], xs[1] as u8, xs[2] as u8, xs[3] as u8);
-            } else {
-                error!("Unity packet was malformed! Packet: {}", msg);
             }
+            // println!("NRGB: {}|{}|{}|{}", xs[0], xs[1], xs[2], xs[3]);
+            led_manager::set_color(&manager, xs[0], xs[1] as u8, xs[2] as u8, xs[3] as u8);
+        } else {
+            error!("Unity packet was malformed! Packet: {}", msg);
         }
     }
+
     Ok(())
 }
