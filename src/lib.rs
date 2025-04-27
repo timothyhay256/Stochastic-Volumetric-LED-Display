@@ -11,8 +11,8 @@ pub mod speedtest;
 pub mod unity;
 pub mod utils;
 
-#[cfg(feature = "gui")]
-pub use gui::main;
+// #[cfg(feature = "gui")]
+// pub use gui::main;
 
 #[cfg(feature = "scan")]
 pub use scan::scan;

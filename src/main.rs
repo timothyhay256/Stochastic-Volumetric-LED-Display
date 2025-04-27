@@ -285,10 +285,10 @@ fn main() {
         );
     }
 
-    #[cfg(feature = "gui")]
-    if let Some(Command::Gui(ref _gui_options)) = opts.command {
-        gui::main(config_holder.clone()).unwrap();
-    }
+    // #[cfg(feature = "gui")]
+    // if let Some(Command::Gui(ref _gui_options)) = opts.command {
+    //     gui::main(config_holder.clone()).unwrap();
+    // }
 
     #[cfg(feature = "scan")]
     if let Some(Command::Calibrate(ref _calibrate_options)) = opts.command {

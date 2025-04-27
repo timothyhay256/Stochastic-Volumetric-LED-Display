@@ -23,11 +23,11 @@ con_fail_limit = 50
 no_controller = false
 scan_mode = 1
 filter_color = 2
-filter_range = 45
+filter_range = 90
 # hsv_red_override = [] #<upper_h, upper_s, upper_v, lower_h, lower_s, lower_v>
 # hsv_green_override = []
-# hsv_blue_override = []
-color_bright = 1
+# hsv_blue_override = [61, 0, 245, 95, 255, 255]
+color_bright = 50
 
 [unity_options]
 num_container = 1
@@ -35,5 +35,5 @@ unity_ip = "127.0.0.1"
 unity_ports = [5001, 5002, 5003]
 unity_serial_ports = ["/dev/ttyUSB0"]
 unity_serial_baudrate = 921600
-unity_position_files = ["test.json"]
+unity_position_files = ["streamlined.json"]
 scale = 0.08

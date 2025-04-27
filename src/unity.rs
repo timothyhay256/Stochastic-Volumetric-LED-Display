@@ -81,6 +81,7 @@ pub fn send_pos(unity: UnityOptions) -> std::io::Result<()> {
         .progress_chars("#>-")); // This can take a while, especially for alot of LEDs
         let mut pb_count = 0;
 
+        debug!("establishing connection to unity");
         let mut stream = TcpStream::connect(format!(
             "{}:{}",
             unity.unity_ip.clone(),
@@ -92,6 +93,7 @@ pub fn send_pos(unity: UnityOptions) -> std::io::Result<()> {
         stream
             .set_write_timeout(Some(Duration::new(0, 1000000000)))
             .unwrap();
+        debug!("sending positions to connection");
         for led in json.iter() {
             pb_count += 1;
             pb.set_position(pb_count);
@@ -130,14 +132,10 @@ pub fn get_events(
     debug!("get_events active on {}:{}", ip, port);
     let socket = UdpSocket::bind(format!("{}:{}", ip, port))?;
 
-    let keepalive;
-    {
-        keepalive = manager.lock().unwrap().keepalive;
-    }
-
     loop {
-        if !keepalive {
+        if !manager.lock().unwrap().keepalive {
             info!("get_events exiting.");
+            manager.lock().unwrap().keepalive = true;
             break;
         }
         let mut buf = [0; 16];
