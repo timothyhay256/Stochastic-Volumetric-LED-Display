@@ -236,6 +236,8 @@ fn main() {
                     hsv_red_override: config_holder.hsv_red_override.clone(),
                     hsv_green_override: config_holder.hsv_green_override.clone(),
                     hsv_blue_override: config_holder.hsv_blue_override.clone(),
+                    frame_cam_1: Default::default(),
+                    frame_cam_2: Default::default(),
                 }));
             }
 

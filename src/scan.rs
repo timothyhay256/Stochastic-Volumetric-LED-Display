@@ -89,7 +89,7 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
 
     if !streamlined {
         info!("Starting crop");
-        pos = match crop(&config) {
+        pos = match crop(&config, manager_guard) {
             Ok(pos) => pos,
             Err(e) => {
                 panic!("There was a problem while trying to crop: {}", e)
@@ -701,8 +701,10 @@ pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Mana
         )}
     };
     
+    let mut manager = manager.lock().unwrap();
+
     loop {
-        let mut frame = Mat::default();
+        let mut frame = &mut manager.frame_cam_1;
         cam.read(&mut frame)?;
 
         // debug!("callback_loop in brightness select");
@@ -724,7 +726,7 @@ pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Mana
         let mut image_hsv: Mat = Default::default();
         let brightest_pos = Point::new(x_guard, y_guard);
 
-        imgproc::cvt_color(&frame, &mut image_hsv, COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap(); // Used to get our HSV
+        imgproc::cvt_color(frame, &mut image_hsv, COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap(); // Used to get our HSV
 
         let hsv = image_hsv.at_2d::<opencv::core::Vec3b>(brightest_pos.y, brightest_pos.x).unwrap();
 
@@ -791,7 +793,7 @@ pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Mana
 
         debug!("applying upper and lower vals in select_brightest: {:?} {:?}", upper_vals, lower_vals);
         let mut hsv_frame = Mat::default();
-        imgproc::cvt_color(&frame, &mut hsv_frame, imgproc::COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap();
+        imgproc::cvt_color(frame, &mut hsv_frame, imgproc::COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap();
         
         let mut mask = Mat::default();
         core::in_range(&hsv_frame, &lowerb, &upperb, &mut mask).unwrap();
@@ -799,10 +801,10 @@ pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Mana
         let mut mask_color = Mat::default();
         imgproc::cvt_color(&mask, &mut mask_color, imgproc::COLOR_GRAY2BGR, 0, get_default_algorithm_hint().unwrap()).unwrap();
 
-        core::add_weighted(&frame.clone(), 0.5, &mask_color, 0.7, 0.0, &mut frame, -1).unwrap();
+        core::add_weighted(&frame.clone(), 0.5, &mask_color, 0.7, 0.0, frame, -1).unwrap();
         
         if frame.size()?.width > 0 {
-            highgui::imshow(window, &frame)?;
+            highgui::imshow(window, frame)?;
         } else {
             warn!("frame is too small!");
         }
@@ -810,7 +812,6 @@ pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Mana
         let key = highgui::wait_key(10)?;
         if key > 0 && key != 255 {
             if x_guard != 0 && y_guard != 0 {
-                let mut manager = manager.lock().unwrap();
                 let filter_color = manager.filter_color.unwrap();
                 // let hsv_override ;
 
@@ -851,7 +852,45 @@ pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Mana
     result
 }
 
-pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
+pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPos, Box<dyn Error>> {
+    if config.crop_override.is_some() {
+        let crop_override = config.crop_override.clone().unwrap();
+        if config.multi_camera {
+            if crop_override.len() == 8 {
+                return Ok(CropPos {
+                    x1_start: crop_override[0],
+                    y1_start: crop_override[1],
+                    x1_end: crop_override[2],
+                    y1_end: crop_override[3],
+                    x2_start: Some(crop_override[4]),
+                    y2_start: Some(crop_override[5]),
+                    x2_end: Some(crop_override[6]),
+                    y2_end: Some(crop_override[7]),
+                    cam_1_brightest: None,
+                    cam_1_darkest: None,
+                    cam_2_brightest: None,
+                    cam_2_darkest: None,
+                })
+            } else {
+                error!("crop_override needs 8 elements to use with multiple cameras.");
+            }
+        } else {
+            return Ok(CropPos {
+                x1_start: crop_override[0],
+                y1_start: crop_override[1],
+                x1_end: crop_override[2],
+                y1_end: crop_override[3],
+                x2_start: None,
+                y2_start: None,
+                x2_end: None,
+                y2_end: None,
+                cam_1_brightest: None,
+                cam_1_darkest: None,
+                cam_2_brightest: None,
+                cam_2_darkest: None,
+            })
+        }
+    }
     let window = "Calibration";
 
     let x1_start = Arc::new(Mutex::new(0));
@@ -946,7 +985,7 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
     let mut y2_end_result = None;
 
     debug!("starting callback_loop for first camera.");
-    (x_start_result, x_end_result, y_start_result, y_end_result) = match callback_loop(&cam_guard, x1_start.clone(), y1_start.clone(), Some(x1_end.clone()), Some(y1_end.clone()), window, "Please drag the mouse around the container. Press any key to continue".to_string(), true) {
+    (x_start_result, x_end_result, y_start_result, y_end_result) = match callback_loop(&cam_guard, manager, x1_start.clone(), y1_start.clone(), Some(x1_end.clone()), Some(y1_end.clone()), window, "Please drag the mouse around the container. Press any key to continue".to_string(), true) {
         Ok((x_start, x_end, y_start, y_end)) => (x_start, x_end, y_start, y_end),
         Err(e) => panic!("Something went wrong during cropping: {e}")
     };
@@ -961,7 +1000,7 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
                 index
             )}
         };
-        let loop_out = callback_loop(&cam_guard, x2_start, y2_start, Some(x2_end), Some(y2_end), window, "Please drag the mouse around the second container. Press any key to continue".to_string(), true).unwrap();
+        let loop_out = callback_loop(&cam_guard, manager, x2_start, y2_start, Some(x2_end), Some(y2_end), window, "Please drag the mouse around the second container. Press any key to continue".to_string(), true).unwrap();
         (x2_start_result, x2_end_result, y2_start_result, y2_end_result) = (
             Some(loop_out.0),
             Some(loop_out.1),
@@ -969,9 +1008,7 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
             Some(loop_out.3));
     }
 
-    debug!("crop finished");
-
-    Ok(CropPos {
+    let pos = CropPos {
         x1_start: x_start_result,
         y1_start: y_start_result.unwrap(),
         x1_end: x_end_result,
@@ -984,11 +1021,14 @@ pub fn crop(config: &Config) -> Result<CropPos, Box<dyn Error>> {
         cam_1_darkest: None,
         cam_2_brightest: None,
         cam_2_darkest: None,
-    })
+    };
+    debug!("crop finished, returning: {:?}", pos);
+
+    Ok(pos)
 
 }
 
-pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, x_start: Arc<Mutex<i32>>, y_start: Arc<Mutex<i32>>, x_end: Option<Arc<Mutex<i32>>>, y_end: Option<Arc<Mutex<i32>>>, window: &str, msg: String, crop: bool) -> Result<CallbackResult, Box<dyn Error>> {
+pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<ManagerData>>, x_start: Arc<Mutex<i32>>, y_start: Arc<Mutex<i32>>, x_end: Option<Arc<Mutex<i32>>>, y_end: Option<Arc<Mutex<i32>>>, window: &str, msg: String, crop: bool) -> Result<CallbackResult, Box<dyn Error>> {
     info!("{msg}");
     debug!("window: {}, title: {}", window, msg);
     let mut cam = cam.lock().unwrap();
@@ -1004,9 +1044,10 @@ pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, x_start: Arc<Mutex<i32>>, y
             "Unable to open camera!"
         )}
     };
-    
+    let mut manager = manager.lock().unwrap();
+
     loop {
-        let mut frame = Mat::default();
+        let mut frame = &mut manager.frame_cam_1;
         cam.read(&mut frame)?;
         if crop {
             // debug!("callback_loop in crop mode");
@@ -1036,7 +1077,7 @@ pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, x_start: Arc<Mutex<i32>>, y
             .expect("Could not draw a rectangle");
 
             if frame.size()?.width > 0 {
-                highgui::imshow(window, &frame)?;
+                highgui::imshow(window, frame)?;
             } else {
                 warn!("frame is too small! size: {:?}", frame.size()?);
             }
@@ -1070,7 +1111,7 @@ pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, x_start: Arc<Mutex<i32>>, y
             let mut image_hsv: Mat = Default::default();
             let brightest_pos = Point::new(x_guard, y_guard);
 
-            imgproc::cvt_color(&frame, &mut image_hsv, COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap(); // Used to get our HSV
+            imgproc::cvt_color(frame, &mut image_hsv, COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap(); // Used to get our HSV
 
             let hsv = image_hsv.at_2d::<opencv::core::Vec3b>(brightest_pos.y, brightest_pos.x).unwrap();
 
@@ -1078,7 +1119,7 @@ pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, x_start: Arc<Mutex<i32>>, y
             debug!("pos from manual select is {:?}", brightest_pos);
             
             if frame.size()?.width > 0 {
-                highgui::imshow(window, &frame)?;
+                highgui::imshow(window, frame)?;
             } else {
                 warn!("frame is too small!");
             }
@@ -1315,7 +1356,6 @@ pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, config: &Config, cam: 
     } else {
         led_manager::set_color(manager, i.try_into().unwrap(), brightness, brightness, brightness);
     }
-
     let mut frame = Mat::default();
     {
         let mut cam = cam.unwrap().lock().unwrap();
@@ -1333,6 +1373,7 @@ pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, config: &Config, cam: 
         },
     )?
     .try_clone()?;
+
     if scan_data.invert {
         flip(&frame.clone(), &mut frame, 1).unwrap();
     }
@@ -1341,6 +1382,14 @@ pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, config: &Config, cam: 
         debug!("applying filter");
         filter(&mut frame, &filter_color, manager);
     }
+
+    // Update frame_cam_x after all our modifications
+    if second_cam {
+        manager.lock().unwrap().frame_cam_2 = frame.clone();
+    } else {
+        manager.lock().unwrap().frame_cam_1 = frame.clone();
+    }
+    
     let (_, max_val, pos) = get_brightest_cam_1_pos(frame.try_clone()?, scan_mode);
 
     if max_val >= scan_data.pos.cam_1_darkest.unwrap() + ((scan_data.pos.cam_1_brightest.unwrap() - scan_data.pos.cam_1_darkest.unwrap()) * 0.5) {
