@@ -27,7 +27,7 @@ filter_range = 90
 # hsv_red_override = [] #<upper_h, upper_s, upper_v, lower_h, lower_s, lower_v>
 # hsv_green_override = []
 # hsv_blue_override = [61, 0, 245, 95, 255, 255]
-color_bright = 50
+color_bright = 10
 
 [unity_options]
 num_container = 1

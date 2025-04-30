@@ -1,4 +1,5 @@
 use log::{debug, error, info, warn}; // TODO: Depreceate unity export byte data
+use opencv::prelude::*;
 use serde::Deserialize;
 use serialport::SerialPort;
 use std::{
@@ -42,6 +43,7 @@ pub struct Config {
     pub hsv_green_override: Option<Vec<u8>>,
     pub hsv_blue_override: Option<Vec<u8>>,
     pub color_bright: Option<u8>,
+    pub crop_override: Option<Vec<i32>>, // When set, cropping will be skipped.
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -88,6 +90,8 @@ pub struct ManagerData {
     pub hsv_red_override: Option<Vec<u8>>, // Override the filter band for the red color when using a color filter. Should be formatted like <upper_h, upper_s, upper_v, lower_h, lower_s, lower_v>
     pub hsv_green_override: Option<Vec<u8>>,
     pub hsv_blue_override: Option<Vec<u8>>,
+    pub frame_cam_1: Mat, // Allow public access to most recent captured frame. Currently used for open sauce
+    pub frame_cam_2: Mat,
 }
 
 pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Config) {
@@ -221,6 +225,8 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
             hsv_red_override: hsv_red_override.clone(),
             hsv_green_override: hsv_green_override.clone(),
             hsv_blue_override: hsv_blue_override.clone(),
+            frame_cam_1: Default::default(),
+            frame_cam_2: Default::default(),
         },
         config_holder.unity_options.clone(),
         config_holder,
