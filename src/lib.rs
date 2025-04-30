@@ -16,6 +16,7 @@ pub mod utils;
 
 #[cfg(feature = "scan")]
 pub use scan::scan;
+pub use scan::CropPos;
 
 pub use driver_wizard::wizard;
 pub use led_manager::set_color;
