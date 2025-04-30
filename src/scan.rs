@@ -25,18 +25,18 @@ pub struct ScanData {
 
 #[derive(Clone, Debug)]
 pub struct CropPos {
-    x1_start: i32,
-    y1_start: i32,
-    x1_end: i32,
-    y1_end: i32,
-    x2_start: Option<i32>,
-    y2_start: Option<i32>,
-    x2_end: Option<i32>,
-    y2_end: Option<i32>,
-    cam_1_brightest: Option<f64>,
-    cam_2_brightest: Option<f64>,
-    cam_1_darkest: Option<f64>,
-    cam_2_darkest: Option<f64>
+    pub x1_start: i32,
+    pub y1_start: i32,
+    pub x1_end: i32,
+    pub y1_end: i32,
+    pub x2_start: Option<i32>,
+    pub y2_start: Option<i32>,
+    pub x2_end: Option<i32>,
+    pub y2_end: Option<i32>,
+    pub cam_1_brightest: Option<f64>,
+    pub cam_2_brightest: Option<f64>,
+    pub cam_1_darkest: Option<f64>,
+    pub cam_2_darkest: Option<f64>
 }
 type ScanResult = Result<(i32, i32, Option<i32>, Option<i32>), Box<dyn Error>>;
 type PosEntry = Vec<(String, (i32, i32), Option<(i32, i32)>)>;
