@@ -238,6 +238,7 @@ fn main() {
                     hsv_blue_override: config_holder.hsv_blue_override.clone(),
                     frame_cam_1: Default::default(),
                     frame_cam_2: Default::default(),
+                    no_video: config_holder.no_video,
                 }));
             }
 

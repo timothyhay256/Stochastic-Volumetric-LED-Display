@@ -803,7 +803,7 @@ pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Mana
 
         core::add_weighted(&frame.clone(), 0.5, &mask_color, 0.7, 0.0, frame, -1).unwrap();
         
-        if frame.size()?.width > 0 {
+        if frame.size()?.width > 0 && config.no_video {
             highgui::imshow(window, frame)?;
         } else {
             warn!("frame is too small!");
@@ -1044,6 +1044,8 @@ pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Manager
             "Unable to open camera!"
         )}
     };
+
+    let no_video = manager.lock().unwrap().no_video;
     let mut manager = manager.lock().unwrap();
 
     loop {
@@ -1076,7 +1078,7 @@ pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Manager
             )
             .expect("Could not draw a rectangle");
 
-            if frame.size()?.width > 0 {
+            if frame.size()?.width > 0 && !no_video {
                 highgui::imshow(window, frame)?;
             } else {
                 warn!("frame is too small! size: {:?}", frame.size()?);
@@ -1118,7 +1120,7 @@ pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Manager
             debug!("hsv from manual select is {:?}", hsv);
             debug!("pos from manual select is {:?}", brightest_pos);
             
-            if frame.size()?.width > 0 {
+            if frame.size()?.width > 0 && no_video {
                 highgui::imshow(window, frame)?;
             } else {
                 warn!("frame is too small!");
@@ -1443,8 +1445,10 @@ pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, config: &Config, cam: 
             );
         }
     }
-    highgui::set_window_title(window, &("LED index: ".to_owned() + &i.to_string()))?;
-    highgui::imshow(window, &frame)?;
+    if !config.no_video {
+        highgui::set_window_title(window, &("LED index: ".to_owned() + &i.to_string()))?;
+        highgui::imshow(window, &frame)?;
+    }
     highgui::wait_key(1)?;
     led_manager::set_color(manager, i.try_into().unwrap(), 0, 0, 0);
     Ok((success, failures))
@@ -1615,7 +1619,7 @@ pub fn manual_calibrate(
         debug!("setting cricle at {:?}", pos);
         imgproc::circle(&mut frame, pos, 20, color, 2, LINE_8, 0)?;
 
-        if frame.size()?.width > 0 {
+        if frame.size()?.width > 0 && !config.no_video {
             highgui::imshow(window, &frame)?;
         }
 
