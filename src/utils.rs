@@ -44,6 +44,7 @@ pub struct Config {
     pub hsv_blue_override: Option<Vec<u8>>,
     pub color_bright: Option<u8>,
     pub crop_override: Option<Vec<i32>>, // When set, cropping will be skipped.
+    pub no_video: bool, // When set in conjunction with streamlined being true, no video feed will show.
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -92,6 +93,7 @@ pub struct ManagerData {
     pub hsv_blue_override: Option<Vec<u8>>,
     pub frame_cam_1: Mat, // Allow public access to most recent captured frame. Currently used for open sauce
     pub frame_cam_2: Mat,
+    pub no_video: bool,
 }
 
 pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Config) {
@@ -141,6 +143,7 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
     let hsv_green_override = config_holder.hsv_green_override.clone();
     let hsv_blue_override = config_holder.hsv_blue_override.clone();
 
+    let no_video = config_holder.no_video;
     // Validate config and inform user of settings
 
     if !no_controller {
@@ -227,6 +230,7 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
             hsv_blue_override: hsv_blue_override.clone(),
             frame_cam_1: Default::default(),
             frame_cam_2: Default::default(),
+            no_video,
         },
         config_holder.unity_options.clone(),
         config_holder,
