@@ -243,14 +243,14 @@ fn main() {
             }
 
             let owned_options = unity_options.clone();
+            let owned_config = config_holder.clone();
             children.push(thread::spawn(move || {
                 debug!("inside thread");
                 match unity::get_events(
                     owned_manager,
-                    owned_options.unity_ip,
-                    owned_options.unity_ports.clone()[i as usize]
-                        .try_into()
-                        .unwrap(),
+                    owned_options.clone(),
+                    owned_config,
+                    owned_options.unity_ports.clone()[i as usize],
                 ) {
                     Ok(_) => {
                         debug!("thread exited??")
