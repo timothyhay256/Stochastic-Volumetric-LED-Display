@@ -70,7 +70,9 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
     }
 
     let window = "Please wait...";
-    highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
+    if !config.no_video {
+        highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
+    }
 
     let mut pos = CropPos { // Needed because of possible uninitialization in the else bracket of the streamlined check below
         x1_start: 0,
@@ -1186,9 +1188,11 @@ pub fn scan_area(
     let cam_1_window = "Camera 1";
     let cam_2_window = "Camera 2";
 
-    highgui::named_window(cam_1_window, highgui::WINDOW_AUTOSIZE)?;
+    if !config.no_video {
+        highgui::named_window(cam_1_window, highgui::WINDOW_AUTOSIZE)?;
+    }
 
-    if config.multi_camera {
+    if config.multi_camera && !config.no_video {
         highgui::named_window(cam_2_window, highgui::WINDOW_AUTOSIZE)?;
     }
     
