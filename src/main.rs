@@ -247,10 +247,10 @@ fn main() {
             children.push(thread::spawn(move || {
                 debug!("inside thread");
                 match unity::get_events(
-                    owned_manager,
-                    owned_options.clone(),
-                    owned_config,
-                    owned_options.unity_ports.clone()[i as usize],
+                    &owned_manager,
+                    &owned_options.clone(),
+                    &owned_config,
+                    &owned_options.unity_ports.clone()[i as usize],
                 ) {
                     Ok(_) => {
                         debug!("thread exited??")

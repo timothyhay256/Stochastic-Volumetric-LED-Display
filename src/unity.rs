@@ -133,10 +133,10 @@ pub fn send_pos(unity: UnityOptions) -> std::io::Result<()> {
 }
 
 pub fn get_events(
-    manager: Arc<Mutex<ManagerData>>,
-    unity: UnityOptions,
-    config: Config,
-    port: u32,
+    manager: &Arc<Mutex<ManagerData>>,
+    unity: &UnityOptions,
+    config: &Config,
+    port: &u32,
 ) -> Result<(), Box<dyn Error>> {
     type JsonHashmap = HashMap<usize, ((f32, f32), (f32, f32), (u8, u8, u8), bool)>; // <index, xy, zy, rgb, illuminated>
 
@@ -261,7 +261,7 @@ pub fn get_events(
                     )
                 }
             };
-            led_manager::set_color(&manager, index, 0, 0, 0);
+            led_manager::set_color(manager, index, 0, 0, 0);
 
             // Indicate this isn't illuminated
             if let Some(value) = json_hashmap.get_mut(&(index as usize)) {
@@ -289,7 +289,7 @@ pub fn get_events(
                 value.3 = true;
                 value.2 = (xs[1] as u8, xs[2] as u8, xs[3] as u8);
             }
-            led_manager::set_color(&manager, xs[0], xs[1] as u8, xs[2] as u8, xs[3] as u8);
+            led_manager::set_color(manager, xs[0], xs[1] as u8, xs[2] as u8, xs[3] as u8);
         } else {
             error!("Unity packet was malformed! Packet: {}", msg);
         }
