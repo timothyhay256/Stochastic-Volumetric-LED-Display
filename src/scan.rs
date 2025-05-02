@@ -803,7 +803,7 @@ pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Mana
 
         core::add_weighted(&frame.clone(), 0.5, &mask_color, 0.7, 0.0, frame, -1).unwrap();
         
-        if frame.size()?.width > 0 && config.no_video {
+        if frame.size()?.width > 0 && !config.no_video {
             highgui::imshow(window, frame)?;
         } else {
             warn!("frame is too small!");
@@ -1120,7 +1120,7 @@ pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Manager
             debug!("hsv from manual select is {:?}", hsv);
             debug!("pos from manual select is {:?}", brightest_pos);
             
-            if frame.size()?.width > 0 && no_video {
+            if frame.size()?.width > 0 && !no_video {
                 highgui::imshow(window, frame)?;
             } else {
                 warn!("frame is too small!");
