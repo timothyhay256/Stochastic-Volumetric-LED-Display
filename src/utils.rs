@@ -45,6 +45,9 @@ pub struct Config {
     pub color_bright: Option<u8>,
     pub crop_override: Option<Vec<i32>>, // When set, cropping will be skipped.
     pub no_video: bool, // When set in conjunction with streamlined being true, no video feed will show.
+    pub get_events_streams_video: bool, // When set to true, get_events will stream to frame_cam_1/2
+    pub get_events_video_widgets: bool, // When set to true, get_events video stream will include circles around illuminated LEDs for visualization purposes
+    pub get_events_widgets_pos_index: Option<i32>, // Which pos file to use for visualization
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -58,6 +61,7 @@ pub struct UnityOptions {
 }
 #[derive(Debug)]
 pub struct ManagerData {
+    // TODO: put a Config struct in here instead of just sharing items we need
     // Used to persist data through led_manager::set_color.
     pub num_led: u32,
     pub num_strips: u32,
@@ -144,6 +148,7 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
     let hsv_blue_override = config_holder.hsv_blue_override.clone();
 
     let no_video = config_holder.no_video;
+
     // Validate config and inform user of settings
 
     if !no_controller {
