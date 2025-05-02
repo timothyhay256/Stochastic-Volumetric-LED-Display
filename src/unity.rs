@@ -194,6 +194,36 @@ pub fn get_events(
             .collect();
     }
 
+    let mut cam = None;
+    let mut cam2 = None;
+
+    if config.get_events_streams_video {
+        cam = Some(videoio::VideoCapture::new(
+            config.camera_index_1,
+            videoio::CAP_ANY,
+        )?);
+
+        match videoio::VideoCapture::is_opened(cam.as_ref().unwrap())? {
+            true => {}
+            false => {
+                panic!("Unable to open camera 1!")
+            }
+        };
+
+        if config.multi_camera {
+            cam2 = Some(videoio::VideoCapture::new(
+                config.camera_index_2.unwrap(),
+                videoio::CAP_ANY,
+            )?);
+            match videoio::VideoCapture::is_opened(cam2.as_ref().unwrap())? {
+                true => {}
+                false => {
+                    panic!("Unable to open camera 2!")
+                }
+            };
+        }
+    }
+
     loop {
         if !manager.lock().unwrap().keepalive {
             info!("get_events exiting.");
@@ -201,38 +231,16 @@ pub fn get_events(
             break;
         }
 
-        let mut frame_cam_1 = &mut manager.lock().unwrap().frame_cam_1;
-        let mut frame_cam_2 = &mut manager.lock().unwrap().frame_cam_2;
+        if config.get_events_streams_video && cam.is_some() {
+            cam.as_mut()
+                .unwrap()
+                .read(&mut manager.lock().unwrap().frame_cam_1)?;
 
-        let cam;
-        let cam2;
-
-        if config.get_events_streams_video {
-            cam = Some(videoio::VideoCapture::new(
-                config.camera_index_1,
-                videoio::CAP_ANY,
-            )?);
-            if config.multi_camera {
-                cam2 = Some(videoio::VideoCapture::new(
-                    config.camera_index_2.unwrap(),
-                    videoio::CAP_ANY,
-                )?);
-                match videoio::VideoCapture::is_opened(cam2.as_ref().unwrap())? {
-                    true => {}
-                    false => {
-                        panic!("Unable to open camera 2!")
-                    }
-                };
-
-                cam2.unwrap().read(&mut frame_cam_2)?;
+            if config.multi_camera && cam2.is_some() {
+                cam2.as_mut()
+                    .unwrap()
+                    .read(&mut manager.lock().unwrap().frame_cam_2)?;
             }
-            match videoio::VideoCapture::is_opened(cam.as_ref().unwrap())? {
-                true => {}
-                false => {
-                    panic!("Unable to open camera 1!")
-                }
-            };
-            cam.unwrap().read(&mut frame_cam_1)?;
         }
 
         let mut buf = [0; 16];
@@ -302,7 +310,7 @@ pub fn get_events(
                 debug!("applying circles to frames");
 
                 imgproc::circle(
-                    &mut frame_cam_1,
+                    &mut manager.lock().unwrap().frame_cam_2,
                     Point::new(xy.0 as i32, xy.1 as i32),
                     20,
                     Scalar::new(0.0f64, rgb.2 as f64, rgb.1 as f64, rgb.0 as f64),
@@ -312,7 +320,7 @@ pub fn get_events(
                 )?;
 
                 imgproc::circle(
-                    &mut frame_cam_1,
+                    &mut manager.lock().unwrap().frame_cam_1,
                     Point::new(z.1 as i32, xy.1 as i32),
                     20,
                     Scalar::new(0.0f64, rgb.2 as f64, rgb.1 as f64, rgb.0 as f64),
