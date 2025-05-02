@@ -1384,13 +1384,6 @@ pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, config: &Config, cam: 
         debug!("applying filter");
         filter(&mut frame, &filter_color, manager);
     }
-
-    // Update frame_cam_x after all our modifications
-    if second_cam {
-        manager.lock().unwrap().frame_cam_2 = frame.clone();
-    } else {
-        manager.lock().unwrap().frame_cam_1 = frame.clone();
-    }
     
     let (_, max_val, pos) = get_brightest_cam_1_pos(frame.try_clone()?, scan_mode);
 
@@ -1445,6 +1438,13 @@ pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, config: &Config, cam: 
             );
         }
     }
+    // Update frame_cam_x after all our modifications
+    if second_cam {
+        manager.lock().unwrap().frame_cam_2 = frame.clone();
+    } else {
+        manager.lock().unwrap().frame_cam_1 = frame.clone();
+    }
+    
     if !config.no_video {
         highgui::set_window_title(window, &("LED index: ".to_owned() + &i.to_string()))?;
         highgui::imshow(window, &frame)?;
