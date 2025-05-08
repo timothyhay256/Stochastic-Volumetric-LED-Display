@@ -99,6 +99,11 @@ pub struct ManagerData {
     pub frame_cam_2: Mat,
     pub no_video: bool,
 }
+#[derive(Clone)]
+pub struct GetEventsFrameBuffer {
+    pub shared_frame_1: Mat,
+    pub shared_frame_2: Mat,
+}
 
 pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Config) {
     // Load and validate config
@@ -154,7 +159,7 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
     if !no_controller {
         if communication_mode == 2 {
             for path in serial_port_paths.iter() {
-                if Path::new(path).exists() {
+                if Path::new(&path).exists() {
                     info!("Using serial for communication on {}!", path);
                 } else {
                     panic!("Serial port {} does not exist!", path);

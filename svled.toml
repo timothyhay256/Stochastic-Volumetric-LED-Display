@@ -17,8 +17,8 @@ record_esp_data_file = "record_esp_data.bvled" # File to record bvled data to
 print_send_back = false                         # Debugging only: Prints what the ESP received when using Serial
 udp_read_timeout = 100                         # How long to wait for a response from ESP when using UDP
 multi_camera = true 
-camera_index_1 = 2
-camera_index_2 = 0
+camera_index_1 = 0
+camera_index_2 = 2
 con_fail_limit = 50
 no_controller = false
 scan_mode = 1
@@ -28,6 +28,9 @@ filter_range = 90
 # hsv_green_override = []
 # hsv_blue_override = [61, 0, 245, 95, 255, 255]
 color_bright = 10
+no_video = false
+get_events_streams_video = true
+get_events_video_widgets = true
 
 [unity_options]
 num_container = 1

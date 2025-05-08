@@ -185,14 +185,17 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
             )}
         };
         
-        thread::spawn(move || {
+        match thread::Builder::new().name("frame_consumer".to_string()).spawn(move || {
             loop {
                 let mut frame = Mat::default();
                 cam2_guard.lock().unwrap().read(&mut frame).unwrap();
                 thread::sleep(Duration::from_millis(1)); // Give us a chance to grab the lock
             }
 
-        });
+        }) {
+            Ok(_) => {},
+            Err(e) => error!("Failed to spawn frame_consumer! Scan results may be inaccurate! Error: {e}")
+        };
         // let initial_cal_var = brightest_darkest(cam2.as_ref().unwrap(), &config, manager_guard, pos.x1_start, pos.y1_start, pos.x1_end, pos.y1_end, !streamlined);
         // (pos.cam_2_brightest, pos.cam_2_darkest) = (
         //     Some(match initial_cal_var {
@@ -443,10 +446,9 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
         }
     }
     highgui::destroy_all_windows().unwrap();
-    {
-        post_process(&mut led_pos, manager_guard.lock().unwrap().num_led);
-    }
     
+    post_process(&mut led_pos, manager_guard.lock().unwrap().num_led);
+
     if !streamlined {
         loop {
             let date = Local::now();
@@ -567,7 +569,7 @@ pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manage
             },
         )?;
 
-        let brightest_result = get_brightest_cam_1_pos(frame.try_clone()?, config.scan_mode);
+        let brightest_result = get_brightest_cam_1_pos(frame.try_clone()?);
         (_, brightest, brightest_pos) = (brightest_result.0, brightest_result.1 as u8, brightest_result.2);
 
         hsv = image_hsv.at_2d::<opencv::core::Vec3b>(brightest_pos.y, brightest_pos.x).unwrap();
@@ -604,7 +606,7 @@ pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manage
             height: y_end - y_start,
         },
     )?;
-    let (_, darkest, _) = get_brightest_cam_1_pos(frame.try_clone()?, config.scan_mode);
+    let (_, darkest, _) = get_brightest_cam_1_pos(frame.try_clone()?);
 
     Ok((brightest as f64, darkest, *hsv))
     
@@ -1141,7 +1143,7 @@ pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Manager
     }
 }
 
-pub fn get_brightest_cam_1_pos(mut frame: Mat, scan_mode: u32) -> (f64, f64, Point) { 
+pub fn get_brightest_cam_1_pos(mut frame: Mat) -> (f64, f64, Point) { 
     debug!("Frame channels: {}", frame.channels());
 
     imgproc::gaussian_blur(
@@ -1316,7 +1318,7 @@ pub fn filter(mut frame: &mut Mat, filter_color: &u32, manager: &Arc<Mutex<Manag
     let mut mask_color = Mat::default();
     imgproc::cvt_color(&mask, &mut mask_color, imgproc::COLOR_GRAY2BGR, 0, get_default_algorithm_hint().unwrap()).unwrap();
 
-    core::add_weighted(&frame.clone(), 0.5, &mask_color, 0.7, 0.0, &mut frame, -1).unwrap();
+    core::add_weighted(&frame.clone(), 0.3, &mask_color, 0.7, 0.0, &mut frame, -1).unwrap();
 }
 
 pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, config: &Config, cam: Option<&Arc<Mutex<VideoCapture>>>, scan_data: &mut ScanData, led_pos: &mut PosEntry, i: u32, second_cam: bool, window:&str) -> Result<(i32, i32), Box<dyn Error>> {
@@ -1389,7 +1391,7 @@ pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, config: &Config, cam: 
         filter(&mut frame, &filter_color, manager);
     }
     
-    let (_, max_val, pos) = get_brightest_cam_1_pos(frame.try_clone()?, scan_mode);
+    let (_, max_val, pos) = get_brightest_cam_1_pos(frame.try_clone()?);
 
     if max_val >= scan_data.pos.cam_1_darkest.unwrap() + ((scan_data.pos.cam_1_brightest.unwrap() - scan_data.pos.cam_1_darkest.unwrap()) * 0.5) {
         debug!("Succesful xy calibration: {:?} on index: {}", pos, i);
@@ -1710,7 +1712,7 @@ pub fn post_process(led_pos: &mut PosEntry, led_count: u32) {
 
         if current_z > z_mid {
             led_pos[i as usize].2.unwrap().0 = z_mid - (current_z - z_mid);
-        } else if current_y < y_mid {
+        } else if current_z < z_mid {
             led_pos[i as usize].2.unwrap().0 = z_mid + (z_mid - current_z);
         }
     }

@@ -34,8 +34,8 @@ pub fn speedtest(manager: &Arc<Mutex<ManagerData>>, num_led: u32, writes: u32) {
     let end = start.elapsed();
 
     let mut queue_total_lengths: u32 = 0;
-    for n in 0..=queue_lengths.len() - 1 {
-        queue_total_lengths += queue_lengths[n] as u32;
+    for n in queue_lengths.iter().take((queue_lengths.len() - 1) + 1) {
+        queue_total_lengths += queue_lengths[*n as usize] as u32;
     }
 
     info!("{:.2?} seconds.", end);

@@ -244,22 +244,28 @@ fn main() {
 
             let owned_options = unity_options.clone();
             let owned_config = config_holder.clone();
-            children.push(thread::spawn(move || {
-                debug!("inside thread");
-                match unity::get_events(
-                    &owned_manager,
-                    &owned_options.clone(),
-                    &owned_config,
-                    &owned_options.unity_ports.clone()[i as usize],
-                ) {
-                    Ok(_) => {
-                        debug!("thread exited??")
-                    }
-                    Err(e) => {
-                        panic!("get_events thread crashed with error: {}", e)
-                    }
-                }
-            }))
+            children.push(
+                thread::Builder::new()
+                    .name("get_events".to_string())
+                    .spawn(move || {
+                        debug!("inside thread");
+                        match unity::get_events(
+                            owned_manager,
+                            &owned_options.clone(),
+                            &owned_config,
+                            &owned_options.unity_ports.clone()[i as usize],
+                            &None,
+                        ) {
+                            Ok(_) => {
+                                debug!("thread exited??")
+                            }
+                            Err(e) => {
+                                panic!("get_events thread crashed with error: {}", e)
+                            }
+                        }
+                    })
+                    .unwrap(),
+            )
         }
 
         for child in children {
@@ -296,7 +302,7 @@ fn main() {
     #[cfg(feature = "scan")]
     if let Some(Command::Calibrate(ref _calibrate_options)) = opts.command {
         info!("Performing calibrating");
-        scan::scan(config_holder.clone(), &manager, true, None).expect("failure");
+        scan::scan(config_holder.clone(), &manager, false, None).expect("failure");
     }
 
     // led_manager::set_color(&mut manager, 1, 255, 255, 255);
