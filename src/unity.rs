@@ -1,11 +1,12 @@
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use opencv::{
-    core::{Point, Scalar},
+    core::{Mat, Point, Scalar},
     imgproc::{self, LINE_8},
-    videoio::{self, VideoCaptureTrait, VideoCaptureTraitConst},
+    videoio::{self, VideoCapture, VideoCaptureTrait, VideoCaptureTraitConst},
 };
 use std::{
+    cmp::max,
     collections::HashMap,
     error::Error,
     fs::File,
@@ -13,13 +14,14 @@ use std::{
     net::{Ipv4Addr, TcpStream, UdpSocket},
     str,
     sync::{Arc, Mutex},
+    thread,
     time::Duration,
 };
 
-use crate::led_manager;
 use crate::Config;
 use crate::ManagerData;
 use crate::UnityOptions;
+use crate::{led_manager, GetEventsFrameBuffer};
 
 type JsonEntry = Vec<(String, (f32, f32), (f32, f32))>;
 
@@ -133,10 +135,11 @@ pub fn send_pos(unity: UnityOptions) -> std::io::Result<()> {
 }
 
 pub fn get_events(
-    manager: &Arc<Mutex<ManagerData>>,
+    manager: Arc<Mutex<ManagerData>>,
     unity: &UnityOptions,
     config: &Config,
     port: &u32,
+    frame_buffer: &Option<Arc<Mutex<GetEventsFrameBuffer>>>, // Seperate buffer for frames to reduce locks on manager
 ) -> Result<(), Box<dyn Error>> {
     type JsonHashmap = HashMap<usize, ((f32, f32), (f32, f32), (u8, u8, u8), bool)>; // <index, xy, zy, rgb, illuminated>
 
@@ -146,8 +149,14 @@ pub fn get_events(
     let socket = UdpSocket::bind(format!("{}:{}", ip, port))?;
 
     // load positions if we are streaming video with widgets
-    let json: JsonEntry;
-    let mut json_hashmap: JsonHashmap = Default::default();
+    let mut json: JsonEntry;
+    let mut json_hashmap: Arc<Mutex<JsonHashmap>> = Arc::new(Mutex::new(Default::default()));
+
+    let mut frame_cam_1: Mat = Default::default();
+    let mut frame_cam_2: Mat = Default::default();
+
+    let owned_config = config.clone();
+    let owned_manager = Arc::clone(&manager);
 
     if config.get_events_video_widgets {
         // If one isn't set, assume the first pos file
@@ -187,62 +196,134 @@ pub fn get_events(
             }
         };
 
-        json_hashmap = json
-            .into_iter()
-            .enumerate()
-            .map(|(i, (_key, val1, val2))| (i, (val1, val2, (0u8, 0u8, 0u8), false)))
-            .collect();
-    }
+        let led_count = json.len();
+        let mut y_max = i32::MIN;
 
-    let mut cam = None;
-    let mut cam2 = None;
+        for i in 0..led_count {
+            // Get max and min values in led_pos
+            y_max = max((json[i].1 .1) as i32, y_max);
+        }
 
-    if config.get_events_streams_video {
-        cam = Some(videoio::VideoCapture::new(
-            config.camera_index_1,
-            videoio::CAP_ANY,
-        )?);
+        for i in 0..led_count {
+            let y_mid = y_max / 2;
+            let current_y = json[i].1 .1;
 
-        match videoio::VideoCapture::is_opened(cam.as_ref().unwrap())? {
-            true => {}
-            false => {
-                panic!("Unable to open camera 1!")
-            }
-        };
-
-        if config.multi_camera {
-            cam2 = Some(videoio::VideoCapture::new(
-                config.camera_index_2.unwrap(),
-                videoio::CAP_ANY,
-            )?);
-            match videoio::VideoCapture::is_opened(cam2.as_ref().unwrap())? {
-                true => {}
-                false => {
-                    panic!("Unable to open camera 2!")
-                }
+            json[i].1 .1 = match current_y {
+                y if y > y_mid as f32 => y_mid as f32 - (y - y_mid as f32),
+                y if y < y_mid as f32 => y_mid as f32 + (y_mid as f32 - y),
+                _ => json[i].1 .1,
             };
         }
+
+        json_hashmap = Arc::new(Mutex::new(
+            json.into_iter()
+                .enumerate()
+                .map(|(i, (_key, val1, val2))| (i, (val1, val2, (0u8, 0u8, 0u8), false)))
+                .collect(),
+        ));
+    }
+
+    if config.get_events_streams_video && frame_buffer.is_some() {
+        info!("Spawning get_events_streams_video thread.");
+        warn!("This should only be used in demos due to decreased performance!");
+
+        let owned_frame_buffer = Arc::clone(frame_buffer.as_ref().unwrap());
+        let json_hashmap_guard = Arc::clone(&json_hashmap);
+
+        thread::Builder::new()
+            .name("get_events_stream_video".to_string())
+            .spawn(move || {
+                debug!("Opening cameras!");
+
+                let config = owned_config;
+                let mut cam2 = None;
+
+                let cam = Arc::new(Mutex::new(
+                    videoio::VideoCapture::new(config.camera_index_1, videoio::CAP_ANY).unwrap(),
+                ));
+
+                match videoio::VideoCapture::is_opened(cam.as_ref().lock().as_ref().unwrap())
+                    .unwrap()
+                {
+                    true => {}
+                    false => {
+                        panic!("Unable to open camera 1!")
+                    }
+                };
+
+                if config.multi_camera {
+                    cam2 = Some(Arc::new(Mutex::new(
+                        videoio::VideoCapture::new(
+                            config.camera_index_2.unwrap(),
+                            videoio::CAP_ANY,
+                        )
+                        .unwrap(),
+                    )));
+                    match videoio::VideoCapture::is_opened(&cam2.as_ref().unwrap().lock().unwrap())
+                        .unwrap()
+                    {
+                        true => {}
+                        false => {
+                            panic!("Unable to open camera 2!")
+                        }
+                    };
+                }
+
+                loop {
+                    cam.lock().unwrap().read(&mut frame_cam_1).unwrap();
+
+                    if let Some(cam2) = &mut cam2 {
+                        if config.multi_camera {
+                            cam2.lock().unwrap().read(&mut frame_cam_2).unwrap();
+                        }
+                    }
+
+                    if config.get_events_video_widgets {
+                        for (_key, (xy, z, rgb, _enabled)) in json_hashmap_guard
+                            .lock()
+                            .unwrap()
+                            .iter()
+                            .filter(|(_, (_xy, _z, _rgb, enabled))| *enabled)
+                        {
+                            imgproc::circle(
+                                &mut frame_cam_1,
+                                Point::new(xy.0 as i32, xy.1 as i32),
+                                20,
+                                Scalar::new(rgb.2 as f64, rgb.1 as f64, rgb.0 as f64, 0.0f64),
+                                2,
+                                LINE_8,
+                                0,
+                            )
+                            .unwrap();
+
+                            imgproc::circle(
+                                &mut frame_cam_2,
+                                Point::new(z.0 as i32, xy.1 as i32),
+                                20,
+                                Scalar::new(rgb.2 as f64, rgb.1 as f64, rgb.0 as f64, 0.0f64),
+                                2,
+                                LINE_8,
+                                0,
+                            )
+                            .unwrap();
+                        }
+                    }
+
+                    {
+                        let mut frame_buffer = owned_frame_buffer.lock().unwrap();
+                        frame_buffer.shared_frame_1 = frame_cam_1.clone();
+                        frame_buffer.shared_frame_2 = frame_cam_2.clone();
+                        if !owned_manager.lock().unwrap().keepalive {
+                            info!("get_events_streams_video thread exiting");
+                            break;
+                        }
+                    }
+                }
+            })
+            .unwrap();
     }
 
     loop {
-        if !manager.lock().unwrap().keepalive {
-            info!("get_events exiting.");
-            manager.lock().unwrap().keepalive = true;
-            break;
-        }
-
-        if config.get_events_streams_video && cam.is_some() {
-            cam.as_mut()
-                .unwrap()
-                .read(&mut manager.lock().unwrap().frame_cam_1)?;
-
-            if config.multi_camera && cam2.is_some() {
-                cam2.as_mut()
-                    .unwrap()
-                    .read(&mut manager.lock().unwrap().frame_cam_2)?;
-            }
-        }
-
         let mut buf = [0; 16];
         socket.recv_from(&mut buf)?;
         let msg = match str::from_utf8(&buf) {
@@ -257,7 +338,7 @@ pub fn get_events(
         };
         let mut msg = msg.to_string();
         if msg.contains("E") {
-            println!("{msg}");
+            // println!("{msg}");
             // Clear color of index `EN`
             msg.remove(0);
             let index = match msg.to_string().parse::<u16>() {
@@ -269,12 +350,13 @@ pub fn get_events(
                     )
                 }
             };
-            led_manager::set_color(manager, index, 0, 0, 0);
+            led_manager::set_color(&manager, index, 0, 0, 0);
 
             // Indicate this isn't illuminated
-            if let Some(value) = json_hashmap.get_mut(&(index as usize)) {
+            if let Some(value) = json_hashmap.lock().unwrap().get_mut(&(index as usize)) {
                 value.3 = false;
             }
+            info!("dimming {}", index);
         } else if msg.contains("|") {
             // Set index n with r g b from string n|r|g|b
             let mut xs: [u16; 4] = [0; 4];
@@ -290,45 +372,27 @@ pub fn get_events(
                     }
                 };
             }
-            // println!("NRGB: {}|{}|{}|{}", xs[0], xs[1], xs[2], xs[3]);
 
-            // Indicate this is illuminated
-            if let Some(value) = json_hashmap.get_mut(&(xs[0] as usize)) {
-                value.3 = true;
-                value.2 = (xs[1] as u8, xs[2] as u8, xs[3] as u8);
+            if xs[1] != 0 || xs[2] != 0 || xs[3] != 0 {
+                // Indicate this is illuminated
+                if let Some(value) = json_hashmap.lock().unwrap().get_mut(&(xs[0] as usize)) {
+                    value.3 = true;
+                    value.2 = (xs[1] as u8, xs[2] as u8, xs[3] as u8);
+                }
+            } else {
+                // Indicate this isn't illuminated
+                if let Some(value) = json_hashmap.lock().unwrap().get_mut(&(xs[0] as usize)) {
+                    value.3 = false;
+                }
             }
-            led_manager::set_color(manager, xs[0], xs[1] as u8, xs[2] as u8, xs[3] as u8);
+            led_manager::set_color(&manager, xs[0], xs[1] as u8, xs[2] as u8, xs[3] as u8);
         } else {
             error!("Unity packet was malformed! Packet: {}", msg);
         }
-
-        if config.get_events_video_widgets {
-            for (_key, (xy, z, rgb, _enabled)) in json_hashmap
-                .iter()
-                .filter(|(_, (_xy, _z, _rgb, enabled))| *enabled)
-            {
-                debug!("applying circles to frames");
-
-                imgproc::circle(
-                    &mut manager.lock().unwrap().frame_cam_2,
-                    Point::new(xy.0 as i32, xy.1 as i32),
-                    20,
-                    Scalar::new(0.0f64, rgb.2 as f64, rgb.1 as f64, rgb.0 as f64),
-                    2,
-                    LINE_8,
-                    0,
-                )?;
-
-                imgproc::circle(
-                    &mut manager.lock().unwrap().frame_cam_1,
-                    Point::new(z.1 as i32, xy.1 as i32),
-                    20,
-                    Scalar::new(0.0f64, rgb.2 as f64, rgb.1 as f64, rgb.0 as f64),
-                    2,
-                    LINE_8,
-                    0,
-                )?;
-            }
+        if !manager.lock().unwrap().keepalive {
+            info!("get_events exiting.");
+            manager.lock().unwrap().keepalive = true;
+            break;
         }
     }
 
