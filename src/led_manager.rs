@@ -17,6 +17,8 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
 
     let mut manager: std::sync::MutexGuard<'_, ManagerData> = manager_guard.lock().unwrap();
 
+    let skip_confirmation = manager.skip_confirmation;
+
     if manager.unity_controls_recording {
         // TODO: Find better solution for this.
         let unity_start_anim_path: PathBuf = [env::temp_dir().to_str().unwrap(), "start_animate"]
@@ -283,7 +285,7 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
                                 error!("print_send_back could not read serial port: {}", e);
                             }
                         };
-                    } else {
+                    } else if !skip_confirmation {
                         let mut failures = 0;
                         let mut serial_buf: Vec<u8> = vec![0; 1];
 

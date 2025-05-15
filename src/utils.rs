@@ -48,6 +48,10 @@ pub struct Config {
     pub get_events_streams_video: bool, // When set to true, get_events will stream to frame_cam_1/2
     pub get_events_video_widgets: bool, // When set to true, get_events video stream will include circles around illuminated LEDs for visualization purposes
     pub get_events_widgets_pos_index: Option<i32>, // Which pos file to use for visualization
+    pub use_queue: Option<bool>,        // Should set_color queue writes?
+    pub video_width: f64,
+    pub video_height: f64,
+    pub skip_confirmation: bool, // Should we skip checking if the LED was properly set? Speeds things way up at the cost of accuracy.
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -55,7 +59,6 @@ pub struct UnityOptions {
     pub num_container: u8,
     pub unity_ip: Ipv4Addr,
     pub unity_ports: Vec<u32>,
-    pub unity_serial_ports: Vec<PathBuf>,
     pub unity_position_files: Vec<PathBuf>,
     pub scale: f32,
 }
@@ -98,11 +101,35 @@ pub struct ManagerData {
     pub frame_cam_1: Mat, // Allow public access to most recent captured frame. Currently used for open sauce
     pub frame_cam_2: Mat,
     pub no_video: bool,
+    pub skip_confirmation: bool, // pub use_queue: Option<bool>,
 }
 #[derive(Clone)]
 pub struct GetEventsFrameBuffer {
     pub shared_frame_1: Mat,
     pub shared_frame_2: Mat,
+}
+
+#[derive(Clone, Debug)]
+pub struct ScanData {
+    pub pos: CropPos,
+    pub invert: bool,
+    pub depth: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct CropPos {
+    pub x1_start: i32,
+    pub y1_start: i32,
+    pub x1_end: i32,
+    pub y1_end: i32,
+    pub x2_start: Option<i32>,
+    pub y2_start: Option<i32>,
+    pub x2_end: Option<i32>,
+    pub y2_end: Option<i32>,
+    pub cam_1_brightest: Option<f64>,
+    pub cam_2_brightest: Option<f64>,
+    pub cam_1_darkest: Option<f64>,
+    pub cam_2_darkest: Option<f64>,
 }
 
 pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Config) {
@@ -153,6 +180,8 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
     let hsv_blue_override = config_holder.hsv_blue_override.clone();
 
     let no_video = config_holder.no_video;
+
+    let skip_confirmation = config_holder.skip_confirmation;
 
     // Validate config and inform user of settings
 
@@ -241,6 +270,7 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
             frame_cam_1: Default::default(),
             frame_cam_2: Default::default(),
             no_video,
+            skip_confirmation,
         },
         config_holder.unity_options.clone(),
         config_holder,

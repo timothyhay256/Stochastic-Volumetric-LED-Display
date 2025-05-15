@@ -3,7 +3,10 @@ use log::{debug, error, info, warn};
 use opencv::{
     core::{Mat, Point, Scalar},
     imgproc::{self, LINE_8},
-    videoio::{self, VideoCapture, VideoCaptureTrait, VideoCaptureTraitConst},
+    videoio::{
+        self, VideoCapture, VideoCaptureTrait, VideoCaptureTraitConst, CAP_PROP_FRAME_HEIGHT,
+        CAP_PROP_FRAME_WIDTH,
+    },
 };
 use std::{
     cmp::max,
@@ -97,12 +100,8 @@ pub fn send_pos(unity: UnityOptions) -> std::io::Result<()> {
             unity.unity_ip.clone(),
             unity.unity_ports.clone()[i as usize]
         ))?;
-        stream
-            .set_read_timeout(Some(Duration::new(0, 1000000000)))
-            .unwrap();
-        stream
-            .set_write_timeout(Some(Duration::new(0, 1000000000)))
-            .unwrap();
+        stream.set_read_timeout(Some(Duration::new(1, 0))).unwrap();
+        stream.set_write_timeout(Some(Duration::new(1, 0))).unwrap();
         debug!("sending positions to connection");
         for led in json.iter() {
             pb_count += 1;
@@ -242,6 +241,15 @@ pub fn get_events(
                     videoio::VideoCapture::new(config.camera_index_1, videoio::CAP_ANY).unwrap(),
                 ));
 
+                cam.lock()
+                    .unwrap()
+                    .set(CAP_PROP_FRAME_WIDTH, config.video_width)
+                    .unwrap();
+                cam.lock()
+                    .unwrap()
+                    .set(CAP_PROP_FRAME_HEIGHT, config.video_height)
+                    .unwrap();
+
                 match videoio::VideoCapture::is_opened(cam.as_ref().lock().as_ref().unwrap())
                     .unwrap()
                 {
@@ -259,6 +267,20 @@ pub fn get_events(
                         )
                         .unwrap(),
                     )));
+
+                    cam2.as_ref()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .set(CAP_PROP_FRAME_WIDTH, config.video_width)
+                        .unwrap();
+                    cam2.as_ref()
+                        .unwrap()
+                        .lock()
+                        .unwrap()
+                        .set(CAP_PROP_FRAME_HEIGHT, config.video_height)
+                        .unwrap();
+
                     match videoio::VideoCapture::is_opened(&cam2.as_ref().unwrap().lock().unwrap())
                         .unwrap()
                     {
