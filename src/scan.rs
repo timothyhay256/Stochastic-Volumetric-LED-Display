@@ -1,43 +1,21 @@
-use chrono::Local; // TODO: Integrate a way to select target HSV when using color filter mode.
-use inquire; // TODO: Fix colour specific mode
+use chrono::Local; // TODO: Play with different camera backends 
+use inquire; 
 use log::{debug, error, info, warn}; // TODO: Properly get HSV for each camera
-use opencv::{// TODO: Sliders to filter out LED
+use opencv::{
     core::{self, flip, get_default_algorithm_hint, min_max_loc, no_array, Point, Scalar},
     highgui::{self, EVENT_LBUTTONDOWN, EVENT_LBUTTONUP, EVENT_MOUSEMOVE},
     imgproc::{self, COLOR_BGR2GRAY, COLOR_BGR2HSV, LINE_8},
     prelude::*,
-    videoio::{self, VideoCapture}, Result,
+    videoio::{self, VideoCapture, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH}, Result,
 };
 use std::{
     cmp::{max, min}, error::Error, fs::File, io::Write, path::Path, process, sync::{Arc, Mutex}, thread, time::Duration
 };
 
-use crate::led_manager;
+use crate::{led_manager, CropPos, ScanData};
 use crate::Config;
 use crate::ManagerData;
 
-#[derive(Clone, Debug)]
-pub struct ScanData {
-    pos: CropPos,
-    invert: bool,
-    depth: bool,
-}
-
-#[derive(Clone, Debug)]
-pub struct CropPos {
-    pub x1_start: i32,
-    pub y1_start: i32,
-    pub x1_end: i32,
-    pub y1_end: i32,
-    pub x2_start: Option<i32>,
-    pub y2_start: Option<i32>,
-    pub x2_end: Option<i32>,
-    pub y2_end: Option<i32>,
-    pub cam_1_brightest: Option<f64>,
-    pub cam_2_brightest: Option<f64>,
-    pub cam_1_darkest: Option<f64>,
-    pub cam_2_darkest: Option<f64>
-}
 type ScanResult = Result<(i32, i32, Option<i32>, Option<i32>), Box<dyn Error>>;
 type PosEntry = Vec<(String, (i32, i32), Option<(i32, i32)>)>;
 type CropData = Option<((i32, i32, i32, i32), (i32, i32, i32, i32))>;
@@ -100,6 +78,10 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
     }
 
     let cam = Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_1, videoio::CAP_ANY)?)); // We need to constantly poll this in the background to get the most recent frame due to OpenCV bug(?)
+    
+    cam.lock().unwrap().set(CAP_PROP_FRAME_WIDTH, config.video_width)?;
+    cam.lock().unwrap().set(CAP_PROP_FRAME_HEIGHT, config.video_height)?;
+
     let mut cam2: Option<Arc<Mutex<VideoCapture>>> = None;
 
     let cam_guard = Arc::clone(&cam);
@@ -149,7 +131,10 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
             debug!("Getting second cam limits");
             cam2 = Some(Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_2.unwrap(), videoio::CAP_ANY)?)));
 
-            pos.x2_end = Some(cam2.as_ref().unwrap().lock().unwrap().get(opencv::videoio::CAP_PROP_FRAME_WIDTH).unwrap() as i32);
+            cam2.as_ref().unwrap().lock().unwrap().set(CAP_PROP_FRAME_WIDTH, config.video_width)?;
+            cam2.as_ref().unwrap().lock().unwrap().set(CAP_PROP_FRAME_HEIGHT, config.video_height)?;
+
+            pos.x2_end = Some(cam2.as_ref().unwrap().lock().unwrap().get(opencv::videoio::CAP_PROP_FRAME_WIDTH).unwrap() as i32); // Sometimes OpenCV will silently fail to set the width/height, so we can't rely on config.video_width here
             pos.y2_end = Some(cam2.as_ref().unwrap().lock().unwrap().get(opencv::videoio::CAP_PROP_FRAME_HEIGHT).unwrap() as i32);
         }
     }
@@ -175,6 +160,10 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
     if config.multi_camera && !streamlined {
         highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
         cam2 = Some(Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_2.unwrap(), videoio::CAP_ANY)?)));
+
+        cam2.as_ref().unwrap().lock().unwrap().set(CAP_PROP_FRAME_WIDTH, config.video_width)?;
+        cam2.as_ref().unwrap().lock().unwrap().set(CAP_PROP_FRAME_HEIGHT, config.video_height)?;
+
         cam2_guard = Arc::clone(cam2.as_ref().unwrap());
 
         match videoio::VideoCapture::is_opened(&cam2_guard.lock().unwrap())? {
@@ -296,7 +285,7 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
         info!("First camera: {success} succesful calibrations, {failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.", success_cam_2.unwrap(), failures_cam_2.unwrap());
     }
 
-    if failures > 0 && !streamlined {
+    if failures > 0 && !streamlined && !config.multi_camera {
         // Rescan XY from the back if there are failures
         {
             data.lock().unwrap().invert = true;
@@ -971,6 +960,9 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
 
     let cam_guard = Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_1, videoio::CAP_ANY)?)); // callback_loop only accepts a Arc<Mutex<VideoCapture>> 
     
+    cam_guard.lock().unwrap().set(CAP_PROP_FRAME_WIDTH, config.video_width)?;
+    cam_guard.lock().unwrap().set(CAP_PROP_FRAME_HEIGHT, config.video_height)?;
+
     match videoio::VideoCapture::is_opened(&cam_guard.lock().unwrap())? {
         true => {},
         false => {panic!(
@@ -997,6 +989,10 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
         debug!("Cropping second camera with index {index}");
         *camera_active.lock().unwrap() = 1;
         let cam_guard = Arc::new(Mutex::new(videoio::VideoCapture::new(index, videoio::CAP_ANY)?));
+        
+        cam_guard.lock().unwrap().set(CAP_PROP_FRAME_WIDTH, config.video_width)?;
+        cam_guard.lock().unwrap().set(CAP_PROP_FRAME_HEIGHT, config.video_height)?;
+
         match videoio::VideoCapture::is_opened(&cam_guard.lock().unwrap())? {
             true => {},
             false => {panic!(
@@ -1436,7 +1432,7 @@ pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, config: &Config, cam: 
                 led_pos[i as usize].1,
                 Some((pos.x, pos.y)),
             );
-        } else {
+        } else { 
             led_pos[i as usize] = (
                 "RECALIBRATE-XY".to_string(),
                 (pos.x, pos.y),
@@ -1700,7 +1696,7 @@ pub fn post_process(led_pos: &mut PosEntry, led_count: u32) {
         let y_mid = y_max / 2;
         let current_y = led_pos[i as usize].1.1;
 
-        let z_mid = y_max / 2;
+        let z_mid = z_max / 2;
         let current_z = led_pos[i as usize].2.unwrap().0;
 
         led_pos[i as usize].1.1 = match current_y {

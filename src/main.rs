@@ -2,11 +2,13 @@ use gumdrop::Options;
 use log::{debug, error, info}; // TODO: Depreceate unity export byte data
 use std::{
     env,
+    fs::File,
+    io::Read,
     path::{Path, PathBuf},
     process,
     sync::{Arc, Mutex},
-    thread,
-    time::SystemTime,
+    thread::{self, sleep},
+    time::{Duration, SystemTime},
 };
 #[cfg(feature = "gui")]
 use svled::gui;
@@ -15,7 +17,7 @@ use svled::gui;
 use svled::scan;
 
 use svled::{
-    driver_wizard, led_manager::set_color, read_vled, speedtest, unity, utils, ManagerData,
+    demo, driver_wizard, led_manager::set_color, read_vled, speedtest, unity, utils, ManagerData,
 };
 
 #[derive(Debug, Options)]
@@ -61,6 +63,9 @@ enum Command {
 
     #[options(help = "set a single led's color")]
     SetColor(SetColorOptions),
+
+    #[options(help = "run a simple demo")]
+    Demo(DemoOptions),
 }
 
 #[derive(Debug, Options)]
@@ -90,11 +95,18 @@ struct CalibrateOptions {}
 
 #[derive(Debug, Options)]
 struct UnityCommandOptions {}
+
 #[cfg(feature = "gui")]
 #[derive(Debug, Options)]
 struct GuiOptions {}
+
 #[derive(Debug, Options)]
 struct DriverWizardOptions {}
+
+#[derive(Debug, Options)]
+struct DemoOptions {}
+
+type JsonEntry = Vec<(String, (f32, f32), (f32, f32))>;
 
 fn main() {
     let opts = MyOptions::parse_args_default_or_exit();
@@ -130,7 +142,7 @@ fn main() {
     if let Some(Command::Speedtest(ref _speedtest_options)) = opts.command {
         info!("Performing speedtest...");
 
-        speedtest::speedtest(&manager, config_holder.num_led, 10000);
+        speedtest::speedtest(&manager, config_holder.num_led, 20000);
     } else if let Some(Command::ReadVled(ref readvled_options)) = opts.command {
         if !readvled_options.vled_file.is_file() {
             error!("You must pass a valid vled file with --vled-file!");
@@ -155,23 +167,6 @@ fn main() {
         }
     } else if let Some(Command::Unity(ref _unity_options)) = opts.command {
         // Validate Unity section of config, if we are using Unity.
-
-        if unity_options.unity_serial_ports.len() < unity_options.num_container.into()
-            || unity_options.unity_position_files.len() < unity_options.num_container.into()
-        {
-            panic!("You need to have enough paths in both unity_serial_ports and unity_position_files to continue!");
-        }
-
-        for i in 0..=unity_options.num_container - 1 {
-            if !Path::new(&unity_options.unity_serial_ports[i as usize]).is_file() {
-                error!(
-                    "{} is not a valid file! Will attempt to continue anyway.",
-                    unity_options.unity_serial_ports[i as usize]
-                        .clone()
-                        .display()
-                );
-            }
-        }
 
         for i in 0..=unity_options.num_container - 1 {
             if !Path::new(&unity_options.unity_position_files[i as usize]).is_file() {
@@ -239,6 +234,7 @@ fn main() {
                     frame_cam_1: Default::default(),
                     frame_cam_2: Default::default(),
                     no_video: config_holder.no_video,
+                    skip_confirmation: config_holder.skip_confirmation,
                 }));
             }
 
@@ -292,6 +288,61 @@ fn main() {
             set_color_options.g,
             set_color_options.b,
         );
+    } else if let Some(Command::Demo(ref _demo_options)) = opts.command {
+        info!("Running demo!");
+
+        let mut pos_file = match File::open(unity_options.unity_position_files[0].clone()) {
+            Ok(file) => file,
+            Err(e) => {
+                panic!(
+                    "Could not read {:?}: {}",
+                    unity_options.unity_position_files[0], e
+                )
+            }
+        };
+
+        let mut file_contents = String::new();
+        match pos_file.read_to_string(&mut file_contents) {
+            Ok(_) => {}
+            Err(e) => {
+                panic!(
+                    "Could not read position file {}: {}",
+                    unity_options.unity_position_files[0].display(),
+                    e
+                )
+            }
+        };
+
+        let json: JsonEntry = match serde_json::from_str(&file_contents) {
+            Ok(json) => json,
+            Err(e) => {
+                panic!(
+                    "{} contains invalid or incomplete calibration data: {}",
+                    unity_options.unity_position_files[0].display(),
+                    e
+                )
+            }
+        };
+
+        loop {
+            demo::rainbow(&manager, &json, 80.0, 50.0, false, demo::Axis::X, true);
+            demo::rainbow(&manager, &json, 120.0, 50.0, false, demo::Axis::Y, true);
+            demo::rainbow(&manager, &json, 80.0, 50.0, false, demo::Axis::Z, true);
+        }
+
+        // let mut offset = 0.0_f32;
+        // let speed = 0.1_f32; // Adjust speed of rainbow shift
+
+        // loop {
+        //     demo::rainbow_fill(&manager, &json, demo::Axis::X, offset);
+
+        //     offset += speed;
+        //     if offset >= 1.0 {
+        //         offset -= 1.0;
+        //     }
+
+        //     // sleep(Duration::from_millis(20)); // Control frame rate
+        // }
     }
 
     // #[cfg(feature = "gui")]
