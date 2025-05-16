@@ -4,9 +4,8 @@ num_strips = 20
 # num_strips = 1
 communication_mode = 2                        # 1 indicates UDP, 2 indicates serial
 host = "192.168.86.53"                        # UDP host
-port = 8888                                    # UDP port (Default is 8888)
-# serial_port_paths = ["/dev/ttyACM0", "/dev/ttyACM1", "/dev/ttyACM2", "/dev/ttyACM3", "/dev/ttyACM4", "/dev/ttyACM5", "/dev/ttyACM6", "/dev/ttyACM7", "/dev/ttyACM8", "/dev/ttyACM9", "/dev/ttyACM10", "/dev/ttyACM11"]              # Serial port
-# serial_port_paths = ["/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_94:A9:90:6E:8B:30-if00"]
+port = 8888                                   # UDP port (Default is 8888)
+
 serial_port_paths = [
   "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_94:A9:90:6E:8B:30-if00",
   "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:3D:AE:4F:E9:98-if00",
@@ -30,33 +29,26 @@ serial_port_paths = [
   "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:3D:AE:51:AB:1C-if00"
 ]
 
-baud_rate = 921600                             # Serial baud rate (Default is 921600)
-serial_read_timeout = 5                       # Serial read timeout in ms
+baud_rate = 3000000                            # Serial baud rate (Default is 921600)
+
 record_data = false                            # If true, all commands will be recorded during the session
 record_esp_data = false                        # If true, all commands will be recorded in a format that can be read by the ESP
-unity_controls_recording = false                # If true, above two will be ignored and controlled by Unity
+unity_controls_recording = false               # If true, above two will be ignored and controlled by Unity
+
 record_data_file = "record_data.vled"          # File to record vled data to
 record_esp_data_file = "record_esp_data.bvled" # File to record bvled data to
-print_send_back = false                         # Debugging only: Prints what the ESP received when using Serial
-udp_read_timeout = 100                         # How long to wait for a response from ESP when using UDP
+
 multi_camera = true 
 camera_index_1 = 2
 camera_index_2 = 4
-con_fail_limit = 5
-no_controller = false
+
 scan_mode = 0
 filter_color = 2
 filter_range = 90
-# hsv_red_override = [] #<upper_h, upper_s, upper_v, lower_h, lower_s, lower_v>
-# hsv_green_override = []
-# hsv_blue_override = [61, 0, 245, 95, 255, 255]
 color_bright = 55
-no_video = false
-get_events_streams_video = false
-get_events_video_widgets = false
+
 video_width = 1280
 video_height = 720
-skip_confirmation = false
 
 [unity_options]
 num_container = 1
@@ -65,3 +57,20 @@ unity_ports = [5001, 5002, 5003]
 unity_serial_baudrate = 921600
 unity_position_files = ["tank.json"]
 scale = 0.08
+
+[advanced]
+serial_read_timeout = 5
+print_send_back = false
+udp_read_timeout = 100
+con_fail_limit = 5
+no_controller = false
+# hsv_red_override = []  # Format: [upper_h, upper_s, upper_v, lower_h, lower_s, lower_v]
+# hsv_green_override = []
+hsv_blue_override = [61, 0, 245, 95, 255, 255]
+no_video = false
+get_events_streams_video = false
+get_events_video_widgets = false
+get_events_widgets_pos_index = 0
+use_queue = false
+skip_confirmation = false
+crop_override = [0, 0, 1280, 720] # Optional example
