@@ -1,6 +1,6 @@
 # SVLED
 ## Stochastic Volumetric LEDs (3D Mapped LEDs [pretty looking lights])
-*Note videos of it working/Unity project cleanup is coming very soon. The code currently does work properly.*
+*Proper documentation and more demo videos are coming soon.*
 
 This project allows you to scan a container full of individually addressible RGB leds, and create a representation of those LEDs in 3d space in Unity, where you can apply whatever effects in 3d that you desire.  
 It also has the ability to save animations either to a file, or directly to the LED controller (ESP32).  
@@ -8,9 +8,9 @@ You can see a demo video setting up the LEDs here: `TODO: make video`
 
 You can see a short demo video here: `TODO: make video`  
 
-Please note that a much cooler demo with gyroscopes and multiple containers is coming soon :3  
+Please note that a much cooler demo with gyroscopes and multiple containers is coming soon  
 
-<img src="docs/demo.gif" width="450" height="250"/>
+https://github.com/user-attachments/assets/2d306b9b-878b-488d-bfa9-6dc4f7c6ec3e
 
 ## Usage
 
