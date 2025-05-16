@@ -2,9 +2,10 @@ use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
 
+use crate::led_manager;
 use crate::ManagerData;
-use crate::{led_manager, UnityOptions};
 type JsonEntry = Vec<(String, (f32, f32), (f32, f32))>;
+type LedPos = [(String, (f32, f32), (f32, f32))];
 
 #[derive(Clone, Copy)]
 pub enum Axis {
@@ -92,12 +93,7 @@ pub fn rainbow(
     }
 }
 
-pub fn rainbow_fill(
-    manager: &Arc<Mutex<ManagerData>>,
-    led_pos: &[(String, (f32, f32), (f32, f32))],
-    axis: Axis,
-    offset: f32,
-) {
+pub fn rainbow_fill(manager: &Arc<Mutex<ManagerData>>, led_pos: &LedPos, axis: Axis, offset: f32) {
     let get_axis_value = |entry: &(String, (f32, f32), (f32, f32))| -> f32 {
         match axis {
             Axis::X => entry.1 .0,
