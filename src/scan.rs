@@ -1,35 +1,51 @@
-use chrono::Local; // TODO: Play with different camera backends 
-use inquire; 
+use chrono::Local; // TODO: Play with different camera backends
+use inquire;
 use log::{debug, error, info, warn}; // TODO: Properly get HSV for each camera
 use opencv::{
     core::{self, flip, get_default_algorithm_hint, min_max_loc, no_array, Point, Scalar},
     highgui::{self, EVENT_LBUTTONDOWN, EVENT_LBUTTONUP, EVENT_MOUSEMOVE},
     imgproc::{self, COLOR_BGR2GRAY, COLOR_BGR2HSV, LINE_8},
     prelude::*,
-    videoio::{self, VideoCapture, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH}, Result,
+    videoio::{self, VideoCapture, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH},
+    Result,
 };
 use std::{
-    cmp::{max, min}, error::Error, fs::File, io::Write, path::Path, process, sync::{Arc, Mutex}, thread, time::Duration
+    cmp::{max, min},
+    error::Error,
+    fs::File,
+    io::Write,
+    path::Path,
+    process,
+    sync::{Arc, Mutex},
+    thread,
+    time::Duration,
 };
 
-use crate::{led_manager, CropPos, ScanData};
 use crate::Config;
 use crate::ManagerData;
+use crate::{led_manager, CropPos, ScanData};
 
 type ScanResult = Result<(i32, i32, Option<i32>, Option<i32>), Box<dyn Error>>;
 type PosEntry = Vec<(String, (i32, i32), Option<(i32, i32)>)>;
 type CropData = Option<((i32, i32, i32, i32), (i32, i32, i32, i32))>;
 type CallbackResult = (i32, i32, Option<i32>, Option<i32>);
 
-pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined: bool, crop_data: CropData) -> Result<()> { // streamlined skips cropping and ALL prompts, thus requiring multiple cameras to function
-    let mut led_pos = vec![("UNCALIBRATED".to_string(), (0, 0), Some((0, 0))); config.num_led as usize];
+pub fn scan(
+    config: Config,
+    manager_guard: &Arc<Mutex<ManagerData>>,
+    streamlined: bool,
+    crop_data: CropData,
+) -> Result<()> {
+    // streamlined skips cropping and ALL prompts, thus requiring multiple cameras to function
+    let mut led_pos =
+        vec![("UNCALIBRATED".to_string(), (0, 0), Some((0, 0))); config.num_led as usize];
     let num_led;
     let scan_mode;
     let filter_color;
     {
-        num_led = manager_guard.lock().unwrap().num_led;
-        scan_mode = manager_guard.lock().unwrap().scan_mode;
-        filter_color = manager_guard.lock().unwrap().filter_color;
+        num_led = manager_guard.lock().unwrap().config.num_led;
+        scan_mode = manager_guard.lock().unwrap().config.scan_mode;
+        filter_color = manager_guard.lock().unwrap().config.filter_color;
     }
     info!("Clearing strip");
     for i in 0..=num_led {
@@ -43,16 +59,18 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
             debug!("Using green filter");
         } else if filter_color.unwrap() == 2 {
             debug!("Using blue filter");
-
         }
     }
 
     let window = "Please wait...";
-    if !config.no_video {
-        highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
+    if let Some(no_video) = config.advanced.no_video {
+        if !no_video {
+            highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
+        }
     }
 
-    let mut pos = CropPos { // Needed because of possible uninitialization in the else bracket of the streamlined check below
+    let mut pos = CropPos {
+        // Needed because of possible uninitialization in the else bracket of the streamlined check below
         x1_start: 0,
         y1_start: 0,
         x1_end: 0,
@@ -64,7 +82,7 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
         cam_1_brightest: None,
         cam_2_brightest: None,
         cam_1_darkest: None,
-        cam_2_darkest: None 
+        cam_2_darkest: None,
     };
 
     if !streamlined {
@@ -77,10 +95,19 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
         };
     }
 
-    let cam = Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_1, videoio::CAP_ANY)?)); // We need to constantly poll this in the background to get the most recent frame due to OpenCV bug(?)
-    
-    cam.lock().unwrap().set(CAP_PROP_FRAME_WIDTH, config.video_width)?;
-    cam.lock().unwrap().set(CAP_PROP_FRAME_HEIGHT, config.video_height)?;
+    let cam = Arc::new(Mutex::new(videoio::VideoCapture::new(
+        config.camera_index_1,
+        videoio::CAP_ANY,
+    )?)); // We need to constantly poll this in the background to get the most recent frame due to OpenCV bug(?)
+
+    if config.video_width.is_some() && config.video_height.is_some() {
+        cam.lock()
+            .unwrap()
+            .set(CAP_PROP_FRAME_WIDTH, config.video_width.unwrap())?;
+        cam.lock()
+            .unwrap()
+            .set(CAP_PROP_FRAME_HEIGHT, config.video_height.unwrap())?;
+    }
 
     let mut cam2: Option<Arc<Mutex<VideoCapture>>> = None;
 
@@ -88,11 +115,13 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
     let cam2_guard: Arc<Mutex<VideoCapture>>;
 
     match videoio::VideoCapture::is_opened(&cam_guard.lock().unwrap())? {
-        true => {},
-        false => {panic!(
-            "Unable to open camera {}! Please select another.",
-            config.camera_index_1
-        )}
+        true => {}
+        false => {
+            panic!(
+                "Unable to open camera {}! Please select another.",
+                config.camera_index_1
+            )
+        }
     };
 
     thread::spawn(move || {
@@ -103,7 +132,7 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
         }
     });
 
-   if streamlined {
+    if streamlined {
         debug!("process is streamlined");
         if crop_data.is_none() {
             pos.x1_start = 0;
@@ -112,36 +141,80 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
             pos.x2_start = Some(0);
             pos.y2_start = Some(0);
 
-            pos.x1_end = cam.lock().unwrap().get(opencv::videoio::CAP_PROP_FRAME_WIDTH).unwrap() as i32; // TODO: Real error handling
-            pos.y1_end = cam.lock().unwrap().get(opencv::videoio::CAP_PROP_FRAME_HEIGHT).unwrap() as i32;
+            pos.x1_end = cam
+                .lock()
+                .unwrap()
+                .get(opencv::videoio::CAP_PROP_FRAME_WIDTH)
+                .unwrap() as i32; // TODO: Real error handling
+            pos.y1_end = cam
+                .lock()
+                .unwrap()
+                .get(opencv::videoio::CAP_PROP_FRAME_HEIGHT)
+                .unwrap() as i32;
         } else {
             let crop_data = crop_data.unwrap();
-            pos.x1_start = crop_data.0.0;
-            pos.x1_end = crop_data.0.1;
-            pos.y1_start = crop_data.0.2;
-            pos.y1_end = crop_data.0.3;
+            pos.x1_start = crop_data.0 .0;
+            pos.x1_end = crop_data.0 .1;
+            pos.y1_start = crop_data.0 .2;
+            pos.y1_end = crop_data.0 .3;
 
-            pos.x2_start = Some(crop_data.1.0);
-            pos.x2_end = Some(crop_data.1.1);
-            pos.y2_start = Some(crop_data.1.2);
-            pos.y2_end = Some(crop_data.1.3);
+            pos.x2_start = Some(crop_data.1 .0);
+            pos.x2_end = Some(crop_data.1 .1);
+            pos.y2_start = Some(crop_data.1 .2);
+            pos.y2_end = Some(crop_data.1 .3);
         }
-        
+
         if config.multi_camera {
             debug!("Getting second cam limits");
-            cam2 = Some(Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_2.unwrap(), videoio::CAP_ANY)?)));
+            cam2 = Some(Arc::new(Mutex::new(videoio::VideoCapture::new(
+                config.camera_index_2.unwrap(),
+                videoio::CAP_ANY,
+            )?)));
 
-            cam2.as_ref().unwrap().lock().unwrap().set(CAP_PROP_FRAME_WIDTH, config.video_width)?;
-            cam2.as_ref().unwrap().lock().unwrap().set(CAP_PROP_FRAME_HEIGHT, config.video_height)?;
+            if config.video_width.is_some() && config.video_height.is_some() {
+                cam2.as_ref()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .set(CAP_PROP_FRAME_WIDTH, config.video_width.unwrap())?;
+                cam2.as_ref()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .set(CAP_PROP_FRAME_HEIGHT, config.video_height.unwrap())?;
+            }
 
-            pos.x2_end = Some(cam2.as_ref().unwrap().lock().unwrap().get(opencv::videoio::CAP_PROP_FRAME_WIDTH).unwrap() as i32); // Sometimes OpenCV will silently fail to set the width/height, so we can't rely on config.video_width here
-            pos.y2_end = Some(cam2.as_ref().unwrap().lock().unwrap().get(opencv::videoio::CAP_PROP_FRAME_HEIGHT).unwrap() as i32);
+            pos.x2_end = Some(
+                cam2.as_ref()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get(opencv::videoio::CAP_PROP_FRAME_WIDTH)
+                    .unwrap() as i32,
+            ); // Sometimes OpenCV will silently fail to set the width/height, so we can't rely on config.video_width here
+            pos.y2_end = Some(
+                cam2.as_ref()
+                    .unwrap()
+                    .lock()
+                    .unwrap()
+                    .get(opencv::videoio::CAP_PROP_FRAME_HEIGHT)
+                    .unwrap() as i32,
+            );
         }
     }
 
     let hsv_brightest: core::VecN<u8, 3>;
 
-    (pos.cam_1_brightest, pos.cam_1_darkest, hsv_brightest) = match brightest_darkest(&cam, &config, manager_guard, pos.x1_start, pos.y1_start, pos.x1_end, pos.y1_end, !streamlined) {
+    (pos.cam_1_brightest, pos.cam_1_darkest, hsv_brightest) = match brightest_darkest(
+        &cam,
+        &config,
+        manager_guard,
+        pos.x1_start,
+        pos.y1_start,
+        pos.x1_end,
+        pos.y1_end,
+        !streamlined,
+    ) {
         Ok((brightest, darkest, hsv_brightest)) => (Some(brightest), Some(darkest), hsv_brightest),
         Err(e) => {
             panic!("There was an issue trying to get the darkest and brightest values: {e}")
@@ -155,35 +228,52 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
         hsv_brightest[1] as f32 / 255.0 * 100.0,
         hsv_brightest[2] as f32 / 255.0 * 100.0
     );
-    
 
     if config.multi_camera && !streamlined {
         highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
-        cam2 = Some(Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_2.unwrap(), videoio::CAP_ANY)?)));
+        cam2 = Some(Arc::new(Mutex::new(videoio::VideoCapture::new(
+            config.camera_index_2.unwrap(),
+            videoio::CAP_ANY,
+        )?)));
 
-        cam2.as_ref().unwrap().lock().unwrap().set(CAP_PROP_FRAME_WIDTH, config.video_width)?;
-        cam2.as_ref().unwrap().lock().unwrap().set(CAP_PROP_FRAME_HEIGHT, config.video_height)?;
+        if config.video_width.is_some() && config.video_height.is_some() {
+            cam2.as_ref()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .set(CAP_PROP_FRAME_WIDTH, config.video_width.unwrap())?;
+            cam2.as_ref()
+                .unwrap()
+                .lock()
+                .unwrap()
+                .set(CAP_PROP_FRAME_HEIGHT, config.video_height.unwrap())?;
+        }
 
         cam2_guard = Arc::clone(cam2.as_ref().unwrap());
 
         match videoio::VideoCapture::is_opened(&cam2_guard.lock().unwrap())? {
-            true => {},
-            false => {panic!(
-                "Unable to open camera {}! Please select another.",
-                config.camera_index_2.unwrap()
-            )}
-        };
-        
-        match thread::Builder::new().name("frame_consumer".to_string()).spawn(move || {
-            loop {
-                let mut frame = Mat::default();
-                cam2_guard.lock().unwrap().read(&mut frame).unwrap();
-                thread::sleep(Duration::from_millis(1)); // Give us a chance to grab the lock
+            true => {}
+            false => {
+                panic!(
+                    "Unable to open camera {}! Please select another.",
+                    config.camera_index_2.unwrap()
+                )
             }
+        };
 
-        }) {
-            Ok(_) => {},
-            Err(e) => error!("Failed to spawn frame_consumer! Scan results may be inaccurate! Error: {e}")
+        match thread::Builder::new()
+            .name("frame_consumer".to_string())
+            .spawn(move || {
+                loop {
+                    let mut frame = Mat::default();
+                    cam2_guard.lock().unwrap().read(&mut frame).unwrap();
+                    thread::sleep(Duration::from_millis(1)); // Give us a chance to grab the lock
+                }
+            }) {
+            Ok(_) => {}
+            Err(e) => {
+                error!("Failed to spawn frame_consumer! Scan results may be inaccurate! Error: {e}")
+            }
         };
         // let initial_cal_var = brightest_darkest(cam2.as_ref().unwrap(), &config, manager_guard, pos.x1_start, pos.y1_start, pos.x1_end, pos.y1_end, !streamlined);
         // (pos.cam_2_brightest, pos.cam_2_darkest) = (
@@ -206,49 +296,46 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
         debug!("Setting upper and lower bounds for LED");
 
         let mut manager = manager_guard.lock().unwrap();
-        let filter_color = manager.filter_color.unwrap();
-        let hsv_override ;
+        let filter_color = manager.config.filter_color.unwrap();
+        let hsv_override;
 
         if filter_color == 0 {
-            hsv_override = manager.hsv_red_override.as_mut();
+            hsv_override = manager.config.hsv_red_override.as_mut();
         } else if filter_color == 1 {
-            hsv_override = manager.hsv_green_override.as_mut();
+            hsv_override = manager.config.hsv_green_override.as_mut();
         } else if filter_color == 2 {
-            hsv_override = manager.hsv_blue_override.as_mut();
+            hsv_override = manager.config.hsv_blue_override.as_mut();
         } else {
             panic!("{filter_color} is not a valid filter color");
         }
 
         if hsv_override.is_none() {
             let override_vec = match filter_color {
-                0 => &mut manager.hsv_red_override,
-                1 => &mut manager.hsv_green_override,
-                2 => &mut manager.hsv_blue_override,
+                0 => &mut manager.config.hsv_red_override,
+                1 => &mut manager.config.hsv_green_override,
+                2 => &mut manager.config.hsv_blue_override,
                 _ => panic!("{filter_color} is not a valid filter color"),
             };
-        
+
             let range = config.filter_range.unwrap();
             let hue_range = range / 4; // Only use half range for Hue
-            
+
             let h = hsv_brightest.0[0];
             let s = hsv_brightest.0[1];
             let v = hsv_brightest.0[2];
-            
+
             // Clamp lower bounds safely
             let lower_h = h.saturating_sub(hue_range).min(179);
             let lower_s = s.saturating_sub(range);
             let lower_v = v.saturating_sub(range);
-            
+
             // Clamp upper bounds safely
             let upper_h = (h + hue_range).min(179);
             let upper_s = s + range;
             let upper_v = v + range;
-            
-            *override_vec = Some(vec![
-                lower_h, lower_s, lower_v,
-                upper_h, upper_s, upper_v,
-            ]);
-            
+
+            *override_vec = Some(vec![lower_h, lower_s, lower_v, upper_h, upper_s, upper_v]);
+
             debug!("lower bound: HSV: {} {} {}", lower_h, lower_s, lower_v);
             debug!("upper bound: HSV: {} {} {}", upper_h, upper_s, upper_v);
         } else {
@@ -263,7 +350,7 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
         invert: false,
         depth: false,
     }));
-    
+
     info!("Scan XY");
     let (success, failures, success_cam_2, failures_cam_2) = match scan_area(
         manager_guard,
@@ -273,7 +360,9 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
         &mut led_pos,
         data.clone(),
     ) {
-        Ok((success, failures, success_cam_2, failures_cam_2)) => (success, failures, success_cam_2, failures_cam_2),
+        Ok((success, failures, success_cam_2, failures_cam_2)) => {
+            (success, failures, success_cam_2, failures_cam_2)
+        }
         Err(e) => {
             panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
         }
@@ -306,7 +395,9 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
             &mut led_pos,
             data.clone(),
         ) {
-            Ok((cam_1_success, cam_1_failures, cam_2_success, cam_2_failures)) => (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures),
+            Ok((cam_1_success, cam_1_failures, cam_2_success, cam_2_failures)) => {
+                (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures)
+            }
             Err(e) => {
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
             }
@@ -318,14 +409,7 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
         }
         if failures > 0 {
             info!("Entering manual calibration mode!");
-            match manual_calibrate(
-                manager_guard,
-                &config,
-                window,
-                &cam,
-                &mut led_pos,
-                &data,
-            ) {
+            match manual_calibrate(manager_guard, &config, window, &cam, &mut led_pos, &data) {
                 Ok(_) => {}
                 Err(e) => {
                     panic!("Something went wrong during manual calibration: {}", e);
@@ -340,8 +424,10 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
     }
 
     if !config.multi_camera {
-        if failures == 0 && !streamlined{
-            info!("Please rotate the container 90 degrees to calibrate Z. Press any key to continue.");
+        if failures == 0 && !streamlined {
+            info!(
+                "Please rotate the container 90 degrees to calibrate Z. Press any key to continue."
+            );
             highgui::set_window_title(
                 window,
                 "Please rotate the container 90 degrees to calibrate Z. Press any key to continue.",
@@ -368,7 +454,9 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
             &mut led_pos,
             data.clone(),
         ) {
-            Ok((cam_1_success, cam_1_failures, cam_2_success, cam_2_failures)) => (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures),
+            Ok((cam_1_success, cam_1_failures, cam_2_success, cam_2_failures)) => {
+                (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures)
+            }
             Err(e) => {
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
             }
@@ -400,13 +488,17 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
                 &mut led_pos,
                 data.clone(),
             ) {
-                Ok((cam_1_success, cam_1_failures, cam_2_success, cam_2_failures)) => (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures),
+                Ok((cam_1_success, cam_1_failures, cam_2_success, cam_2_failures)) => {
+                    (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures)
+                }
                 Err(e) => {
                     panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
                 }
             };
             if !config.multi_camera {
-                info!("{cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations");
+                info!(
+                    "{cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations"
+                );
             } else {
                 info!("First camera: {cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.", cam_2_success.unwrap(), cam_2_failures.unwrap());
             }
@@ -435,8 +527,8 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
         }
     }
     highgui::destroy_all_windows().unwrap();
-    
-    post_process(&mut led_pos, manager_guard.lock().unwrap().num_led);
+
+    post_process(&mut led_pos, manager_guard.lock().unwrap().config.num_led);
 
     if !streamlined {
         loop {
@@ -446,7 +538,7 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
                 date.format("%Y-%m-%d-%H:%M:%S")
             ))
             .prompt();
-    
+
             match name {
                 Ok(mut name) => {
                     if name.is_empty(){
@@ -463,7 +555,7 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
                             process::exit(1);
                         }
                     };
-                    
+
                     match file.write_all(json.as_bytes()) {
                         Ok(_) => {},
                         Err(e) => {
@@ -485,20 +577,16 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
         let mut file = match File::create(Path::new(&name)) {
             Ok(file) => file,
             Err(e) => {
-                error!(
-                    "Unable to write temp-pos to {name}"
-                );
+                error!("Unable to write temp-pos to {name}");
                 println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}", failed_calibration(led_pos.clone()), e);
                 process::exit(1);
             }
         };
-        
+
         match file.write_all(json.as_bytes()) {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(e) => {
-                error!(
-                    "Unable to write temp-pos to {name}"
-                );
+                error!("Unable to write temp-pos to {name}");
                 println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}", failed_calibration(led_pos.clone()), e);
             }
         }
@@ -508,12 +596,20 @@ pub fn scan(config: Config, manager_guard: &Arc<Mutex<ManagerData>>, streamlined
     Ok(())
 }
 
-
-pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manager: &Arc<Mutex<ManagerData>>, x_start: i32, y_start: i32, x_end: i32, y_end: i32, prompt: bool) -> Result<(f64, f64, core::VecN<u8, 3>), Box<dyn Error>>  {
+pub fn brightest_darkest(
+    cam: &Arc<Mutex<VideoCapture>>,
+    config: &Config,
+    manager: &Arc<Mutex<ManagerData>>,
+    x_start: i32,
+    y_start: i32,
+    x_end: i32,
+    y_end: i32,
+    prompt: bool,
+) -> Result<(f64, f64, core::VecN<u8, 3>), Box<dyn Error>> {
     debug!("Getting brightest and darkest points");
 
-    let filter_color = manager.lock().unwrap().filter_color.unwrap();
-    let scan_mode = manager.lock().unwrap().scan_mode;
+    let filter_color = manager.lock().unwrap().config.filter_color.unwrap();
+    let scan_mode = manager.lock().unwrap().config.scan_mode;
 
     let brightness = config.color_bright.unwrap();
     if scan_mode == 1 {
@@ -546,7 +642,14 @@ pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manage
     if !prompt {
         let brightest_pos;
 
-        imgproc::cvt_color(&frame, &mut image_hsv, COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap();
+        imgproc::cvt_color(
+            &frame,
+            &mut image_hsv,
+            COLOR_BGR2HSV,
+            0,
+            get_default_algorithm_hint().unwrap(),
+        )
+        .unwrap();
 
         let frame = Mat::roi(
             &frame,
@@ -559,18 +662,40 @@ pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manage
         )?;
 
         let brightest_result = get_brightest_cam_1_pos(frame.try_clone()?);
-        (_, brightest, brightest_pos) = (brightest_result.0, brightest_result.1 as u8, brightest_result.2);
+        (_, brightest, brightest_pos) = (
+            brightest_result.0,
+            brightest_result.1 as u8,
+            brightest_result.2,
+        );
 
-        hsv = image_hsv.at_2d::<opencv::core::Vec3b>(brightest_pos.y, brightest_pos.x).unwrap();
+        hsv = image_hsv
+            .at_2d::<opencv::core::Vec3b>(brightest_pos.y, brightest_pos.x)
+            .unwrap();
     } else {
         let select_brightest_result = select_brightest(cam, manager, config).unwrap();
         let brightest_pos = Point::new(select_brightest_result.0, select_brightest_result.1);
 
-        imgproc::cvt_color(&frame, &mut image_hsv, COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap(); // Used to get our HSV
-        imgproc::cvt_color(&frame.clone(), &mut frame, COLOR_BGR2GRAY, 0, get_default_algorithm_hint().unwrap()).unwrap();
+        imgproc::cvt_color(
+            &frame,
+            &mut image_hsv,
+            COLOR_BGR2HSV,
+            0,
+            get_default_algorithm_hint().unwrap(),
+        )
+        .unwrap(); // Used to get our HSV
+        imgproc::cvt_color(
+            &frame.clone(),
+            &mut frame,
+            COLOR_BGR2GRAY,
+            0,
+            get_default_algorithm_hint().unwrap(),
+        )
+        .unwrap();
 
         brightest = *frame.at_2d::<u8>(brightest_pos.y, brightest_pos.x).unwrap();
-        hsv = image_hsv.at_2d::<opencv::core::Vec3b>(brightest_pos.y, brightest_pos.x).unwrap();
+        hsv = image_hsv
+            .at_2d::<opencv::core::Vec3b>(brightest_pos.y, brightest_pos.x)
+            .unwrap();
 
         debug!("brightest from manual select is {brightest}");
         debug!("hsv from manual select is {:?}", hsv);
@@ -585,7 +710,7 @@ pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manage
     if scan_mode == 1 {
         filter(&mut frame, &filter_color, manager);
     }
-    
+
     let frame = Mat::roi(
         &frame,
         opencv::core::Rect {
@@ -598,10 +723,13 @@ pub fn brightest_darkest(cam: &Arc<Mutex<VideoCapture>>, config: &Config, manage
     let (_, darkest, _) = get_brightest_cam_1_pos(frame.try_clone()?);
 
     Ok((brightest as f64, darkest, *hsv))
-    
 }
 
-pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<ManagerData>>, config: &Config) -> Result<(i32, i32), Box<dyn Error>> {
+pub fn select_brightest(
+    cam: &Arc<Mutex<VideoCapture>>,
+    manager: &Arc<Mutex<ManagerData>>,
+    config: &Config,
+) -> Result<(i32, i32), Box<dyn Error>> {
     let x1 = Arc::new(Mutex::new(0));
     let y1 = Arc::new(Mutex::new(0));
 
@@ -633,71 +761,104 @@ pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Mana
     highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
     highgui::set_mouse_callback(
         window,
-        Some(Box::new(move |event, x, y, _flag| if event == EVENT_LBUTTONUP {
-            debug!("lbuttonup");
-            *override_active_guard.lock().unwrap() = false;
-            *x1_guard.lock().unwrap() = x;
-            *y1_guard.lock().unwrap() = y;
+        Some(Box::new(move |event, x, y, _flag| {
+            if event == EVENT_LBUTTONUP {
+                debug!("lbuttonup");
+                *override_active_guard.lock().unwrap() = false;
+                *x1_guard.lock().unwrap() = x;
+                *y1_guard.lock().unwrap() = y;
+            }
         })),
     )?;
 
-    highgui::create_trackbar("Hue Upper Limit", window, None, 179, Some(Box::new(move |pos| {
-        if let Ok(mut v) = h_upper_guard.lock() {
-            *v = pos;
-        }
-    })))?;
+    highgui::create_trackbar(
+        "Hue Upper Limit",
+        window,
+        None,
+        179,
+        Some(Box::new(move |pos| {
+            if let Ok(mut v) = h_upper_guard.lock() {
+                *v = pos;
+            }
+        })),
+    )?;
 
-    highgui::create_trackbar("Saturation Upper Limit", window, None, 255, Some(Box::new(move |pos| {
-        if let Ok(mut v) = s_upper_guard.lock() {
-            *v = pos;
-        }
-    })))?;
+    highgui::create_trackbar(
+        "Saturation Upper Limit",
+        window,
+        None,
+        255,
+        Some(Box::new(move |pos| {
+            if let Ok(mut v) = s_upper_guard.lock() {
+                *v = pos;
+            }
+        })),
+    )?;
 
-    highgui::create_trackbar("Value Upper Limit", window, None, 255, Some(Box::new(move |pos| {
-        if let Ok(mut v) = v_upper_guard.lock() {
-            *v = pos;
-        }
-    })))?;
+    highgui::create_trackbar(
+        "Value Upper Limit",
+        window,
+        None,
+        255,
+        Some(Box::new(move |pos| {
+            if let Ok(mut v) = v_upper_guard.lock() {
+                *v = pos;
+            }
+        })),
+    )?;
 
+    highgui::create_trackbar(
+        "Hue Lower Limit",
+        window,
+        None,
+        179,
+        Some(Box::new(move |pos| {
+            if let Ok(mut v) = h_lower_guard.lock() {
+                *v = pos;
+            }
+        })),
+    )?;
 
-    highgui::create_trackbar("Hue Lower Limit", window, None, 179, Some(Box::new(move |pos| {
-        if let Ok(mut v) = h_lower_guard.lock() {
-            *v = pos;
-        }
-    })))?;
+    highgui::create_trackbar(
+        "Saturation Lower Limit",
+        window,
+        None,
+        255,
+        Some(Box::new(move |pos| {
+            if let Ok(mut v) = s_lower_guard.lock() {
+                *v = pos;
+            }
+        })),
+    )?;
 
-    highgui::create_trackbar("Saturation Lower Limit", window, None, 255, Some(Box::new(move |pos| {
-        if let Ok(mut v) = s_lower_guard.lock() {
-            *v = pos;
-        }
-    })))?;
-
-    highgui::create_trackbar("Value Lower Limit", window, None, 255, Some(Box::new(move |pos| {
-        if let Ok(mut v) = v_lower_guard.lock() {
-            *v = pos;
-        }
-    })))?;
+    highgui::create_trackbar(
+        "Value Lower Limit",
+        window,
+        None,
+        255,
+        Some(Box::new(move |pos| {
+            if let Ok(mut v) = v_lower_guard.lock() {
+                *v = pos;
+            }
+        })),
+    )?;
 
     debug!("Starting filter selector");
 
     let mut cam = cam.lock().unwrap();
-    highgui::set_window_title(
-        window,
-        "Modify upper and lower bounds",
-    )
-    .unwrap();
+    highgui::set_window_title(window, "Modify upper and lower bounds").unwrap();
 
     match videoio::VideoCapture::is_opened(&cam)? {
-        true => {},
-        false => {panic!(
-            "Unable to open camera!"
-        )}
+        true => {}
+        false => {
+            panic!("Unable to open camera!")
+        }
     };
-    
+
     let mut manager = manager.lock().unwrap();
 
     loop {
-        let mut frame = &mut manager.frame_cam_1;
+        let mut frame = &mut manager.vision.frame_cam_1;
         cam.read(&mut frame)?;
 
         // debug!("callback_loop in brightness select");
@@ -719,9 +880,18 @@ pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Mana
         let mut image_hsv: Mat = Default::default();
         let brightest_pos = Point::new(x_guard, y_guard);
 
-        imgproc::cvt_color(frame, &mut image_hsv, COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap(); // Used to get our HSV
+        imgproc::cvt_color(
+            frame,
+            &mut image_hsv,
+            COLOR_BGR2HSV,
+            0,
+            get_default_algorithm_hint().unwrap(),
+        )
+        .unwrap(); // Used to get our HSV
 
-        let hsv = image_hsv.at_2d::<opencv::core::Vec3b>(brightest_pos.y, brightest_pos.x).unwrap();
+        let hsv = image_hsv
+            .at_2d::<opencv::core::Vec3b>(brightest_pos.y, brightest_pos.x)
+            .unwrap();
 
         debug!("hsv from manual select is {:?}", hsv);
         debug!("pos from manual select is {:?}", brightest_pos);
@@ -746,12 +916,12 @@ pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Mana
                 let mut h_upper_override = h_upper.lock().unwrap();
                 let mut s_upper_override = s_upper.lock().unwrap();
                 let mut v_upper_override = v_upper.lock().unwrap();
-                
+
                 // Clamp lower bounds safely
                 *h_lower_override = h.saturating_sub(hue_range).min(179) as i32;
                 *s_lower_override = s.saturating_sub(range) as i32;
                 *v_lower_override = v.saturating_sub(range) as i32;
-                
+
                 // Clamp upper bounds safely without overflow
                 *h_upper_override = (h + hue_range).min(179) as i32;
                 *s_upper_override = s.saturating_add(range) as i32;
@@ -759,24 +929,42 @@ pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Mana
             }
             debug!("Setting trackbar_pos");
             // We can't use *h_lower_override directly since the callback will try to lock it, while it's already locked and hang.
-            highgui::set_trackbar_pos("Hue Upper Limit", window, (h + hue_range).min(179) as i32).unwrap();
-            highgui::set_trackbar_pos("Saturation Upper Limit", window, s.saturating_add(range) as i32).unwrap();
-            highgui::set_trackbar_pos("Value Upper Limit", window, v.saturating_add(range) as i32).unwrap();
+            highgui::set_trackbar_pos("Hue Upper Limit", window, (h + hue_range).min(179) as i32)
+                .unwrap();
+            highgui::set_trackbar_pos(
+                "Saturation Upper Limit",
+                window,
+                s.saturating_add(range) as i32,
+            )
+            .unwrap();
+            highgui::set_trackbar_pos("Value Upper Limit", window, v.saturating_add(range) as i32)
+                .unwrap();
 
-            highgui::set_trackbar_pos("Hue Lower Limit", window, h.saturating_sub(hue_range).min(179) as i32).unwrap();
-            highgui::set_trackbar_pos("Saturation Lower Limit", window, s.saturating_sub(range) as i32).unwrap();
-            highgui::set_trackbar_pos("Value Lower Limit", window, v.saturating_sub(range) as i32).unwrap();
+            highgui::set_trackbar_pos(
+                "Hue Lower Limit",
+                window,
+                h.saturating_sub(hue_range).min(179) as i32,
+            )
+            .unwrap();
+            highgui::set_trackbar_pos(
+                "Saturation Lower Limit",
+                window,
+                s.saturating_sub(range) as i32,
+            )
+            .unwrap();
+            highgui::set_trackbar_pos("Value Lower Limit", window, v.saturating_sub(range) as i32)
+                .unwrap();
         }
-        
+
         // Apply HSV filter bounds
         let h_up = *h_upper.lock().unwrap();
         let s_up = *s_upper.lock().unwrap();
         let v_up = *v_upper.lock().unwrap();
-        
+
         let h_lo = *h_lower.lock().unwrap();
         let s_lo = *s_lower.lock().unwrap();
         let v_lo = *v_lower.lock().unwrap();
-        
+
         // Need this so the value lives long enough
         let upper_vals = [h_up, s_up, v_up];
         let lower_vals = [h_lo, s_lo, v_lo];
@@ -784,28 +972,47 @@ pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Mana
         let upperb = Mat::from_slice(&upper_vals).unwrap();
         let lowerb = Mat::from_slice(&lower_vals).unwrap();
 
-        debug!("applying upper and lower vals in select_brightest: {:?} {:?}", upper_vals, lower_vals);
+        debug!(
+            "applying upper and lower vals in select_brightest: {:?} {:?}",
+            upper_vals, lower_vals
+        );
         let mut hsv_frame = Mat::default();
-        imgproc::cvt_color(frame, &mut hsv_frame, imgproc::COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap();
-        
+        imgproc::cvt_color(
+            frame,
+            &mut hsv_frame,
+            imgproc::COLOR_BGR2HSV,
+            0,
+            get_default_algorithm_hint().unwrap(),
+        )
+        .unwrap();
+
         let mut mask = Mat::default();
         core::in_range(&hsv_frame, &lowerb, &upperb, &mut mask).unwrap();
-        
+
         let mut mask_color = Mat::default();
-        imgproc::cvt_color(&mask, &mut mask_color, imgproc::COLOR_GRAY2BGR, 0, get_default_algorithm_hint().unwrap()).unwrap();
+        imgproc::cvt_color(
+            &mask,
+            &mut mask_color,
+            imgproc::COLOR_GRAY2BGR,
+            0,
+            get_default_algorithm_hint().unwrap(),
+        )
+        .unwrap();
 
         core::add_weighted(&frame.clone(), 0.5, &mask_color, 0.7, 0.0, frame, -1).unwrap();
-        
-        if frame.size()?.width > 0 && !config.no_video {
-            highgui::imshow(window, frame)?;
-        } else {
-            warn!("frame is too small!");
+
+        if let Some(no_video) = config.advanced.no_video {
+            if frame.size()?.width > 0 && !no_video {
+                highgui::imshow(window, frame)?;
+            } else {
+                warn!("frame is too small!");
+            }
         }
 
         let key = highgui::wait_key(10)?;
         if key > 0 && key != 255 {
             if x_guard != 0 && y_guard != 0 {
-                let filter_color = manager.filter_color.unwrap();
+                let filter_color = manager.config.filter_color.unwrap();
                 // let hsv_override ;
 
                 // if filter_color == 0 {
@@ -819,20 +1026,24 @@ pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Mana
                 // }
 
                 let override_vec = match filter_color {
-                    0 => &mut manager.hsv_red_override,
-                    1 => &mut manager.hsv_green_override,
-                    2 => &mut manager.hsv_blue_override,
+                    0 => &mut manager.config.hsv_red_override,
+                    1 => &mut manager.config.hsv_green_override,
+                    2 => &mut manager.config.hsv_blue_override,
                     _ => panic!("{filter_color} is not a valid filter color"),
                 };
 
                 *override_vec = Some(vec![
-                    h_lo.try_into().unwrap(), s_lo.try_into().unwrap(), v_lo.try_into().unwrap(),
-                    h_up.try_into().unwrap(), s_up.try_into().unwrap(), v_up.try_into().unwrap(),
+                    h_lo.try_into().unwrap(),
+                    s_lo.try_into().unwrap(),
+                    v_lo.try_into().unwrap(),
+                    h_up.try_into().unwrap(),
+                    s_up.try_into().unwrap(),
+                    v_up.try_into().unwrap(),
                 ]);
-                
+
                 debug!("Overriding hsv_override vec with {:?}", override_vec);
 
-                break
+                break;
             } else {
                 error!("Please select a valid area!");
             }
@@ -846,8 +1057,8 @@ pub fn select_brightest(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Mana
 }
 
 pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPos, Box<dyn Error>> {
-    if config.crop_override.is_some() {
-        let crop_override = config.crop_override.clone().unwrap();
+    if config.advanced.crop_override.is_some() {
+        let crop_override = config.advanced.crop_override.clone().unwrap();
         if config.multi_camera {
             if crop_override.len() == 8 {
                 return Ok(CropPos {
@@ -863,7 +1074,7 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
                     cam_1_darkest: None,
                     cam_2_brightest: None,
                     cam_2_darkest: None,
-                })
+                });
             } else {
                 error!("crop_override needs 8 elements to use with multiple cameras.");
             }
@@ -881,7 +1092,7 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
                 cam_1_darkest: None,
                 cam_2_brightest: None,
                 cam_2_darkest: None,
-            })
+            });
         }
     }
     let window = "Calibration";
@@ -958,17 +1169,30 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
         })),
     )?;
 
-    let cam_guard = Arc::new(Mutex::new(videoio::VideoCapture::new(config.camera_index_1, videoio::CAP_ANY)?)); // callback_loop only accepts a Arc<Mutex<VideoCapture>> 
-    
-    cam_guard.lock().unwrap().set(CAP_PROP_FRAME_WIDTH, config.video_width)?;
-    cam_guard.lock().unwrap().set(CAP_PROP_FRAME_HEIGHT, config.video_height)?;
+    let cam_guard = Arc::new(Mutex::new(videoio::VideoCapture::new(
+        config.camera_index_1,
+        videoio::CAP_ANY,
+    )?)); // callback_loop only accepts a Arc<Mutex<VideoCapture>>
+
+    if config.video_width.is_some() && config.video_height.is_some() {
+        cam_guard
+            .lock()
+            .unwrap()
+            .set(CAP_PROP_FRAME_WIDTH, config.video_width.unwrap())?;
+        cam_guard
+            .lock()
+            .unwrap()
+            .set(CAP_PROP_FRAME_HEIGHT, config.video_height.unwrap())?;
+    }
 
     match videoio::VideoCapture::is_opened(&cam_guard.lock().unwrap())? {
-        true => {},
-        false => {panic!(
-            "Unable to open camera {}! Please select another.",
-            config.camera_index_1
-        )}
+        true => {}
+        false => {
+            panic!(
+                "Unable to open camera {}! Please select another.",
+                config.camera_index_1
+            )
+        }
     };
     let x_start_result;
     let x_end_result;
@@ -981,31 +1205,69 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
     let mut y2_end_result = None;
 
     debug!("starting callback_loop for first camera.");
-    (x_start_result, x_end_result, y_start_result, y_end_result) = match callback_loop(&cam_guard, manager, x1_start.clone(), y1_start.clone(), Some(x1_end.clone()), Some(y1_end.clone()), window, "Please drag the mouse around the container. Press any key to continue".to_string(), true) {
+    (x_start_result, x_end_result, y_start_result, y_end_result) = match callback_loop(
+        &cam_guard,
+        manager,
+        x1_start.clone(),
+        y1_start.clone(),
+        Some(x1_end.clone()),
+        Some(y1_end.clone()),
+        window,
+        "Please drag the mouse around the container. Press any key to continue".to_string(),
+        true,
+    ) {
         Ok((x_start, x_end, y_start, y_end)) => (x_start, x_end, y_start, y_end),
-        Err(e) => panic!("Something went wrong during cropping: {e}")
+        Err(e) => panic!("Something went wrong during cropping: {e}"),
     };
     if let Some(index) = config.camera_index_2 {
         debug!("Cropping second camera with index {index}");
         *camera_active.lock().unwrap() = 1;
-        let cam_guard = Arc::new(Mutex::new(videoio::VideoCapture::new(index, videoio::CAP_ANY)?));
-        
-        cam_guard.lock().unwrap().set(CAP_PROP_FRAME_WIDTH, config.video_width)?;
-        cam_guard.lock().unwrap().set(CAP_PROP_FRAME_HEIGHT, config.video_height)?;
+        let cam_guard = Arc::new(Mutex::new(videoio::VideoCapture::new(
+            index,
+            videoio::CAP_ANY,
+        )?));
+
+        if config.video_width.is_some() && config.video_height.is_some() {
+            cam_guard
+                .lock()
+                .unwrap()
+                .set(CAP_PROP_FRAME_WIDTH, config.video_width.unwrap())?;
+            cam_guard
+                .lock()
+                .unwrap()
+                .set(CAP_PROP_FRAME_HEIGHT, config.video_height.unwrap())?;
+        }
 
         match videoio::VideoCapture::is_opened(&cam_guard.lock().unwrap())? {
-            true => {},
-            false => {panic!(
-                "Unable to open camera {}! Please select another.",
-                index
-            )}
+            true => {}
+            false => {
+                panic!("Unable to open camera {}! Please select another.", index)
+            }
         };
-        let loop_out = callback_loop(&cam_guard, manager, x2_start, y2_start, Some(x2_end), Some(y2_end), window, "Please drag the mouse around the second container. Press any key to continue".to_string(), true).unwrap();
-        (x2_start_result, x2_end_result, y2_start_result, y2_end_result) = (
+        let loop_out = callback_loop(
+            &cam_guard,
+            manager,
+            x2_start,
+            y2_start,
+            Some(x2_end),
+            Some(y2_end),
+            window,
+            "Please drag the mouse around the second container. Press any key to continue"
+                .to_string(),
+            true,
+        )
+        .unwrap();
+        (
+            x2_start_result,
+            x2_end_result,
+            y2_start_result,
+            y2_end_result,
+        ) = (
             Some(loop_out.0),
             Some(loop_out.1),
             Some(loop_out.2),
-            Some(loop_out.3));
+            Some(loop_out.3),
+        );
     }
 
     let pos = CropPos {
@@ -1025,31 +1287,36 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
     debug!("crop finished, returning: {:?}", pos);
 
     Ok(pos)
-
 }
 
-pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<ManagerData>>, x_start: Arc<Mutex<i32>>, y_start: Arc<Mutex<i32>>, x_end: Option<Arc<Mutex<i32>>>, y_end: Option<Arc<Mutex<i32>>>, window: &str, msg: String, crop: bool) -> Result<CallbackResult, Box<dyn Error>> {
+pub fn callback_loop(
+    cam: &Arc<Mutex<VideoCapture>>,
+    manager: &Arc<Mutex<ManagerData>>,
+    x_start: Arc<Mutex<i32>>,
+    y_start: Arc<Mutex<i32>>,
+    x_end: Option<Arc<Mutex<i32>>>,
+    y_end: Option<Arc<Mutex<i32>>>,
+    window: &str,
+    msg: String,
+    crop: bool,
+) -> Result<CallbackResult, Box<dyn Error>> {
     info!("{msg}");
     debug!("window: {}, title: {}", window, msg);
     let mut cam = cam.lock().unwrap();
-    highgui::set_window_title(
-        window,
-        &msg,
-    )
-    .unwrap();
+    highgui::set_window_title(window, &msg).unwrap();
 
     match videoio::VideoCapture::is_opened(&cam)? {
-        true => {},
-        false => {panic!(
-            "Unable to open camera!"
-        )}
+        true => {}
+        false => {
+            panic!("Unable to open camera!")
+        }
     };
 
-    let no_video = manager.lock().unwrap().no_video;
+    let no_video = manager.lock().unwrap().config.no_video;
     let mut manager = manager.lock().unwrap();
 
     loop {
-        let mut frame = &mut manager.frame_cam_1;
+        let mut frame = &mut manager.vision.frame_cam_1;
         cam.read(&mut frame)?;
         if crop {
             // debug!("callback_loop in crop mode");
@@ -1078,17 +1345,25 @@ pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Manager
             )
             .expect("Could not draw a rectangle");
 
-            if frame.size()?.width > 0 && !no_video {
-                highgui::imshow(window, frame)?;
-            } else {
-                warn!("frame is too small! size: {:?}", frame.size()?);
+            if let Some(no_video) = no_video {
+                if frame.size()?.width > 0 && !no_video {
+                    highgui::imshow(window, frame)?;
+                } else {
+                    warn!("frame is too small! size: {:?}", frame.size()?);
+                }
             }
+
             let key = highgui::wait_key(10)?;
             if key > 0 && key != 255 {
                 if x_start_guard != 0 && x_end_guard != 0 {
                     // highgui::destroy_all_windows().unwrap();
                     // highgui::destroy_all_windows().unwrap();
-                    break Ok((x_start_guard, x_end_guard, Some(y_start_guard), Some(y_end_guard)))
+                    break Ok((
+                        x_start_guard,
+                        x_end_guard,
+                        Some(y_start_guard),
+                        Some(y_end_guard),
+                    ));
                 } else {
                     error!("Please select a valid are for the crop");
                 }
@@ -1113,24 +1388,35 @@ pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Manager
             let mut image_hsv: Mat = Default::default();
             let brightest_pos = Point::new(x_guard, y_guard);
 
-            imgproc::cvt_color(frame, &mut image_hsv, COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap(); // Used to get our HSV
+            imgproc::cvt_color(
+                frame,
+                &mut image_hsv,
+                COLOR_BGR2HSV,
+                0,
+                get_default_algorithm_hint().unwrap(),
+            )
+            .unwrap(); // Used to get our HSV
 
-            let hsv = image_hsv.at_2d::<opencv::core::Vec3b>(brightest_pos.y, brightest_pos.x).unwrap();
+            let hsv = image_hsv
+                .at_2d::<opencv::core::Vec3b>(brightest_pos.y, brightest_pos.x)
+                .unwrap();
 
             debug!("hsv from manual select is {:?}", hsv);
             debug!("pos from manual select is {:?}", brightest_pos);
-            
-            if frame.size()?.width > 0 && !no_video {
-                highgui::imshow(window, frame)?;
-            } else {
-                warn!("frame is too small!");
+
+            if let Some(no_video) = no_video {
+                if frame.size()?.width > 0 && !no_video {
+                    highgui::imshow(window, frame)?;
+                } else {
+                    warn!("frame is too small!");
+                }
             }
 
             let key = highgui::wait_key(10)?;
             if key > 0 && key != 255 {
                 if x_guard != 0 && y_guard != 0 {
                     // highgui::destroy_all_windows().unwrap();
-                    break Ok((x_guard, y_guard, None, None))
+                    break Ok((x_guard, y_guard, None, None));
                 } else {
                     error!("Please select a valid area!");
                 }
@@ -1139,7 +1425,7 @@ pub fn callback_loop(cam: &Arc<Mutex<VideoCapture>>, manager: &Arc<Mutex<Manager
     }
 }
 
-pub fn get_brightest_cam_1_pos(mut frame: Mat) -> (f64, f64, Point) { 
+pub fn get_brightest_cam_1_pos(mut frame: Mat) -> (f64, f64, Point) {
     debug!("Frame channels: {}", frame.channels());
 
     imgproc::gaussian_blur(
@@ -1150,11 +1436,18 @@ pub fn get_brightest_cam_1_pos(mut frame: Mat) -> (f64, f64, Point) {
         0.0,
         0.0,
         0,
-        get_default_algorithm_hint().unwrap()
+        get_default_algorithm_hint().unwrap(),
     )
     .unwrap();
 
-    imgproc::cvt_color(&frame.clone(), &mut frame, COLOR_BGR2GRAY, 0, get_default_algorithm_hint().unwrap()).unwrap(); // Greyscales frame
+    imgproc::cvt_color(
+        &frame.clone(),
+        &mut frame,
+        COLOR_BGR2GRAY,
+        0,
+        get_default_algorithm_hint().unwrap(),
+    )
+    .unwrap(); // Greyscales frame
 
     let mut min_val = 0.0;
     let mut max_val = 0.0;
@@ -1186,14 +1479,16 @@ pub fn scan_area(
     let cam_1_window = "Camera 1";
     let cam_2_window = "Camera 2";
 
-    if !config.no_video {
-        highgui::named_window(cam_1_window, highgui::WINDOW_AUTOSIZE)?;
+    if let Some(no_video) = config.advanced.no_video {
+        if !no_video {
+            highgui::named_window(cam_1_window, highgui::WINDOW_AUTOSIZE)?;
+        }
+
+        if config.multi_camera && !no_video {
+            highgui::named_window(cam_2_window, highgui::WINDOW_AUTOSIZE)?;
+        }
     }
 
-    if config.multi_camera && !config.no_video {
-        highgui::named_window(cam_2_window, highgui::WINDOW_AUTOSIZE)?;
-    }
-    
     let mut success = 0;
     let mut failures = 0;
 
@@ -1209,12 +1504,33 @@ pub fn scan_area(
 
         if valid_cycle {
             if config.multi_camera {
-                let scan_area_result = scan_area_cycle(manager, config, cam2, scan_data, led_pos, i, true, cam_2_window).unwrap();
-                (cam_2_success, cam_2_failures) = (Some(scan_area_result.0), Some(scan_area_result.1));
+                let scan_area_result = scan_area_cycle(
+                    manager,
+                    config,
+                    cam2,
+                    scan_data,
+                    led_pos,
+                    i,
+                    true,
+                    cam_2_window,
+                )
+                .unwrap();
+                (cam_2_success, cam_2_failures) =
+                    (Some(scan_area_result.0), Some(scan_area_result.1));
             }
 
             debug!("valid_cycle: {}", i);
-            (success, failures) = scan_area_cycle(manager, config, Some(cam), scan_data, led_pos, i, false, cam_1_window).unwrap();
+            (success, failures) = scan_area_cycle(
+                manager,
+                config,
+                Some(cam),
+                scan_data,
+                led_pos,
+                i,
+                false,
+                cam_1_window,
+            )
+            .unwrap();
         }
     }
     Ok((success, failures, cam_2_success, cam_2_failures))
@@ -1239,17 +1555,17 @@ pub fn scan_area(
 //         // Reduce brightness gradually by multiplying with a factor
 //         let mut dimmed = Mat::default();
 //         frame.convert_to(&mut dimmed, -1, brightness_factor, 0.0).unwrap();
-        
+
 //         // Update frame with the dimmed image
 //         frame = dimmed.clone();
-        
+
 //         // Update the white mask with the new dimmed image
 //         imgproc::cvt_color(&frame, &mut gray_frame, imgproc::COLOR_BGR2GRAY, 0, get_default_algorithm_hint().unwrap()).unwrap();
 //         imgproc::threshold(&gray_frame, &mut white_mask, 240.0, 255.0, imgproc::THRESH_BINARY).unwrap();
 
 //         // Reduce the brightness factor further
 //         brightness_factor -= 0.05;
-        
+
 //         // If the brightness_factor is too low, stop the loop to avoid making it too dark.
 //         if brightness_factor <= 0.05 {
 //             break;
@@ -1257,7 +1573,7 @@ pub fn scan_area(
 //     }
 // }
 
-pub fn filter(mut frame: &mut Mat, filter_color: &u32, manager: &Arc<Mutex<ManagerData>>) { 
+pub fn filter(mut frame: &mut Mat, filter_color: &u32, manager: &Arc<Mutex<ManagerData>>) {
     let manager = manager.lock().unwrap();
     // Filters frame for color
     let lowerb;
@@ -1267,7 +1583,7 @@ pub fn filter(mut frame: &mut Mat, filter_color: &u32, manager: &Arc<Mutex<Manag
     let tmp_array_upper: Vec<u8>;
 
     if *filter_color == 0 {
-        if let Some(tmp_override) = &manager.hsv_red_override {
+        if let Some(tmp_override) = &manager.config.hsv_red_override {
             tmp_array_lower = vec![tmp_override[0], tmp_override[1], tmp_override[2]];
             tmp_array_upper = vec![tmp_override[3], tmp_override[4], tmp_override[5]];
 
@@ -1278,18 +1594,18 @@ pub fn filter(mut frame: &mut Mat, filter_color: &u32, manager: &Arc<Mutex<Manag
             upperb = Mat::from_slice(&[5, 255, 255]);
         }
     } else if *filter_color == 1 {
-        if let Some(tmp_override) = &manager.hsv_green_override {
+        if let Some(tmp_override) = &manager.config.hsv_green_override {
             tmp_array_lower = vec![tmp_override[0], tmp_override[1], tmp_override[2]];
             tmp_array_upper = vec![tmp_override[3], tmp_override[4], tmp_override[5]];
 
             lowerb = Mat::from_slice(&tmp_array_lower);
             upperb = Mat::from_slice(&tmp_array_upper);
         } else {
-            lowerb = Mat::from_slice(&[35, 100, 100]);  
+            lowerb = Mat::from_slice(&[35, 100, 100]);
             upperb = Mat::from_slice(&[85, 255, 255]);
         }
     } else if *filter_color == 2 {
-        if let Some(tmp_override) = &manager.hsv_blue_override {
+        if let Some(tmp_override) = &manager.config.hsv_blue_override {
             tmp_array_lower = vec![tmp_override[0], tmp_override[1], tmp_override[2]];
             tmp_array_upper = vec![tmp_override[3], tmp_override[4], tmp_override[5]];
 
@@ -1297,27 +1613,53 @@ pub fn filter(mut frame: &mut Mat, filter_color: &u32, manager: &Arc<Mutex<Manag
             upperb = Mat::from_slice(&tmp_array_upper);
         } else {
             lowerb = Mat::from_slice(&[120, 150, 150]);
-        upperb = Mat::from_slice(&[140, 255, 255]);
+            upperb = Mat::from_slice(&[140, 255, 255]);
         }
     } else {
         panic!("Invalid filter_color selected: {filter_color}");
     }
 
-    debug!("applying upper and lower vals in filter function: {:?} {:?}", upperb, lowerb);
+    debug!(
+        "applying upper and lower vals in filter function: {:?} {:?}",
+        upperb, lowerb
+    );
 
     let mut hsv_frame = Mat::default();
-    imgproc::cvt_color(frame, &mut hsv_frame, imgproc::COLOR_BGR2HSV, 0, get_default_algorithm_hint().unwrap()).unwrap();
-    
+    imgproc::cvt_color(
+        frame,
+        &mut hsv_frame,
+        imgproc::COLOR_BGR2HSV,
+        0,
+        get_default_algorithm_hint().unwrap(),
+    )
+    .unwrap();
+
     let mut mask = Mat::default();
     core::in_range(&hsv_frame, &lowerb.unwrap(), &upperb.unwrap(), &mut mask).unwrap();
-    
+
     let mut mask_color = Mat::default();
-    imgproc::cvt_color(&mask, &mut mask_color, imgproc::COLOR_GRAY2BGR, 0, get_default_algorithm_hint().unwrap()).unwrap();
+    imgproc::cvt_color(
+        &mask,
+        &mut mask_color,
+        imgproc::COLOR_GRAY2BGR,
+        0,
+        get_default_algorithm_hint().unwrap(),
+    )
+    .unwrap();
 
     core::add_weighted(&frame.clone(), 0.3, &mask_color, 0.7, 0.0, &mut frame, -1).unwrap();
 }
 
-pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, config: &Config, cam: Option<&Arc<Mutex<VideoCapture>>>, scan_data: &mut ScanData, led_pos: &mut PosEntry, i: u32, second_cam: bool, window:&str) -> Result<(i32, i32), Box<dyn Error>> {
+pub fn scan_area_cycle(
+    manager: &Arc<Mutex<ManagerData>>,
+    config: &Config,
+    cam: Option<&Arc<Mutex<VideoCapture>>>,
+    scan_data: &mut ScanData,
+    led_pos: &mut PosEntry,
+    i: u32,
+    second_cam: bool,
+    window: &str,
+) -> Result<(i32, i32), Box<dyn Error>> {
     let capture_frames = 1; // Increase me if calibration appears scrambled to ensure the video buffer is empty.
 
     let mut success = 0;
@@ -1340,30 +1682,46 @@ pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, config: &Config, cam: 
         y_end = scan_data.pos.y2_end.unwrap();
     }
 
-    let filter_color = manager.lock().unwrap().filter_color.unwrap();
-    let scan_mode = manager.lock().unwrap().scan_mode;
+    let filter_color = manager.lock().unwrap().config.filter_color.unwrap();
+    let scan_mode = manager.lock().unwrap().config.scan_mode;
 
     let brightness = config.color_bright.unwrap();
 
     if scan_mode == 1 {
         debug!("using color filter");
         if filter_color == 0 {
-            debug!("Using red color filter with filter range: {:?}", manager.lock().unwrap().hsv_red_override);
+            debug!(
+                "Using red color filter with filter range: {:?}",
+                manager.lock().unwrap().config.hsv_red_override
+            );
             led_manager::set_color(manager, i.try_into().unwrap(), brightness, 0, 0);
         } else if filter_color == 1 {
-            debug!("Using green color filter with filter range: {:?}", manager.lock().unwrap().hsv_green_override);
+            debug!(
+                "Using green color filter with filter range: {:?}",
+                manager.lock().unwrap().config.hsv_green_override
+            );
             led_manager::set_color(manager, i.try_into().unwrap(), 0, brightness, 0);
         } else if filter_color == 2 {
-            debug!("Using blue color filter with filter range: {:?}", manager.lock().unwrap().hsv_blue_override);
+            debug!(
+                "Using blue color filter with filter range: {:?}",
+                manager.lock().unwrap().config.hsv_blue_override
+            );
             led_manager::set_color(manager, i.try_into().unwrap(), 0, 0, brightness);
         }
     } else {
-        led_manager::set_color(manager, i.try_into().unwrap(), brightness, brightness, brightness);
+        led_manager::set_color(
+            manager,
+            i.try_into().unwrap(),
+            brightness,
+            brightness,
+            brightness,
+        );
     }
     let mut frame = Mat::default();
     {
         let mut cam = cam.unwrap().lock().unwrap();
-        for _ in 0..capture_frames { // This is still needed unfortunately. It may need to be increased if you continue to encounter issues
+        for _ in 0..capture_frames {
+            // This is still needed unfortunately. It may need to be increased if you continue to encounter issues
             cam.read(&mut frame)?;
         }
     }
@@ -1386,10 +1744,14 @@ pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, config: &Config, cam: 
         debug!("applying filter");
         filter(&mut frame, &filter_color, manager);
     }
-    
+
     let (_, max_val, pos) = get_brightest_cam_1_pos(frame.try_clone()?);
 
-    if max_val >= scan_data.pos.cam_1_darkest.unwrap() + ((scan_data.pos.cam_1_brightest.unwrap() - scan_data.pos.cam_1_darkest.unwrap()) * 0.5) {
+    if max_val
+        >= scan_data.pos.cam_1_darkest.unwrap()
+            + ((scan_data.pos.cam_1_brightest.unwrap() - scan_data.pos.cam_1_darkest.unwrap())
+                * 0.5)
+    {
         debug!("Succesful xy calibration: {:?} on index: {}", pos, i);
         success += 1;
         imgproc::circle(
@@ -1432,7 +1794,7 @@ pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, config: &Config, cam: 
                 led_pos[i as usize].1,
                 Some((pos.x, pos.y)),
             );
-        } else { 
+        } else {
             led_pos[i as usize] = (
                 "RECALIBRATE-XY".to_string(),
                 (pos.x, pos.y),
@@ -1440,17 +1802,21 @@ pub fn scan_area_cycle(manager: &Arc<Mutex<ManagerData>>, config: &Config, cam: 
             );
         }
     }
+
     // Update frame_cam_x after all our modifications
     if second_cam {
-        manager.lock().unwrap().frame_cam_2 = frame.clone();
+        manager.lock().unwrap().vision.frame_cam_2 = frame.clone();
     } else {
-        manager.lock().unwrap().frame_cam_1 = frame.clone();
+        manager.lock().unwrap().vision.frame_cam_1 = frame.clone();
     }
-    
-    if !config.no_video {
-        highgui::set_window_title(window, &("LED index: ".to_owned() + &i.to_string()))?;
-        highgui::imshow(window, &frame)?;
+
+    if let Some(no_video) = config.advanced.no_video {
+        if !no_video {
+            highgui::set_window_title(window, &("LED index: ".to_owned() + &i.to_string()))?;
+            highgui::imshow(window, &frame)?;
+        }
     }
+
     highgui::wait_key(1)?;
     led_manager::set_color(manager, i.try_into().unwrap(), 0, 0, 0);
     Ok((success, failures))
@@ -1608,7 +1974,10 @@ pub fn manual_calibrate(
                 *callback_called.lock().unwrap() = false;
             }
         } else if !*callback_called.lock().unwrap() {
-            debug!("pos not from depth, from led_pos[led_index].1 which is {:?}", led_pos[led_index].1);
+            debug!(
+                "pos not from depth, from led_pos[led_index].1 which is {:?}",
+                led_pos[led_index].1
+            );
             pos = Point::new(led_pos[led_index].1 .0, led_pos[led_index].1 .1)
         } else {
             debug!("pos not from depth, from callback");
@@ -1621,8 +1990,10 @@ pub fn manual_calibrate(
         debug!("setting cricle at {:?}", pos);
         imgproc::circle(&mut frame, pos, 20, color, 2, LINE_8, 0)?;
 
-        if frame.size()?.width > 0 && !config.no_video {
-            highgui::imshow(window, &frame)?;
+        if let Some(no_video) = config.advanced.no_video {
+            if frame.size()?.width > 0 && !no_video {
+                highgui::imshow(window, &frame)?;
+            }
         }
 
         loop {
@@ -1675,36 +2046,37 @@ pub fn post_process(led_pos: &mut PosEntry, led_count: u32) {
     let mut x_min = i32::MAX;
     let mut y_min = i32::MAX;
     let mut z_min = i32::MAX;
-    
-    for i in 0..led_count { // Get max and min values in led_pos
-        x_min = min(led_pos[i as usize].1.0, x_min);
 
-        y_max = max(led_pos[i as usize].1.1, y_max);
-        y_min = min(led_pos[i as usize].1.1, y_min);
+    for i in 0..led_count {
+        // Get max and min values in led_pos
+        x_min = min(led_pos[i as usize].1 .0, x_min);
+
+        y_max = max(led_pos[i as usize].1 .1, y_max);
+        y_min = min(led_pos[i as usize].1 .1, y_min);
 
         z_min = min(led_pos[i as usize].2.unwrap().0, z_min);
         z_max = max(led_pos[i as usize].2.unwrap().0, z_max);
     }
 
-    for i in 0..led_count { // Normalize values
-        led_pos[i as usize].1.0 -= x_min;
-        led_pos[i as usize].1.1 -= y_min;
+    for i in 0..led_count {
+        // Normalize values
+        led_pos[i as usize].1 .0 -= x_min;
+        led_pos[i as usize].1 .1 -= y_min;
         led_pos[i as usize].2.unwrap().0 = led_pos[i as usize].2.unwrap().0 - z_min;
     }
 
     for i in 0..led_count {
         let y_mid = y_max / 2;
-        let current_y = led_pos[i as usize].1.1;
+        let current_y = led_pos[i as usize].1 .1;
 
         let z_mid = z_max / 2;
         let current_z = led_pos[i as usize].2.unwrap().0;
 
-        led_pos[i as usize].1.1 = match current_y {
+        led_pos[i as usize].1 .1 = match current_y {
             y if y > y_mid => y_mid - (y - y_mid),
             y if y < y_mid => y_mid + (y_mid - y),
-            _ => led_pos[i as usize].1.1, // when current_y == y_mid, no change
+            _ => led_pos[i as usize].1 .1, // when current_y == y_mid, no change
         };
-        
 
         if current_z > z_mid {
             led_pos[i as usize].2.unwrap().0 = z_mid - (current_z - z_mid);

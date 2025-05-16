@@ -7,8 +7,8 @@ use std::{
     path::{Path, PathBuf},
     process,
     sync::{Arc, Mutex},
-    thread::{self, sleep},
-    time::{Duration, SystemTime},
+    thread::{self},
+    time::SystemTime,
 };
 #[cfg(feature = "gui")]
 use svled::gui;
@@ -17,7 +17,8 @@ use svled::gui;
 use svled::scan;
 
 use svled::{
-    demo, driver_wizard, led_manager::set_color, read_vled, speedtest, unity, utils, ManagerData,
+    demo, driver_wizard, led_manager::set_color, read_vled, speedtest, unity, utils, IOHandles,
+    ManagerData, ManagerState, RuntimeConfig, VisionData,
 };
 
 #[derive(Debug, Options)]
@@ -151,8 +152,8 @@ fn main() {
             info!("Playing back {}!", readvled_options.vled_file.display());
 
             {
-                manager.lock().unwrap().record_data = false;
-                manager.lock().unwrap().record_esp_data = false;
+                manager.lock().unwrap().config.record_data = false;
+                manager.lock().unwrap().config.record_esp_data = false;
             }
             match read_vled::read_vled(&manager, readvled_options.vled_file.clone()) {
                 Ok(_) => {}
@@ -199,42 +200,50 @@ fn main() {
             {
                 let manager = manager.lock().unwrap();
                 owned_manager = Arc::new(Mutex::new(ManagerData {
-                    num_led: config_holder.num_led,
-                    num_strips: config_holder.num_strips,
-                    communication_mode: config_holder.communication_mode,
-                    host: config_holder.host,
-                    port: config_holder.port,
-                    serial_port_paths: manager.serial_port_paths.clone(),
-                    baud_rate: config_holder.baud_rate,
-                    serial_read_timeout: manager.serial_read_timeout,
-                    record_data: manager.record_data,
-                    record_data_file: manager.record_data_file.clone(),
-                    record_esp_data: manager.record_esp_data,
-                    unity_controls_recording: manager.unity_controls_recording,
-                    record_esp_data_file: manager.record_esp_data_file.clone(),
-                    failures: 0,
-                    con_fail_limit: config_holder.con_fail_limit,
-                    print_send_back: config_holder.print_send_back,
-                    udp_read_timeout: config_holder.udp_read_timeout,
-                    first_run: true,
-                    call_time: SystemTime::now(),
-                    data_file_buf: None,
-                    esp_data_file_buf: None,
-                    udp_socket: None,
-                    serial_port: Vec::new(),
-                    keepalive: true,
-                    queue_lengths: Vec::new(),
-                    no_controller: config_holder.no_controller,
-                    scan_mode: config_holder.scan_mode,
-                    filter_color: config_holder.filter_color,
-                    filter_range: config_holder.filter_range,
-                    hsv_red_override: config_holder.hsv_red_override.clone(),
-                    hsv_green_override: config_holder.hsv_green_override.clone(),
-                    hsv_blue_override: config_holder.hsv_blue_override.clone(),
-                    frame_cam_1: Default::default(),
-                    frame_cam_2: Default::default(),
-                    no_video: config_holder.no_video,
-                    skip_confirmation: config_holder.skip_confirmation,
+                    config: RuntimeConfig {
+                        num_led: config_holder.num_led,
+                        num_strips: config_holder.num_strips,
+                        communication_mode: config_holder.communication_mode,
+                        host: config_holder.host,
+                        port: config_holder.port,
+                        serial_port_paths: manager.config.serial_port_paths.clone(),
+                        baud_rate: config_holder.baud_rate,
+                        serial_read_timeout: manager.config.serial_read_timeout,
+                        record_data: manager.config.record_data,
+                        record_data_file: manager.config.record_data_file.clone(),
+                        record_esp_data: manager.config.record_esp_data,
+                        unity_controls_recording: manager.config.unity_controls_recording,
+                        record_esp_data_file: manager.config.record_esp_data_file.clone(),
+                        print_send_back: config_holder.advanced.print_send_back,
+                        udp_read_timeout: config_holder.advanced.udp_read_timeout,
+                        con_fail_limit: config_holder.advanced.con_fail_limit,
+                        no_controller: config_holder.advanced.no_controller,
+                        scan_mode: config_holder.scan_mode,
+                        filter_color: config_holder.filter_color,
+                        filter_range: config_holder.filter_range,
+                        hsv_red_override: config_holder.advanced.hsv_red_override.clone(),
+                        hsv_green_override: config_holder.advanced.hsv_green_override.clone(),
+                        hsv_blue_override: config_holder.advanced.hsv_blue_override.clone(),
+                        no_video: config_holder.advanced.no_video,
+                        skip_confirmation: config_holder.advanced.skip_confirmation,
+                    },
+                    state: ManagerState {
+                        failures: 0,
+                        first_run: true,
+                        call_time: SystemTime::now(),
+                        keepalive: true,
+                        queue_lengths: Vec::new(),
+                    },
+                    io: IOHandles {
+                        data_file_buf: None,
+                        esp_data_file_buf: None,
+                        udp_socket: None,
+                        serial_port: Vec::new(),
+                    },
+                    vision: VisionData {
+                        frame_cam_1: Default::default(),
+                        frame_cam_2: Default::default(),
+                    },
                 }));
             }
 
@@ -325,9 +334,9 @@ fn main() {
         };
 
         loop {
-            demo::rainbow(&manager, &json, 80.0, 50.0, false, demo::Axis::X, true);
-            demo::rainbow(&manager, &json, 120.0, 50.0, false, demo::Axis::Y, true);
-            demo::rainbow(&manager, &json, 80.0, 50.0, false, demo::Axis::Z, true);
+            // demo::rainbow(&manager, &json, 80.0, 50.0, false, demo::Axis::X, true);
+            demo::rainbow(&manager, &json, 50.0, 50.0, false, demo::Axis::Y, false);
+            // demo::rainbow(&manager, &json, 80.0, 50.0, false, demo::Axis::Z, true);
         }
 
         // let mut offset = 0.0_f32;

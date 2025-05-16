@@ -29,7 +29,7 @@ pub fn speedtest(manager: &Arc<Mutex<ManagerData>>, num_led: u32, writes: u32) {
         );
     }
 
-    let queue_lengths = manager.lock().unwrap().queue_lengths.clone();
+    let queue_lengths = manager.lock().unwrap().state.queue_lengths.clone();
 
     let end = start.elapsed();
 

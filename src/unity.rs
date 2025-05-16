@@ -4,7 +4,7 @@ use opencv::{
     core::{Mat, Point, Scalar},
     imgproc::{self, LINE_8},
     videoio::{
-        self, VideoCapture, VideoCaptureTrait, VideoCaptureTraitConst, CAP_PROP_FRAME_HEIGHT,
+        self, VideoCaptureTrait, VideoCaptureTraitConst, CAP_PROP_FRAME_HEIGHT,
         CAP_PROP_FRAME_WIDTH,
     },
 };
@@ -157,9 +157,9 @@ pub fn get_events(
     let owned_config = config.clone();
     let owned_manager = Arc::clone(&manager);
 
-    if config.get_events_video_widgets {
+    if config.advanced.get_events_video_widgets.unwrap_or(false) {
         // If one isn't set, assume the first pos file
-        let pos_index = config.get_events_widgets_pos_index.unwrap_or(0);
+        let pos_index = config.advanced.get_events_widgets_pos_index.unwrap_or(0);
 
         let mut pos_file = match File::open(unity.unity_position_files[pos_index as usize].clone())
         {
@@ -222,7 +222,12 @@ pub fn get_events(
         ));
     }
 
-    if config.get_events_streams_video && frame_buffer.is_some() {
+    if config
+        .advanced
+        .get_events_streams_video
+        .unwrap_or_else(|| false)
+        && frame_buffer.is_some()
+    {
         info!("Spawning get_events_streams_video thread.");
         warn!("This should only be used in demos due to decreased performance!");
 
@@ -241,14 +246,16 @@ pub fn get_events(
                     videoio::VideoCapture::new(config.camera_index_1, videoio::CAP_ANY).unwrap(),
                 ));
 
-                cam.lock()
-                    .unwrap()
-                    .set(CAP_PROP_FRAME_WIDTH, config.video_width)
-                    .unwrap();
-                cam.lock()
-                    .unwrap()
-                    .set(CAP_PROP_FRAME_HEIGHT, config.video_height)
-                    .unwrap();
+                if config.video_width.is_some() && config.video_height.is_some() {
+                    cam.lock()
+                        .unwrap()
+                        .set(CAP_PROP_FRAME_WIDTH, config.video_width.unwrap())
+                        .unwrap();
+                    cam.lock()
+                        .unwrap()
+                        .set(CAP_PROP_FRAME_HEIGHT, config.video_height.unwrap())
+                        .unwrap();
+                }
 
                 match videoio::VideoCapture::is_opened(cam.as_ref().lock().as_ref().unwrap())
                     .unwrap()
@@ -268,18 +275,20 @@ pub fn get_events(
                         .unwrap(),
                     )));
 
-                    cam2.as_ref()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .set(CAP_PROP_FRAME_WIDTH, config.video_width)
-                        .unwrap();
-                    cam2.as_ref()
-                        .unwrap()
-                        .lock()
-                        .unwrap()
-                        .set(CAP_PROP_FRAME_HEIGHT, config.video_height)
-                        .unwrap();
+                    if config.video_width.is_some() && config.video_height.is_some() {
+                        cam2.as_ref()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .set(CAP_PROP_FRAME_WIDTH, config.video_width.unwrap())
+                            .unwrap();
+                        cam2.as_ref()
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .set(CAP_PROP_FRAME_HEIGHT, config.video_height.unwrap())
+                            .unwrap();
+                    }
 
                     match videoio::VideoCapture::is_opened(&cam2.as_ref().unwrap().lock().unwrap())
                         .unwrap()
@@ -300,7 +309,11 @@ pub fn get_events(
                         }
                     }
 
-                    if config.get_events_video_widgets {
+                    if config
+                        .advanced
+                        .get_events_video_widgets
+                        .unwrap_or_else(|| false)
+                    {
                         for (_key, (xy, z, rgb, _enabled)) in json_hashmap_guard
                             .lock()
                             .unwrap()
@@ -335,7 +348,7 @@ pub fn get_events(
                         let mut frame_buffer = owned_frame_buffer.lock().unwrap();
                         frame_buffer.shared_frame_1 = frame_cam_1.clone();
                         frame_buffer.shared_frame_2 = frame_cam_2.clone();
-                        if !owned_manager.lock().unwrap().keepalive {
+                        if !owned_manager.lock().unwrap().state.keepalive {
                             info!("get_events_streams_video thread exiting");
                             break;
                         }
@@ -411,9 +424,9 @@ pub fn get_events(
         } else {
             error!("Unity packet was malformed! Packet: {}", msg);
         }
-        if !manager.lock().unwrap().keepalive {
+        if !manager.lock().unwrap().state.keepalive {
             info!("get_events exiting.");
-            manager.lock().unwrap().keepalive = true;
+            manager.lock().unwrap().state.keepalive = true;
             break;
         }
     }
