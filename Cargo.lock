@@ -4921,6 +4921,7 @@ name = "svled"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "crossbeam-channel",
  "ctrlc",
  "env_logger",
  "gumdrop",

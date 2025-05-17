@@ -18,7 +18,7 @@ use svled::scan;
 
 use svled::{
     demo, driver_wizard, led_manager::set_color, read_vled, speedtest, unity, utils, IOHandles,
-    ManagerData, ManagerState, RuntimeConfig, VisionData,
+    LedState, ManagerData, ManagerState, RuntimeConfig, VisionData,
 };
 
 #[derive(Debug, Options)]
@@ -143,7 +143,7 @@ fn main() {
     if let Some(Command::Speedtest(ref _speedtest_options)) = opts.command {
         info!("Performing speedtest...");
 
-        speedtest::speedtest(&manager, config_holder.num_led, 20000);
+        speedtest::speedtest(&manager, config_holder.num_led, 10000);
     } else if let Some(Command::ReadVled(ref readvled_options)) = opts.command {
         if !readvled_options.vled_file.is_file() {
             error!("You must pass a valid vled file with --vled-file!");
@@ -226,13 +226,18 @@ fn main() {
                         hsv_blue_override: config_holder.advanced.hsv_blue_override.clone(),
                         no_video: config_holder.advanced.no_video,
                         skip_confirmation: config_holder.advanced.skip_confirmation,
+                        use_queue: config_holder.advanced.use_queue,
+                        queue_size: config_holder.advanced.queue_size,
+                        led_config: None, // This will be constructed as needed by led_manager
                     },
                     state: ManagerState {
-                        failures: 0,
                         first_run: true,
                         call_time: SystemTime::now(),
                         keepalive: true,
-                        queue_lengths: Vec::new(),
+                        led_state: LedState {
+                            failures: 0,
+                            queue_lengths: Vec::new(),
+                        },
                     },
                     io: IOHandles {
                         data_file_buf: None,
@@ -334,24 +339,10 @@ fn main() {
         };
 
         loop {
-            // demo::rainbow(&manager, &json, 80.0, 50.0, false, demo::Axis::X, true);
-            demo::rainbow(&manager, &json, 50.0, 50.0, false, demo::Axis::Y, false);
-            // demo::rainbow(&manager, &json, 80.0, 50.0, false, demo::Axis::Z, true);
+            demo::rainbow(&manager, &json, 80.0, 50.0, false, demo::Axis::X, true);
+            demo::rainbow(&manager, &json, 50.0, 50.0, false, demo::Axis::Y, true);
+            demo::rainbow(&manager, &json, 80.0, 50.0, false, demo::Axis::Z, true);
         }
-
-        // let mut offset = 0.0_f32;
-        // let speed = 0.1_f32; // Adjust speed of rainbow shift
-
-        // loop {
-        //     demo::rainbow_fill(&manager, &json, demo::Axis::X, offset);
-
-        //     offset += speed;
-        //     if offset >= 1.0 {
-        //         offset -= 1.0;
-        //     }
-
-        //     // sleep(Duration::from_millis(20)); // Control frame rate
-        // }
     }
 
     // #[cfg(feature = "gui")]
