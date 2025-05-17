@@ -71,6 +71,6 @@ no_video = false
 get_events_streams_video = false
 get_events_video_widgets = false
 get_events_widgets_pos_index = 0
-use_queue = false
+use_queue = false # When set to true, a queue and multiple threads are used in led_manager for large performance boosts. A side effect is that saving sequences to a file is unsupported due to the nature of the threads.
 skip_confirmation = false
 crop_override = [0, 0, 1280, 720] # Optional example
