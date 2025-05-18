@@ -238,6 +238,7 @@ fn main() {
                             failures: 0,
                             queue_lengths: Vec::new(),
                         },
+                        led_thread_channels: Vec::new(),
                     },
                     io: IOHandles {
                         data_file_buf: None,

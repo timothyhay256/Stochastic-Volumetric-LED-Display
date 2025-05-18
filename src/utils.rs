@@ -1,3 +1,4 @@
+use crossbeam_channel::Sender;
 use log::{debug, error, info, warn}; // TODO: Depreceate unity export byte data
 use opencv::prelude::*;
 use serde::Deserialize;
@@ -114,6 +115,7 @@ pub struct ManagerState {
     pub call_time: SystemTime,
     pub keepalive: bool,
     pub led_state: LedState,
+    pub led_thread_channels: Vec<Sender<Task>>,
 }
 
 #[derive(Debug)]
@@ -181,6 +183,12 @@ pub struct LedConfig {
     pub con_fail_limit: Option<u32>,
     pub print_send_back: Option<bool>,
     pub serial_port_paths: Vec<String>,
+}
+
+#[derive(Copy, Clone)]
+pub struct Task {
+    pub command: (u16, u8, u8, u8),
+    pub controller_queue_length: Option<u8>,
 }
 
 pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Config) {
@@ -331,6 +339,7 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
                         queue_lengths: Vec::new(),
                     }
                 },
+                led_thread_channels: Vec::new(),
             },
             io: IOHandles {
                 data_file_buf: None,
