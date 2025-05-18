@@ -1,3 +1,4 @@
+use crossbeam_channel::Sender;
 use log::{debug, error, info, warn}; // TODO: Depreceate unity export byte data
 use opencv::prelude::*;
 use serde::Deserialize;
@@ -55,6 +56,7 @@ pub struct AdvancedConfig {
     pub get_events_video_widgets: Option<bool>, // When set to true, get_events video stream will include circles around illuminated LEDs for visualization purposes
     pub get_events_widgets_pos_index: Option<i32>, // Which pos file to use for visualization
     pub use_queue: Option<bool>,                // Should set_color queue writes?
+    pub queue_size: Option<usize>,
     pub skip_confirmation: Option<bool>, // Should we skip checking if the LED was properly set? Speeds things way up at the cost of accuracy.
     pub crop_override: Option<Vec<i32>>, // When set, cropping will be skipped.
 }
@@ -75,7 +77,7 @@ pub struct ManagerData {
     pub vision: VisionData,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RuntimeConfig {
     pub num_led: u32,
     pub num_strips: u32,
@@ -102,15 +104,18 @@ pub struct RuntimeConfig {
     pub hsv_blue_override: Option<Vec<u8>>,
     pub no_video: Option<bool>,
     pub skip_confirmation: Option<bool>,
+    pub use_queue: Option<bool>,
+    pub queue_size: Option<usize>,
+    pub led_config: Option<LedConfig>, // Exists so that we don't have to create a new struct every time we call set_color. Acts just as a holder for other items from RuntimeConfig
 }
 
 #[derive(Debug)]
 pub struct ManagerState {
-    pub failures: u32,
     pub first_run: bool,
     pub call_time: SystemTime,
     pub keepalive: bool,
-    pub queue_lengths: Vec<u8>,
+    pub led_state: LedState,
+    pub led_thread_channels: Vec<Sender<Task>>,
 }
 
 #[derive(Debug)]
@@ -154,6 +159,36 @@ pub struct CropPos {
     pub cam_2_brightest: Option<f64>,
     pub cam_1_darkest: Option<f64>,
     pub cam_2_darkest: Option<f64>,
+}
+
+#[derive(Debug)]
+pub struct LedState {
+    pub failures: u32,
+    pub queue_lengths: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LedConfig {
+    // This contains values that will be cloned before moving into closure inside a thread so we don't have to deal with shared configs when using queues inside led_manager.
+    pub skip_confirmation: Option<bool>,
+    pub unity_controls_recording: bool,
+    pub no_controller: Option<bool>,
+    pub port: i32,
+    pub communication_mode: i8,
+    pub num_led: u32,
+    pub num_strips: u32,
+    pub serial_read_timeout: Option<u32>,
+    pub udp_read_timeout: u32,
+    pub host: Ipv4Addr,
+    pub con_fail_limit: Option<u32>,
+    pub print_send_back: Option<bool>,
+    pub serial_port_paths: Vec<String>,
+}
+
+#[derive(Copy, Clone)]
+pub struct Task {
+    pub command: (u16, u8, u8, u8),
+    pub controller_queue_length: Option<u8>,
 }
 
 pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Config) {
@@ -206,6 +241,9 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
     let no_video = config_holder.advanced.no_video;
 
     let skip_confirmation = config_holder.advanced.skip_confirmation;
+
+    let use_queue = config_holder.advanced.use_queue;
+    let queue_size = config_holder.advanced.queue_size;
 
     // Validate config and inform user of settings
 
@@ -287,13 +325,21 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
                 hsv_blue_override: hsv_blue_override.clone(),
                 no_video,
                 skip_confirmation,
+                use_queue,
+                queue_size,
+                led_config: None,
             },
             state: ManagerState {
-                failures: 0,
                 first_run: true,
                 call_time: SystemTime::now(),
                 keepalive: true,
-                queue_lengths: Vec::new(),
+                led_state: {
+                    LedState {
+                        failures: 0,
+                        queue_lengths: Vec::new(),
+                    }
+                },
+                led_thread_channels: Vec::new(),
             },
             io: IOHandles {
                 data_file_buf: None,

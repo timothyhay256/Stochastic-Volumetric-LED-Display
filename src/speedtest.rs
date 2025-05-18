@@ -1,4 +1,4 @@
-use log::info;
+use log::{debug, info};
 use rand::Rng;
 use std::{
     sync::{Arc, Mutex},
@@ -29,7 +29,13 @@ pub fn speedtest(manager: &Arc<Mutex<ManagerData>>, num_led: u32, writes: u32) {
         );
     }
 
-    let queue_lengths = manager.lock().unwrap().state.queue_lengths.clone();
+    let queue_lengths = manager
+        .lock()
+        .unwrap()
+        .state
+        .led_state
+        .queue_lengths
+        .clone();
 
     let end = start.elapsed();
 
@@ -44,8 +50,15 @@ pub fn speedtest(manager: &Arc<Mutex<ManagerData>>, num_led: u32, writes: u32) {
         "{:.3} LEDs per second",
         (writes as f64 / (end.as_millis() as f64)) * 1000.0
     );
-    info!(
-        "Average queue length: {}",
-        queue_total_lengths / queue_lengths.len() as u32
-    );
+
+    if queue_lengths.len() != 0 {
+        info!(
+            "Average queue length: {}",
+            queue_total_lengths / queue_lengths.len() as u32
+        );
+    } else {
+        debug!(
+            "queue_lengths.len() is 0, check debug logs for average queue lengths from threads."
+        );
+    }
 }
