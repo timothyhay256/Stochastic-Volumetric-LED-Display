@@ -5,7 +5,7 @@
 This project allows you to scan a container full of individually addressible RGB leds, and create a representation of those LEDs in 3d space in Unity, where you can apply whatever effects in 3d that you desire.  
 It also has the ability to save animations either to a file, or directly to the LED controller (ESP32). 
 
-Additionally, it supports multiple controllers on the same strip, meaning that it can drive large amonts of LEDs very fast (~9,500 LEDs per second with 20 controllers and 1,000 LEDs).  
+Additionally, it supports multiple controllers on the same strip, meaning that it can drive very large amounts of LEDs very fast (~9,500 LEDs per second with 20 controllers and 1,000 LEDs).  
 
 You can see a demo video setting up the LEDs here: `TODO: make video`  
 
