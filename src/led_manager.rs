@@ -4,7 +4,7 @@ use serialport::SerialPort;
 use std::{
     env,
     io::{BufWriter, ErrorKind::WouldBlock, Write},
-    net::{Ipv4Addr, UdpSocket},
+    net::UdpSocket,
     path::{Path, PathBuf},
     process,
     sync::{Arc, Mutex},
@@ -12,12 +12,7 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use crate::{utils::ManagerData, LedConfig, LedState};
-
-struct Task {
-    command: (u16, u8, u8, u8),
-    controller_queue_length: Option<u8>,
-}
+use crate::{utils::ManagerData, LedConfig, LedState, Task};
 
 enum ConnectionType<'a> {
     Udp(&'a mut Option<UdpSocket>),
@@ -29,16 +24,14 @@ enum SendCommandArgs<'a> {
     ChannelConfigState(ConnectionType<'a>, &'a LedConfig, &'a mut LedState),
 }
 
-pub fn dispatch_threads(manager_guard: &Arc<Mutex<ManagerData>>) -> Vec<Sender<Task>> {
-    let config = manager_guard.lock().unwrap().config.clone();
+fn dispatch_threads(manager: &ManagerData) -> Vec<Sender<Task>> {
+    let config = manager.config.clone();
     let mut channels = Vec::new();
 
-    for port in &manager_guard.lock().unwrap().config.serial_port_paths {
-        let (tx, rx): (Sender<Task>, Receiver<Task>) =
-            bounded(config.queue_size.clone().unwrap_or(20));
+    for path in config.serial_port_paths.clone() {
+        let (tx, rx): (Sender<Task>, Receiver<Task>) = bounded(config.queue_size.unwrap_or(20));
         channels.push(tx);
 
-        let owned_manager = Arc::clone(&manager_guard);
         let owned_led_config = LedConfig {
             skip_confirmation: config.skip_confirmation,
             no_controller: config.no_controller,
@@ -55,7 +48,54 @@ pub fn dispatch_threads(manager_guard: &Arc<Mutex<ManagerData>>) -> Vec<Sender<T
             serial_port_paths: config.serial_port_paths.clone(),
         };
 
-        thread::spawn(move || while let Ok(cmd) = rx.recv() {});
+        let baud_rate = config.baud_rate;
+        let serial_read_timeout = config.serial_read_timeout;
+
+        let mut serial_port = match serialport::new(&path, baud_rate)
+            .timeout(Duration::from_millis(
+                serial_read_timeout.unwrap_or(200).into(),
+            ))
+            .open()
+        {
+            Ok(port) => port,
+            Err(e) => panic!("Could not open {}: {}", path, e),
+        };
+
+        debug!("Dispatching thread!");
+        thread::spawn(move || {
+            let mut owned_state = LedState {
+                failures: 0,
+                queue_lengths: Vec::new(),
+            };
+
+            while let Ok(cmd) = rx.recv() {
+                send_color_command(
+                    SendCommandArgs::ChannelConfigState(
+                        ConnectionType::Serial(&mut *serial_port),
+                        &owned_led_config,
+                        &mut owned_state,
+                    ),
+                    cmd.command.0,
+                    cmd.command.1,
+                    cmd.command.2,
+                    cmd.command.3,
+                );
+            }
+
+            let mut queue_total_lengths: u32 = 0;
+            for n in owned_state
+                .queue_lengths
+                .iter()
+                .take((owned_state.queue_lengths.len() - 1) + 1)
+            {
+                queue_total_lengths += owned_state.queue_lengths[*n as usize] as u32;
+            }
+            debug!(
+                "Average queue length: {}",
+                queue_total_lengths / owned_state.queue_lengths.len() as u32
+            );
+            debug!("socket worker thread exiting!");
+        });
     }
 
     channels
@@ -198,6 +238,32 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
                     send_color_command(SendCommandArgs::Manager(&mut manager), n, r, g, b);
                 }
             }
+        } else if manager.state.led_thread_channels.is_empty() {
+            manager.state.led_thread_channels = dispatch_threads(&manager);
+        } else {
+            let mut n = n;
+
+            let leds_per_strip = manager.config.num_led / manager.config.num_strips;
+
+            for index in 1..manager.config.num_strips + 1 {
+                if (n as u32) < index * leds_per_strip && n as u32 >= (index - 1) * leds_per_strip {
+                    // Determines which strip to send the index instruction to.
+                    n = if index > 1 {
+                        n - (leds_per_strip * (index - 1)) as u16
+                    } else {
+                        n
+                    };
+
+                    manager.state.led_thread_channels[(index - 1) as usize]
+                        .send(Task {
+                            command: (n, r, g, b),
+                            controller_queue_length: None,
+                        })
+                        .expect("Could not dispatch task to a worker thread!");
+
+                    break;
+                }
+            }
         }
     }
 }
@@ -240,11 +306,6 @@ fn send_color_command(manager_or_config: SendCommandArgs, n: u16, r: u8, g: u8, 
                         let mut serial_port = None;
 
                         for index in 1..manager.config.num_strips + 1 {
-                            debug!(
-                                "n: {n}, leds_per_strip: {leds_per_strip}, max: {}, min: {}",
-                                index * leds_per_strip,
-                                (index - 1) * leds_per_strip
-                            );
                             if (n as u32) < index * leds_per_strip
                                 && n as u32 >= (index - 1) * leds_per_strip
                             {
