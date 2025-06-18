@@ -1,9 +1,10 @@
-use std::sync::{Arc, Mutex};
-use std::thread::sleep;
-use std::time::Duration;
+use std::{
+    sync::{Arc, Mutex},
+    thread::sleep,
+    time::Duration,
+};
 
-use crate::led_manager;
-use crate::ManagerData;
+use crate::{led_manager, ManagerData};
 type JsonEntry = Vec<(String, (f32, f32), (f32, f32))>;
 type LedPos = [(String, (f32, f32), (f32, f32))];
 

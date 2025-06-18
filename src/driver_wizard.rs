@@ -38,7 +38,7 @@ pub fn wizard() {
     let mut led_pins = Vec::new();
 
     for i in 1.._led_count.parse::<i32>().unwrap() {
-        let pin = Text::new(&format!("Enter pin for LED {}", i)).prompt();
+        let pin = Text::new(&format!("Enter pin for LED {i}")).prompt();
 
         match pin {
             Ok(pin) => led_pins.push(pin),

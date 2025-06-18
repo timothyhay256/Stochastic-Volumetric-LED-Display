@@ -1,12 +1,12 @@
-use log::{debug, info};
-use rand::Rng;
 use std::{
     sync::{Arc, Mutex},
     time::Instant,
 };
 
-use crate::led_manager;
-use crate::ManagerData;
+use log::{debug, info};
+use rand::Rng;
+
+use crate::{led_manager, ManagerData};
 
 pub fn speedtest(manager: &Arc<Mutex<ManagerData>>, num_led: u32, writes: u32) {
     let mut rng = rand::thread_rng();
@@ -16,7 +16,7 @@ pub fn speedtest(manager: &Arc<Mutex<ManagerData>>, num_led: u32, writes: u32) {
         led_manager::set_color(manager, n as u16, 0, 0, 0);
     }
 
-    info!("Testing {} random writes", writes);
+    info!("Testing {writes} random writes");
     let start = Instant::now();
 
     for _n in 0..=writes {
@@ -40,18 +40,20 @@ pub fn speedtest(manager: &Arc<Mutex<ManagerData>>, num_led: u32, writes: u32) {
     let end = start.elapsed();
 
     let mut queue_total_lengths: u32 = 0;
-    for n in queue_lengths.iter().take((queue_lengths.len() - 1) + 1) {
-        queue_total_lengths += queue_lengths[*n as usize] as u32;
+    if !queue_lengths.is_empty() {
+        for n in queue_lengths.iter().take((queue_lengths.len() - 1) + 1) {
+            queue_total_lengths += queue_lengths[*n as usize] as u32;
+        }
     }
 
-    info!("{:.2?} seconds.", end);
+    info!("{end:.2?} seconds.");
     info!("{:.5?} seconds per LED", end / writes);
     info!(
         "{:.3} LEDs per second",
         (writes as f64 / (end.as_millis() as f64)) * 1000.0
     );
 
-    if queue_lengths.len() != 0 {
+    if !queue_lengths.is_empty() {
         info!(
             "Average queue length: {}",
             queue_total_lengths / queue_lengths.len() as u32

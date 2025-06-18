@@ -1,14 +1,3 @@
-use chrono::Local; // TODO: Play with different camera backends
-use inquire;
-use log::{debug, error, info, warn}; // TODO: Properly get HSV for each camera
-use opencv::{
-    core::{self, flip, get_default_algorithm_hint, min_max_loc, no_array, Point, Scalar},
-    highgui::{self, EVENT_LBUTTONDOWN, EVENT_LBUTTONUP, EVENT_MOUSEMOVE},
-    imgproc::{self, COLOR_BGR2GRAY, COLOR_BGR2HSV, LINE_8},
-    prelude::*,
-    videoio::{self, VideoCapture, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH},
-    Result,
-};
 use std::{
     cmp::{max, min},
     error::Error,
@@ -21,9 +10,19 @@ use std::{
     time::Duration,
 };
 
-use crate::Config;
-use crate::ManagerData;
-use crate::{led_manager, CropPos, ScanData};
+use chrono::Local; // TODO: Play with different camera backends
+use inquire;
+use log::{debug, error, info, warn}; // TODO: Properly get HSV for each camera
+use opencv::{
+    core::{self, flip, get_default_algorithm_hint, min_max_loc, no_array, Point, Scalar},
+    highgui::{self, EVENT_LBUTTONDOWN, EVENT_LBUTTONUP, EVENT_MOUSEMOVE},
+    imgproc::{self, COLOR_BGR2GRAY, COLOR_BGR2HSV, LINE_8},
+    prelude::*,
+    videoio::{self, VideoCapture, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH},
+    Result,
+};
+
+use crate::{led_manager, Config, CropPos, ManagerData, ScanData};
 
 type ScanResult = Result<(i32, i32, Option<i32>, Option<i32>), Box<dyn Error>>;
 type PosEntry = Vec<(String, (i32, i32), Option<(i32, i32)>)>;
@@ -90,7 +89,7 @@ pub fn scan(
         pos = match crop(&config, manager_guard) {
             Ok(pos) => pos,
             Err(e) => {
-                panic!("There was a problem while trying to crop: {}", e)
+                panic!("There was a problem while trying to crop: {e}")
             }
         };
     }
@@ -151,8 +150,7 @@ pub fn scan(
                 .unwrap()
                 .get(opencv::videoio::CAP_PROP_FRAME_HEIGHT)
                 .unwrap() as i32;
-        } else {
-            let crop_data = crop_data.unwrap();
+        } else if let Some(crop_data) = crop_data {
             pos.x1_start = crop_data.0 .0;
             pos.x1_end = crop_data.0 .1;
             pos.y1_start = crop_data.0 .2;
@@ -221,7 +219,7 @@ pub fn scan(
         }
     };
 
-    debug!("hsv_brightest: {:?}", hsv_brightest);
+    debug!("hsv_brightest: {hsv_brightest:?}");
     debug!(
         "HSV (visualizer-friendly): H: {:.1}, S: {:.1}%, V: {:.1}%",
         hsv_brightest[0] as f32 * 2.0,
@@ -336,8 +334,8 @@ pub fn scan(
 
             *override_vec = Some(vec![lower_h, lower_s, lower_v, upper_h, upper_s, upper_v]);
 
-            debug!("lower bound: HSV: {} {} {}", lower_h, lower_s, lower_v);
-            debug!("upper bound: HSV: {} {} {}", upper_h, upper_s, upper_v);
+            debug!("lower bound: HSV: {lower_h} {lower_s} {lower_v}");
+            debug!("upper bound: HSV: {upper_h} {upper_s} {upper_v}");
         } else {
             info!("Existing hsv_override found, not overriding");
         }
@@ -412,7 +410,7 @@ pub fn scan(
             match manual_calibrate(manager_guard, &config, window, &cam, &mut led_pos, &data) {
                 Ok(_) => {}
                 Err(e) => {
-                    panic!("Something went wrong during manual calibration: {}", e);
+                    panic!("Something went wrong during manual calibration: {e}");
                 }
             }
         }
@@ -514,7 +512,7 @@ pub fn scan(
                 ) {
                     Ok(_) => {}
                     Err(e) => {
-                        panic!("Something went wrong during manual calibration: {}", e);
+                        panic!("Something went wrong during manual calibration: {e}");
                     }
                 }
             }
@@ -596,7 +594,7 @@ pub fn scan(
     Ok(())
 }
 
-pub fn brightest_darkest(
+fn brightest_darkest(
     cam: &Arc<Mutex<VideoCapture>>,
     config: &Config,
     manager: &Arc<Mutex<ManagerData>>,
@@ -698,8 +696,8 @@ pub fn brightest_darkest(
             .unwrap();
 
         debug!("brightest from manual select is {brightest}");
-        debug!("hsv from manual select is {:?}", hsv);
-        debug!("pos from manual select is {:?}", brightest_pos);
+        debug!("hsv from manual select is {hsv:?}");
+        debug!("pos from manual select is {brightest_pos:?}");
     }
 
     debug!("get darkest_cam_1");
@@ -893,8 +891,8 @@ pub fn select_brightest(
             .at_2d::<opencv::core::Vec3b>(brightest_pos.y, brightest_pos.x)
             .unwrap();
 
-        debug!("hsv from manual select is {:?}", hsv);
-        debug!("pos from manual select is {:?}", brightest_pos);
+        debug!("hsv from manual select is {hsv:?}");
+        debug!("pos from manual select is {brightest_pos:?}");
 
         // Set hsv upper and lower based on the selected area automatically
         if !*override_active.lock().unwrap() {
@@ -972,10 +970,7 @@ pub fn select_brightest(
         let upperb = Mat::from_slice(&upper_vals).unwrap();
         let lowerb = Mat::from_slice(&lower_vals).unwrap();
 
-        debug!(
-            "applying upper and lower vals in select_brightest: {:?} {:?}",
-            upper_vals, lower_vals
-        );
+        debug!("applying upper and lower vals in select_brightest: {upper_vals:?} {lower_vals:?}");
         let mut hsv_frame = Mat::default();
         imgproc::cvt_color(
             frame,
@@ -1041,7 +1036,7 @@ pub fn select_brightest(
                     v_up.try_into().unwrap(),
                 ]);
 
-                debug!("Overriding hsv_override vec with {:?}", override_vec);
+                debug!("Overriding hsv_override vec with {override_vec:?}");
 
                 break;
             } else {
@@ -1241,7 +1236,7 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
         match videoio::VideoCapture::is_opened(&cam_guard.lock().unwrap())? {
             true => {}
             false => {
-                panic!("Unable to open camera {}! Please select another.", index)
+                panic!("Unable to open camera {index}! Please select another.")
             }
         };
         let loop_out = callback_loop(
@@ -1284,12 +1279,12 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
         cam_2_brightest: None,
         cam_2_darkest: None,
     };
-    debug!("crop finished, returning: {:?}", pos);
+    debug!("crop finished, returning: {pos:?}");
 
     Ok(pos)
 }
 
-pub fn callback_loop(
+fn callback_loop(
     cam: &Arc<Mutex<VideoCapture>>,
     manager: &Arc<Mutex<ManagerData>>,
     x_start: Arc<Mutex<i32>>,
@@ -1301,7 +1296,7 @@ pub fn callback_loop(
     crop: bool,
 ) -> Result<CallbackResult, Box<dyn Error>> {
     info!("{msg}");
-    debug!("window: {}, title: {}", window, msg);
+    debug!("window: {window}, title: {msg}");
     let mut cam = cam.lock().unwrap();
     highgui::set_window_title(window, &msg).unwrap();
 
@@ -1401,8 +1396,8 @@ pub fn callback_loop(
                 .at_2d::<opencv::core::Vec3b>(brightest_pos.y, brightest_pos.x)
                 .unwrap();
 
-            debug!("hsv from manual select is {:?}", hsv);
-            debug!("pos from manual select is {:?}", brightest_pos);
+            debug!("hsv from manual select is {hsv:?}");
+            debug!("pos from manual select is {brightest_pos:?}");
 
             if let Some(no_video) = no_video {
                 if frame.size()?.width > 0 && !no_video {
@@ -1519,7 +1514,7 @@ pub fn scan_area(
                     (Some(scan_area_result.0), Some(scan_area_result.1));
             }
 
-            debug!("valid_cycle: {}", i);
+            debug!("valid_cycle: {i}");
             (success, failures) = scan_area_cycle(
                 manager,
                 config,
@@ -1619,10 +1614,7 @@ pub fn filter(mut frame: &mut Mat, filter_color: &u32, manager: &Arc<Mutex<Manag
         panic!("Invalid filter_color selected: {filter_color}");
     }
 
-    debug!(
-        "applying upper and lower vals in filter function: {:?} {:?}",
-        upperb, lowerb
-    );
+    debug!("applying upper and lower vals in filter function: {upperb:?} {lowerb:?}");
 
     let mut hsv_frame = Mat::default();
     imgproc::cvt_color(
@@ -1650,7 +1642,7 @@ pub fn filter(mut frame: &mut Mat, filter_color: &u32, manager: &Arc<Mutex<Manag
     core::add_weighted(&frame.clone(), 0.3, &mask_color, 0.7, 0.0, &mut frame, -1).unwrap();
 }
 
-pub fn scan_area_cycle(
+fn scan_area_cycle(
     manager: &Arc<Mutex<ManagerData>>,
     config: &Config,
     cam: Option<&Arc<Mutex<VideoCapture>>>,
@@ -1752,7 +1744,7 @@ pub fn scan_area_cycle(
             + ((scan_data.pos.cam_1_brightest.unwrap() - scan_data.pos.cam_1_darkest.unwrap())
                 * 0.5)
     {
-        debug!("Succesful xy calibration: {:?} on index: {}", pos, i);
+        debug!("Succesful xy calibration: {pos:?} on index: {i}");
         success += 1;
         imgproc::circle(
             &mut frame,
@@ -1777,7 +1769,7 @@ pub fn scan_area_cycle(
             );
         }
     } else {
-        debug!("Failed xy calibration: {:?} on index: {}", pos, i);
+        debug!("Failed xy calibration: {pos:?} on index: {i}");
         failures += 1;
         imgproc::circle(
             &mut frame,
@@ -1827,12 +1819,8 @@ pub fn failed_calibration(led_pos: PosEntry) -> String {
 
     let date = Local::now();
     let path = format!("temp-pos-{}", date.format("%Y-%m-%d-%H:%M:%S"));
-    let mut file = File::create(Path::new(&path)).unwrap_or_else(|_| {
-        panic!(
-            "Unable to write temp-pos to {path}, temp-pos: {:?}",
-            led_pos
-        )
-    });
+    let mut file = File::create(Path::new(&path))
+        .unwrap_or_else(|_| panic!("Unable to write temp-pos to {path}, temp-pos: {led_pos:?}"));
     file.write_all(json.as_bytes())
         .unwrap_or_else(|_| panic!("Unable to write temp-pos file at {path}"));
     path
@@ -1884,7 +1872,7 @@ pub fn manual_calibrate(
 ) -> Result<()> {
     let scan_data = scan_data_guard.lock().unwrap();
 
-    debug!("scan_data: {:?}", scan_data);
+    debug!("scan_data: {scan_data:?}");
     info!("You are entering manual calibration mode. \n
     This is to manually calibrate all LEDs that failed to properly calibrate, and to make sure all LEDs did calibrate properly. The controls are:\n
     R: Move to the next LED
@@ -1916,13 +1904,10 @@ pub fn manual_calibrate(
 
     let mut led_index: usize = 0;
     'video: loop {
-        debug!("led_index: {}", led_index);
+        debug!("led_index: {led_index}");
         highgui::set_window_title(
             window,
-            &format!(
-                "R for next, E for previous, Q to finish. On LED {}",
-                led_index,
-            ),
+            &format!("R for next, E for previous, Q to finish. On LED {led_index}",),
         )
         .unwrap();
         led_manager::set_color(manager_guard, led_index as u16, 255, 255, 255);
@@ -1987,7 +1972,7 @@ pub fn manual_calibrate(
             color = Scalar::new(0.0, 255.0, 0.0, 255.0);
             *callback_called.lock().unwrap() = false;
         }
-        debug!("setting cricle at {:?}", pos);
+        debug!("setting cricle at {pos:?}");
         imgproc::circle(&mut frame, pos, 20, color, 2, LINE_8, 0)?;
 
         if let Some(no_video) = config.advanced.no_video {

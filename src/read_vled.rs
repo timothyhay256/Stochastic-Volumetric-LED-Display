@@ -1,18 +1,17 @@
-use log::{error, info, warn};
-use {
-    std::error::Error,
-    std::ffi::OsStr,
-    std::fs::File,
-    std::io::{self, BufRead},
-    std::path::{Path, PathBuf},
-    std::sync::{Arc, Mutex},
-    std::thread,
-    std::time,
-    time::Instant,
+use std::{
+    error::Error,
+    ffi::OsStr,
+    fs::File,
+    io::{self, BufRead},
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+    thread, time,
 };
 
-use crate::led_manager;
-use crate::ManagerData;
+use log::{error, info, warn};
+use time::Instant;
+
+use crate::{led_manager, ManagerData};
 
 pub fn read_vled(manager: &Arc<Mutex<ManagerData>>, file: PathBuf) -> Result<(), Box<dyn Error>> {
     if file.extension().and_then(OsStr::to_str) != Some("vled") {
@@ -33,8 +32,7 @@ pub fn read_vled(manager: &Arc<Mutex<ManagerData>>, file: PathBuf) -> Result<(),
                     Ok(index) => index,
                     Err(e) => {
                         panic!(
-                            "VLED was malformed: Attempted to convert {} to u8: {}",
-                            line, e
+                            "VLED was malformed: Attempted to convert {line} to u8: {e}"
                         )
                     }
                 };
@@ -49,8 +47,7 @@ pub fn read_vled(manager: &Arc<Mutex<ManagerData>>, file: PathBuf) -> Result<(),
                         Ok(el) => el,
                         Err(e) => {
                             panic!(
-                                "VLED was malformed: Attempted to convert {} to u8: {}",
-                                el, e
+                                "VLED was malformed: Attempted to convert {el} to u8: {e}"
                             )
                         }
                     };
@@ -64,8 +61,7 @@ pub fn read_vled(manager: &Arc<Mutex<ManagerData>>, file: PathBuf) -> Result<(),
                     Ok(sleep) => sleep,
                     Err(e) => {
                         panic!(
-                            "VLED was malformed: Attempted to convert {} to u8: {}",
-                            line, e
+                            "VLED was malformed: Attempted to convert {line} to u8: {e}"
                         )
                     }
                 };
