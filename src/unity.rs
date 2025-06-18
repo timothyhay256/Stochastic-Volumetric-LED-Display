@@ -1,13 +1,3 @@
-use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use log::{debug, error, info, warn};
-use opencv::{
-    core::{Mat, Point, Scalar},
-    imgproc::{self, LINE_8},
-    videoio::{
-        self, VideoCaptureTrait, VideoCaptureTraitConst, CAP_PROP_FRAME_HEIGHT,
-        CAP_PROP_FRAME_WIDTH,
-    },
-};
 use std::{
     cmp::max,
     collections::HashMap,
@@ -18,18 +8,29 @@ use std::{
     str,
     sync::{Arc, Mutex},
     thread,
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
-use crate::Config;
-use crate::ManagerData;
-use crate::UnityOptions;
-use crate::{led_manager, GetEventsFrameBuffer};
+use indicatif::{ProgressBar, ProgressState, ProgressStyle};
+use log::{debug, error, info, warn};
+use opencv::{
+    core::{Mat, Point, Scalar},
+    imgproc::{self, LINE_8},
+    videoio::{
+        self, VideoCaptureTrait, VideoCaptureTraitConst, CAP_PROP_FRAME_HEIGHT,
+        CAP_PROP_FRAME_WIDTH,
+    },
+};
+
+use crate::{
+    led_manager, Config, GetEventsFrameBuffer, IOHandles, LedState, ManagerData, ManagerState,
+    RuntimeConfig, UnityOptions, VisionData,
+};
 
 type JsonEntry = Vec<(String, (f32, f32), (f32, f32))>;
 
 pub fn signal_restart(unity_ip: Ipv4Addr, unity_port: u32) {
-    let mut stream = match TcpStream::connect(format!("{}:{}", unity_ip, unity_port)) {
+    let mut stream = match TcpStream::connect(format!("{unity_ip}:{unity_port}")) {
         Ok(stream) => stream,
         Err(e) => {
             panic!("Could not establish connection on {unity_ip}:{unity_port} with Unity: {e}")
@@ -120,7 +121,7 @@ pub fn send_pos(unity: UnityOptions) -> std::io::Result<()> {
 
             if match str::from_utf8(&response) {
                 Ok(v) => v,
-                Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
+                Err(e) => panic!("Invalid UTF-8 sequence: {e}"),
             } != "ack"
             {
                 error!("Did not get acknowledgement from Unity! You may have missing LEDs.");
@@ -144,8 +145,8 @@ pub fn get_events(
 
     let ip = unity.unity_ip;
 
-    debug!("get_events active on {}:{}", ip, port);
-    let socket = UdpSocket::bind(format!("{}:{}", ip, port))?;
+    debug!("get_events active on {ip}:{port}");
+    let socket = UdpSocket::bind(format!("{ip}:{port}"))?;
 
     // load positions if we are streaming video with widgets
     let mut json: JsonEntry;
@@ -222,12 +223,7 @@ pub fn get_events(
         ));
     }
 
-    if config
-        .advanced
-        .get_events_streams_video
-        .unwrap_or_else(|| false)
-        && frame_buffer.is_some()
-    {
+    if config.advanced.get_events_streams_video.unwrap_or(false) && frame_buffer.is_some() {
         info!("Spawning get_events_streams_video thread.");
         warn!("This should only be used in demos due to decreased performance!");
 
@@ -309,11 +305,7 @@ pub fn get_events(
                         }
                     }
 
-                    if config
-                        .advanced
-                        .get_events_video_widgets
-                        .unwrap_or_else(|| false)
-                    {
+                    if config.advanced.get_events_video_widgets.unwrap_or(false) {
                         for (_key, (xy, z, rgb, _enabled)) in json_hashmap_guard
                             .lock()
                             .unwrap()
@@ -365,8 +357,7 @@ pub fn get_events(
             Ok(msg) => msg,
             Err(e) => {
                 error!(
-                    "Received invalid packet from Unity:{:?} which resulted in the following: {}",
-                    buf, e
+                    "Received invalid packet from Unity:{buf:?} which resulted in the following: {e}"
                 );
                 "FAIL"
             }
@@ -379,10 +370,7 @@ pub fn get_events(
             let index = match msg.to_string().parse::<u16>() {
                 Ok(index) => index,
                 Err(e) => {
-                    panic!(
-                        "Unity packet was malformed: Attempted to convert {} to u8: {}",
-                        msg, e
-                    )
+                    panic!("Unity packet was malformed: Attempted to convert {msg} to u8: {e}")
                 }
             };
             led_manager::set_color(&manager, index, 0, 0, 0);
@@ -391,7 +379,7 @@ pub fn get_events(
             if let Some(value) = json_hashmap.lock().unwrap().get_mut(&(index as usize)) {
                 value.3 = false;
             }
-            info!("dimming {}", index);
+            info!("dimming {index}");
         } else if msg.contains("|") {
             // Set index n with r g b from string n|r|g|b
             let mut xs: [u16; 4] = [0; 4];
@@ -400,10 +388,7 @@ pub fn get_events(
                 xs[i] = match el.parse::<u16>() {
                     Ok(el) => el,
                     Err(e) => {
-                        panic!(
-                            "Unity packet was malformed: Attempted to convert {} to u8: {}",
-                            el, e
-                        )
+                        panic!("Unity packet was malformed: Attempted to convert {el} to u8: {e}")
                     }
                 };
             }
@@ -422,7 +407,7 @@ pub fn get_events(
             }
             led_manager::set_color(&manager, xs[0], xs[1] as u8, xs[2] as u8, xs[3] as u8);
         } else {
-            error!("Unity packet was malformed! Packet: {}", msg);
+            error!("Unity packet was malformed! Packet: {msg}");
         }
         if !manager.lock().unwrap().state.keepalive {
             info!("get_events exiting.");
@@ -432,4 +417,106 @@ pub fn get_events(
     }
 
     Ok(())
+}
+
+pub fn start_listeners(config_holder: &Config, manager: &Arc<Mutex<ManagerData>>) {
+    info!("Spawning listening threads");
+
+    let mut children = Vec::new();
+
+    for i in 0..config_holder.unity_options.num_container {
+        debug!("Spawning listening thread.");
+
+        let owned_manager;
+
+        {
+            let manager = manager.lock().unwrap();
+            owned_manager = Arc::new(Mutex::new(ManagerData {
+                config: RuntimeConfig {
+                    num_led: config_holder.num_led,
+                    num_strips: config_holder.num_strips,
+                    communication_mode: config_holder.communication_mode,
+                    host: config_holder.host,
+                    port: config_holder.port,
+                    serial_port_paths: manager.config.serial_port_paths.clone(),
+                    baud_rate: config_holder.baud_rate,
+                    serial_read_timeout: manager.config.serial_read_timeout,
+                    record_data: manager.config.record_data,
+                    record_data_file: manager.config.record_data_file.clone(),
+                    record_esp_data: manager.config.record_esp_data,
+                    unity_controls_recording: manager.config.unity_controls_recording,
+                    record_esp_data_file: manager.config.record_esp_data_file.clone(),
+                    print_send_back: config_holder.advanced.print_send_back,
+                    udp_read_timeout: config_holder.advanced.udp_read_timeout,
+                    con_fail_limit: config_holder.advanced.con_fail_limit,
+                    no_controller: config_holder.advanced.no_controller,
+                    scan_mode: config_holder.scan_mode,
+                    filter_color: config_holder.filter_color,
+                    filter_range: config_holder.filter_range,
+                    hsv_red_override: config_holder.advanced.hsv_red_override.clone(),
+                    hsv_green_override: config_holder.advanced.hsv_green_override.clone(),
+                    hsv_blue_override: config_holder.advanced.hsv_blue_override.clone(),
+                    no_video: config_holder.advanced.no_video,
+                    skip_confirmation: config_holder.advanced.skip_confirmation,
+                    use_queue: config_holder.advanced.use_queue,
+                    queue_size: config_holder.advanced.queue_size,
+                    led_config: None, // This will be constructed as needed by led_manager
+                },
+                state: ManagerState {
+                    first_run: true,
+                    call_time: SystemTime::now(),
+                    keepalive: true,
+                    led_state: LedState {
+                        failures: 0,
+                        queue_lengths: Vec::new(),
+                    },
+                    led_thread_channels: Vec::new(),
+                },
+                io: IOHandles {
+                    data_file_buf: None,
+                    esp_data_file_buf: None,
+                    udp_socket: None,
+                    serial_port: Vec::new(),
+                },
+                vision: VisionData {
+                    frame_cam_1: Default::default(),
+                    frame_cam_2: Default::default(),
+                },
+            }));
+        }
+
+        let owned_options = config_holder.unity_options.clone();
+        let owned_config = config_holder.clone();
+        children.push(
+            thread::Builder::new()
+                .name("get_events".to_string())
+                .spawn(move || {
+                    debug!("inside thread");
+                    match get_events(
+                        owned_manager,
+                        &owned_options.clone(),
+                        &owned_config,
+                        &owned_options.unity_ports.clone()[i as usize],
+                        &None,
+                    ) {
+                        Ok(_) => {
+                            debug!("thread exited??")
+                        }
+                        Err(e) => {
+                            panic!("get_events thread crashed with error: {e}")
+                        }
+                    }
+                })
+                .unwrap(),
+        )
+    }
+
+    for child in children {
+        match child.join() {
+            Ok(_) => {}
+            Err(e) => {
+                error!("Couldn't join child thread {e:?}")
+            }
+        };
+    }
 }
