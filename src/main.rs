@@ -1,5 +1,3 @@
-use gumdrop::Options;
-use log::{debug, error, info}; // TODO: Depreceate unity export byte data
 use std::{
     env,
     fs::File,
@@ -7,18 +5,20 @@ use std::{
     path::{Path, PathBuf},
     process,
     sync::{Arc, Mutex},
-    thread::{self},
-    time::SystemTime,
 };
+
+use gumdrop::Options;
+use log::{error, info}; // TODO: Depreceate unity export byte data
 #[cfg(feature = "gui")]
 use svled::gui;
-
 #[cfg(feature = "scan")]
 use svled::scan;
-
 use svled::{
-    demo, driver_wizard, led_manager::set_color, read_vled, speedtest, unity, utils, IOHandles,
-    LedState, ManagerData, ManagerState, RuntimeConfig, VisionData,
+    demo, driver_wizard,
+    led_manager::{self, set_color},
+    read_vled, speedtest,
+    unity::{self, start_listeners},
+    utils,
 };
 
 #[derive(Debug, Options)]
@@ -53,8 +53,15 @@ enum Command {
     #[options(help = "calibrate a svled container")]
     Calibrate(CalibrateOptions),
 
-    #[options(help = "connect to Unity")]
+    #[options(help = "send positions and connect to Unity")]
     Unity(UnityCommandOptions),
+
+    #[options(help = "send positions to Unity")]
+    SendPos(SendPosOptions),
+
+    #[options(help = "connect to Unity")]
+    ConnectUnity(ConnectUnity),
+
     #[cfg(feature = "gui")]
     #[options(help = "launch the GUI")]
     Gui(GuiOptions),
@@ -62,8 +69,11 @@ enum Command {
     #[options(help = "interactively create a ino/cpp file for your LED driver")]
     DriverWizard(DriverWizardOptions),
 
-    #[options(help = "set a single led's color")]
+    #[options(help = "set a single leds color")]
     SetColor(SetColorOptions),
+
+    #[options(help = "clear the strip")]
+    Clear(ClearOptions),
 
     #[options(help = "run a simple demo")]
     Demo(DemoOptions),
@@ -97,6 +107,12 @@ struct CalibrateOptions {}
 #[derive(Debug, Options)]
 struct UnityCommandOptions {}
 
+#[derive(Debug, Options)]
+struct SendPosOptions {}
+
+#[derive(Debug, Options)]
+struct ConnectUnity {}
+
 #[cfg(feature = "gui")]
 #[derive(Debug, Options)]
 struct GuiOptions {}
@@ -106,6 +122,9 @@ struct DriverWizardOptions {}
 
 #[derive(Debug, Options)]
 struct DemoOptions {}
+
+#[derive(Debug, Options)]
+struct ClearOptions {}
 
 type JsonEntry = Vec<(String, (f32, f32), (f32, f32))>;
 
@@ -185,108 +204,26 @@ fn main() {
         match unity::send_pos(unity_options.clone()) {
             Ok(_) => {}
             Err(e) => {
-                panic!("There was an issue connecting to Unity: {}", e);
+                panic!("There was an issue connecting to Unity: {e}");
             }
         };
-        let mut children = Vec::new();
 
         info!("Spawning listening threads");
 
-        for i in 0..unity_options.num_container {
-            debug!("Spawning listening thread.");
+        start_listeners(&config_holder, &manager);
+    } else if let Some(Command::SendPos(ref _sendpos_options)) = opts.command {
+        info!("Sending positions to Unity");
 
-            let owned_manager;
-
-            {
-                let manager = manager.lock().unwrap();
-                owned_manager = Arc::new(Mutex::new(ManagerData {
-                    config: RuntimeConfig {
-                        num_led: config_holder.num_led,
-                        num_strips: config_holder.num_strips,
-                        communication_mode: config_holder.communication_mode,
-                        host: config_holder.host,
-                        port: config_holder.port,
-                        serial_port_paths: manager.config.serial_port_paths.clone(),
-                        baud_rate: config_holder.baud_rate,
-                        serial_read_timeout: manager.config.serial_read_timeout,
-                        record_data: manager.config.record_data,
-                        record_data_file: manager.config.record_data_file.clone(),
-                        record_esp_data: manager.config.record_esp_data,
-                        unity_controls_recording: manager.config.unity_controls_recording,
-                        record_esp_data_file: manager.config.record_esp_data_file.clone(),
-                        print_send_back: config_holder.advanced.print_send_back,
-                        udp_read_timeout: config_holder.advanced.udp_read_timeout,
-                        con_fail_limit: config_holder.advanced.con_fail_limit,
-                        no_controller: config_holder.advanced.no_controller,
-                        scan_mode: config_holder.scan_mode,
-                        filter_color: config_holder.filter_color,
-                        filter_range: config_holder.filter_range,
-                        hsv_red_override: config_holder.advanced.hsv_red_override.clone(),
-                        hsv_green_override: config_holder.advanced.hsv_green_override.clone(),
-                        hsv_blue_override: config_holder.advanced.hsv_blue_override.clone(),
-                        no_video: config_holder.advanced.no_video,
-                        skip_confirmation: config_holder.advanced.skip_confirmation,
-                        use_queue: config_holder.advanced.use_queue,
-                        queue_size: config_holder.advanced.queue_size,
-                        led_config: None, // This will be constructed as needed by led_manager
-                    },
-                    state: ManagerState {
-                        first_run: true,
-                        call_time: SystemTime::now(),
-                        keepalive: true,
-                        led_state: LedState {
-                            failures: 0,
-                            queue_lengths: Vec::new(),
-                        },
-                        led_thread_channels: Vec::new(),
-                    },
-                    io: IOHandles {
-                        data_file_buf: None,
-                        esp_data_file_buf: None,
-                        udp_socket: None,
-                        serial_port: Vec::new(),
-                    },
-                    vision: VisionData {
-                        frame_cam_1: Default::default(),
-                        frame_cam_2: Default::default(),
-                    },
-                }));
+        match unity::send_pos(unity_options.clone()) {
+            Ok(_) => {}
+            Err(e) => {
+                panic!("There was an issue connecting to Unity: {e}");
             }
+        };
+    } else if let Some(Command::ConnectUnity(ref _connectunity_options)) = opts.command {
+        info!("Spawning listening threads");
 
-            let owned_options = unity_options.clone();
-            let owned_config = config_holder.clone();
-            children.push(
-                thread::Builder::new()
-                    .name("get_events".to_string())
-                    .spawn(move || {
-                        debug!("inside thread");
-                        match unity::get_events(
-                            owned_manager,
-                            &owned_options.clone(),
-                            &owned_config,
-                            &owned_options.unity_ports.clone()[i as usize],
-                            &None,
-                        ) {
-                            Ok(_) => {
-                                debug!("thread exited??")
-                            }
-                            Err(e) => {
-                                panic!("get_events thread crashed with error: {}", e)
-                            }
-                        }
-                    })
-                    .unwrap(),
-            )
-        }
-
-        for child in children {
-            match child.join() {
-                Ok(_) => {}
-                Err(e) => {
-                    error!("Couldn't join child thread {:?}", e)
-                }
-            };
-        }
+        start_listeners(&config_holder, &manager);
     } else if let Some(Command::DriverWizard(ref _driver_wizard_options)) = opts.command {
         info!("Starting driver configuration wizard!");
         driver_wizard::wizard();
@@ -343,6 +280,10 @@ fn main() {
             demo::rainbow(&manager, &json, 80.0, 50.0, false, demo::Axis::X, true);
             demo::rainbow(&manager, &json, 50.0, 50.0, false, demo::Axis::Y, true);
             demo::rainbow(&manager, &json, 80.0, 50.0, false, demo::Axis::Z, true);
+        }
+    } else if let Some(Command::Clear(ref _clear_options)) = opts.command {
+        for n in 0..config_holder.num_led {
+            led_manager::set_color(&manager, n as u16, 0, 0, 0);
         }
     }
 
