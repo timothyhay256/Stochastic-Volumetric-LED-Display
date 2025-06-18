@@ -1,6 +1,3 @@
-use crossbeam_channel::{bounded, Receiver, Sender};
-use log::{debug, error, info, warn};
-use serialport::SerialPort;
 use std::{
     env,
     io::{BufWriter, ErrorKind::WouldBlock, Write},
@@ -11,6 +8,10 @@ use std::{
     thread,
     time::{Duration, SystemTime},
 };
+
+use crossbeam_channel::{bounded, Receiver, Sender};
+use log::{debug, error, info, warn};
+use serialport::SerialPort;
 
 use crate::{utils::ManagerData, LedConfig, LedState, Task};
 
@@ -58,7 +59,7 @@ fn dispatch_threads(manager: &ManagerData) -> Vec<Sender<Task>> {
             .open()
         {
             Ok(port) => port,
-            Err(e) => panic!("Could not open {}: {}", path, e),
+            Err(e) => panic!("Could not open {path}: {e}"),
         };
 
         debug!("Dispatching thread!");
@@ -177,7 +178,7 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
                                     warn!("Modifying instruction to disk by 1 to prevent parsing error!"); // This is a timing instruction, so we cannot let it be written.
                                     writeln!(data_file_buf, "{}|{}|{}|{}", n, r + 1, g, b).expect("Could not write to data_file_buf!");
                                 } else {
-                                    writeln!(data_file_buf, "{}|{}|{}|{}", n, r, g, b).expect("Could not write to data_file_buf!");
+                                    writeln!(data_file_buf, "{n}|{r}|{g}|{b}").expect("Could not write to data_file_buf!");
                                 }
                             }
                             None => error!("record_data is true, but data_file_buf is None! Something has gone very wrong, please report this.")
@@ -191,7 +192,7 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
                                     // debug!("Detected integer overflow, adding to other element");
                                     for i in 1..=5 {
                                         // Indicates a timing instruction, as it is unlikely that LED 1 will be set to 2,3,4 (r,g,b)
-                                        write!(esp_data_file_buf, "{:#x}, ", i).expect("Could not write to esp_data_file_buf!");
+                                        write!(esp_data_file_buf, "{i:#x}, ").expect("Could not write to esp_data_file_buf!");
                                     }
                                     write!(esp_data_file_buf, "{:#x}, ", 255).expect("Could not write to esp_data_file_buf!");
 
@@ -200,18 +201,18 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
                                 if millis > 0 {
                                     // debug!("No longer or not overflow.");
                                     for i in 1..=5 {
-                                        write!(esp_data_file_buf, "{:#x}, ", i).expect("Could not write to esp_data_file_buf!");
+                                        write!(esp_data_file_buf, "{i:#x}, ").expect("Could not write to esp_data_file_buf!");
                                     }
-                                    write!(esp_data_file_buf, "{:#x}, ", millis).expect("Could not write to esp_data_file_buf!");
+                                    write!(esp_data_file_buf, "{millis:#x}, ").expect("Could not write to esp_data_file_buf!");
                                 }
-                                write!(esp_data_file_buf, "{:#x}, {:#x}, {:#x}, {:#x}, ", n, r, g, b).expect("Could not write to esp_data_file_buf!");
+                                write!(esp_data_file_buf, "{n:#x}, {r:#x}, {g:#x}, {b:#x}, ").expect("Could not write to esp_data_file_buf!");
                             }
                             None => error!("record_esp_data is true, but esp_data_file_buf is None!, Something has gone very wrong, please report this.")
                         }
                             }
                         }
                     }
-                    Err(e) => println!("Error: {}", e),
+                    Err(e) => println!("Error: {e}"),
                 }
             }
 
@@ -295,7 +296,7 @@ fn send_color_command(manager_or_config: SendCommandArgs, n: u16, r: u8, g: u8, 
                                         .open()
                                     {
                                         Ok(port) => port,
-                                        Err(e) => panic!("Could not open {}: {}", path, e),
+                                        Err(e) => panic!("Could not open {path}: {e}"),
                                     },
                                 );
                             }
@@ -340,7 +341,7 @@ fn send_color_command(manager_or_config: SendCommandArgs, n: u16, r: u8, g: u8, 
             udp_socket.get_or_insert_with(|| {
                 debug!("Binding to 0.0.0.0:{}", config.port);
                 UdpSocket::bind(format!("0.0.0.0:{}", config.port))
-                    .unwrap_or_else(|e| panic!("Could not bind: {}", e))
+                    .unwrap_or_else(|e| panic!("Could not bind: {e}"))
             });
 
             match udp_socket.as_mut() {
@@ -357,8 +358,7 @@ fn send_color_command(manager_or_config: SendCommandArgs, n: u16, r: u8, g: u8, 
                         Ok(_) => {}
                         Err(e) => {
                             error!(
-                            "Could not write bytes to UDP socket: {}, trying to continue anyway",
-                            e
+                            "Could not write bytes to UDP socket: {e}, trying to continue anyway"
                         )
                         }
                     }
@@ -382,13 +382,13 @@ fn send_color_command(manager_or_config: SendCommandArgs, n: u16, r: u8, g: u8, 
                             {
                                 Ok(_) => {}
                                 Err(e) => {
-                                    error!("Could not write bytes to UDP socket: {}, trying to continue anyway", e)
+                                    error!("Could not write bytes to UDP socket: {e}, trying to continue anyway")
                                 }
                             }
                             state.failures += 1
                         }
                         Err(e) => {
-                            error!("An error occurred sending data: {}", e);
+                            error!("An error occurred sending data: {e}");
                         }
                     }
 
@@ -433,7 +433,7 @@ fn send_color_command(manager_or_config: SendCommandArgs, n: u16, r: u8, g: u8, 
                         );
                     }
                     Err(e) => {
-                        error!("print_send_back could not read serial port: {}", e);
+                        error!("print_send_back could not read serial port: {e}");
                     }
                 };
             } else if !config.skip_confirmation.unwrap_or(false) {

@@ -1,8 +1,3 @@
-use crossbeam_channel::Sender;
-use log::{debug, error, info, warn}; // TODO: Depreceate unity export byte data
-use opencv::prelude::*;
-use serde::Deserialize;
-use serialport::SerialPort;
 use std::{
     error::Error,
     fs::{remove_file, File},
@@ -12,6 +7,12 @@ use std::{
     sync::{Arc, Mutex},
     time::SystemTime,
 };
+
+use crossbeam_channel::Sender;
+use log::{debug, error, info, warn}; // TODO: Depreceate unity export byte data
+use opencv::prelude::*;
+use serde::Deserialize;
+use serialport::SerialPort;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Config {
@@ -252,13 +253,13 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
             if communication_mode == 2 {
                 for path in serial_port_paths.iter() {
                     if Path::new(&path).exists() {
-                        info!("Using serial for communication on {}!", path);
+                        info!("Using serial for communication on {path}!");
                     } else {
-                        panic!("Serial port {} does not exist!", path);
+                        panic!("Serial port {path} does not exist!");
                     }
                 }
             } else if communication_mode == 1 {
-                info!("Using udp for communication at {} on port {}", host, port);
+                info!("Using udp for communication at {host} on port {port}");
             }
         }
     }

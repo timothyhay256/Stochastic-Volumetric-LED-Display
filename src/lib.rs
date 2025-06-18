@@ -15,13 +15,12 @@ pub mod utils;
 // #[cfg(feature = "gui")]
 // pub use gui::main;
 
-#[cfg(feature = "scan")]
-pub use scan::scan;
-
 pub use demo::rainbow;
 pub use driver_wizard::wizard;
 pub use led_manager::set_color;
 pub use read_vled::read_vled;
+#[cfg(feature = "scan")]
+pub use scan::scan;
 pub use speedtest::speedtest;
 pub use unity::{get_events, send_pos, signal_restart};
 pub use utils::*;
