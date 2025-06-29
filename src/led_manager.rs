@@ -84,18 +84,21 @@ fn dispatch_threads(manager: &ManagerData) -> Vec<Sender<Task>> {
             }
 
             let mut queue_total_lengths: u32 = 0;
-            for n in owned_state
-                .queue_lengths
-                .iter()
-                .take((owned_state.queue_lengths.len() - 1) + 1)
-            {
-                queue_total_lengths += owned_state.queue_lengths[*n as usize] as u32;
+
+            if !owned_state.queue_lengths.is_empty() {
+                for n in owned_state
+                    .queue_lengths
+                    .iter()
+                    .take((owned_state.queue_lengths.len() - 1) + 1)
+                {
+                    queue_total_lengths += owned_state.queue_lengths[*n as usize] as u32;
+                }
+                debug!(
+                    "Average queue length: {}",
+                    queue_total_lengths / owned_state.queue_lengths.len() as u32
+                );
+                debug!("socket worker thread exiting!");
             }
-            debug!(
-                "Average queue length: {}",
-                queue_total_lengths / owned_state.queue_lengths.len() as u32
-            );
-            debug!("socket worker thread exiting!");
         });
     }
 
@@ -188,24 +191,20 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
                                 match manager.io.esp_data_file_buf.as_mut() {
                             Some(esp_data_file_buf) => {
                                 while millis > 255 {
-                                    // Adds overflows where we can't store above 255 ms
-                                    // debug!("Detected integer overflow, adding to other element");
-                                    for i in 1..=5 {
-                                        // Indicates a timing instruction, as it is unlikely that LED 1 will be set to 2,3,4 (r,g,b)
-                                        write!(esp_data_file_buf, "{i:#x}, ").expect("Could not write to esp_data_file_buf!");
-                                    }
-                                    write!(esp_data_file_buf, "{:#x}, ", 255).expect("Could not write to esp_data_file_buf!");
-
+                                    // Delay marker + max duration
+                                    write!(esp_data_file_buf, "0xFE, 0xFF, ").expect("Failed to write delay");
                                     millis -= 255;
                                 }
                                 if millis > 0 {
-                                    // debug!("No longer or not overflow.");
-                                    for i in 1..=5 {
-                                        write!(esp_data_file_buf, "{i:#x}, ").expect("Could not write to esp_data_file_buf!");
-                                    }
-                                    write!(esp_data_file_buf, "{millis:#x}, ").expect("Could not write to esp_data_file_buf!");
+                                    write!(esp_data_file_buf, "0xFE, {millis:#04X}, ").expect("Failed to write delay");
                                 }
-                                write!(esp_data_file_buf, "{n:#x}, {r:#x}, {g:#x}, {b:#x}, ").expect("Could not write to esp_data_file_buf!");
+
+                                let n_bytes = n.to_le_bytes();
+                                write!(
+                                    esp_data_file_buf,
+                                    "0x{0:02X}, 0x{1:02X}, 0x{2:02X}, 0x{3:02X}, 0x{4:02X}, ",
+                                    n_bytes[0], n_bytes[1], r, g, b
+                                ).expect("Failed to write LED data");                            
                             }
                             None => error!("record_esp_data is true, but esp_data_file_buf is None!, Something has gone very wrong, please report this.")
                         }
@@ -413,7 +412,7 @@ fn send_color_command(manager_or_config: SendCommandArgs, n: u16, r: u8, g: u8, 
                 Ok(_) => {}
                 Err(e) => {
                     panic!(
-                        "Could not write bytes to {}:{}",
+                        "Could not write bytes to {}: {}",
                         serial_port.name().unwrap(),
                         e
                     )
