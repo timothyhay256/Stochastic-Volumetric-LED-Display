@@ -1652,7 +1652,7 @@ fn scan_area_cycle(
     second_cam: bool,
     window: &str,
 ) -> Result<(i32, i32), Box<dyn Error>> {
-    let capture_frames = 1; // Increase me if calibration appears scrambled to ensure the video buffer is empty.
+    let capture_frames = 3; // Increase me if calibration appears scrambled to ensure the video buffer is empty.
 
     let mut success = 0;
     let mut failures = 0;
