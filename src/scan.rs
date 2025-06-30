@@ -377,8 +377,8 @@ pub fn scan(
         {
             data.lock().unwrap().invert = true;
         }
-        info!("Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.");
-        highgui::set_window_title(window, "Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.")?;
+        info!("Please rotate the container 180 degrees to recalibrate failures. Press space to continue.");
+        highgui::set_window_title(window, "Please rotate the container 180 degrees to recalibrate failures. Press space to continue.")?;
         match wait(data.clone(), &cam, window) {
             Ok(_) => {}
             Err(e) => {
@@ -414,21 +414,21 @@ pub fn scan(
                 }
             }
         }
-        info!("Please rotate the container 270 degrees to calibrate Z. Press any key to continue."); // The LEDS will be 180 degrees away from the original position, and they need to be rotated 270 degrees in this case to go to the appropriate Z calibration position.
+        info!("Please rotate the container 270 degrees to calibrate Z. Press space to continue."); // The LEDS will be 180 degrees away from the original position, and they need to be rotated 270 degrees in this case to go to the appropriate Z calibration position.
         highgui::set_window_title(
             window,
-            "Please rotate the container 270 degrees to calibrate Z. Press any key to continue.",
+            "Please rotate the container 270 degrees to calibrate Z. Press space to continue.",
         )?;
     }
 
     if !config.multi_camera {
         if failures == 0 && !streamlined {
             info!(
-                "Please rotate the container 90 degrees to calibrate Z. Press any key to continue."
+                "Please rotate the container 90 degrees to calibrate Z. Press space to continue."
             );
             highgui::set_window_title(
                 window,
-                "Please rotate the container 90 degrees to calibrate Z. Press any key to continue.",
+                "Please rotate the container 90 degrees to calibrate Z. Press space to continue.",
             )?;
         }
         match wait(data.clone(), &cam, window) {
@@ -470,8 +470,8 @@ pub fn scan(
             {
                 data.lock().unwrap().invert = true;
             }
-            info!("Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.");
-            highgui::set_window_title(window, "Please rotate the container 180 degrees to recalibrate failures. Press any key to continue.")?;
+            info!("Please rotate the container 180 degrees to recalibrate failures. Press space to continue.");
+            highgui::set_window_title(window, "Please rotate the container 180 degrees to recalibrate failures. Press space to continue.")?;
             match wait(data.clone(), &cam, window) {
                 Ok(_) => {}
                 Err(e) => {
@@ -1005,7 +1005,7 @@ pub fn select_brightest(
         }
 
         let key = highgui::wait_key(10)?;
-        if key > 0 && key != 255 {
+        if key == 32 && key != 255 {
             if x_guard != 0 && y_guard != 0 {
                 let filter_color = manager.config.filter_color.unwrap();
                 // let hsv_override ;
@@ -1208,7 +1208,7 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
         Some(x1_end.clone()),
         Some(y1_end.clone()),
         window,
-        "Please drag the mouse around the container. Press any key to continue".to_string(),
+        "Please drag the mouse around the container. Press space to continue".to_string(),
         true,
     ) {
         Ok((x_start, x_end, y_start, y_end)) => (x_start, x_end, y_start, y_end),
@@ -1247,7 +1247,7 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
             Some(x2_end),
             Some(y2_end),
             window,
-            "Please drag the mouse around the second container. Press any key to continue"
+            "Please drag the mouse around the second container. Press space to continue"
                 .to_string(),
             true,
         )
@@ -1349,7 +1349,7 @@ fn callback_loop(
             }
 
             let key = highgui::wait_key(10)?;
-            if key > 0 && key != 255 {
+            if key == 32 && key != 255 {
                 if x_start_guard != 0 && x_end_guard != 0 {
                     // highgui::destroy_all_windows().unwrap();
                     // highgui::destroy_all_windows().unwrap();
@@ -1408,7 +1408,7 @@ fn callback_loop(
             }
 
             let key = highgui::wait_key(10)?;
-            if key > 0 && key != 255 {
+            if key == 32 && key != 255 {
                 if x_guard != 0 && y_guard != 0 {
                     // highgui::destroy_all_windows().unwrap();
                     break Ok((x_guard, y_guard, None, None));
@@ -1855,7 +1855,7 @@ pub fn wait(
         }
 
         let key = highgui::wait_key(10)?;
-        if key > 0 && key != 255 {
+        if key == 32 && key != 255 {
             break;
         }
     }
