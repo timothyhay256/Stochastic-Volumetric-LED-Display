@@ -200,13 +200,13 @@ fn main() {
             let len = json.len();
 
             output_string.push_str(&format!(
-                "static constexpr std::array<std::array<int16_t, 2>, {len}> coords = {{{{"
+                "static constexpr std::array<std::array<int16_t, 3>, {len}> coords = {{{{"
             ));
 
             for (index, entry) in json.iter().enumerate() {
                 output_string.push_str(&format!(
-                    "{{{}, {}}}, {{{}, {}}}",
-                    entry.1 .0, entry.1 .1, entry.2 .0, entry.2 .1
+                    "{{{}, {}, {}}}",
+                    entry.1 .0, entry.1 .1, entry.2 .1
                 ));
 
                 if index == len - 1 {
@@ -234,7 +234,7 @@ fn main() {
     if let Some(Command::Speedtest(ref _speedtest_options)) = opts.command {
         info!("Performing speedtest...");
 
-        speedtest::speedtest(&manager, config_holder.num_led, 10000);
+        speedtest::speedtest(&manager, config_holder.num_led, 40000);
     } else if let Some(Command::ReadVled(ref readvled_options)) = opts.command {
         if !readvled_options.vled_file.is_file() {
             error!("You must pass a valid vled file with --vled-file!");

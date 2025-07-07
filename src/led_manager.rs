@@ -1,6 +1,6 @@
 use std::{
     env,
-    io::{BufWriter, ErrorKind::WouldBlock, Write},
+    io::{BufWriter, ErrorKind::WouldBlock, IoSlice, Write},
     net::UdpSocket,
     path::{Path, PathBuf},
     process,
@@ -408,7 +408,7 @@ fn send_color_command(manager_or_config: SendCommandArgs, n: u16, r: u8, g: u8, 
             let mut msg: [u8; 7] = [0; 7];
             msg[2..4].copy_from_slice(&n.to_le_bytes());
             msg = [0xFF, 0xBB, msg[2], msg[3], r, g, b]; // 0xFF & 0xBB indicate a start of packet.
-            match serial_port.write_all(&msg) {
+            match serial_port.write_vectored(&[IoSlice::new(&msg)]) {
                 Ok(_) => {}
                 Err(e) => {
                     panic!(
@@ -443,14 +443,14 @@ fn send_color_command(manager_or_config: SendCommandArgs, n: u16, r: u8, g: u8, 
                     match serial_port.read_exact(serial_buf.as_mut_slice()) {
                         Ok(_) => break,
                         Err(e) => {
-                            error!("Could not read from {}: {}", serial_port.name().unwrap(), e)
+                            warn!("Could not read from {}: {}", serial_port.name().unwrap(), e)
                         }
                     }
                     failures += 1;
 
                     if failures >= config.serial_read_timeout.unwrap_or(200) {
                         error!(
-                            "Did not receive confirmation byte after {}ms! Continuing anyway!",
+                            "Did not receive confirmation byte after {}ms! Ignoring and continuing anyway!",
                             config.serial_read_timeout.unwrap_or(200)
                         );
                         break;
