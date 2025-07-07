@@ -22,7 +22,7 @@ pub fn speedtest(manager: &Arc<Mutex<ManagerData>>, num_led: u32, writes: u32) {
     for _n in 0..=writes {
         led_manager::set_color(
             manager,
-            rng.gen_range(0..(num_led as u16) - 1),
+            rng.gen_range(0..(num_led as u16)),
             rng.gen_range(0..255),
             rng.gen_range(0..255),
             rng.gen_range(0..255),

@@ -60,6 +60,13 @@ pub struct AdvancedConfig {
     pub queue_size: Option<usize>,
     pub skip_confirmation: Option<bool>, // Should we skip checking if the LED was properly set? Speeds things way up at the cost of accuracy.
     pub crop_override: Option<Vec<i32>>, // When set, cropping will be skipped.
+    pub demo_options: Option<DemoConfig>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct DemoConfig {
+    // Used for gyroscope demo
+    pub gyro_port: i32,
 }
 
 #[derive(Deserialize, Clone, Debug)]
