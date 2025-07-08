@@ -8,7 +8,12 @@ use std::{
 };
 
 use gumdrop::Options;
-use log::{error, info}; // TODO: Depreceate unity export byte data
+use log::{error, info};
+use opencv::{
+    core::{Mat, MatTraitConst},
+    videoio::{self, VideoCaptureTrait, VideoCaptureTraitConst},
+};
+// TODO: Depreceate unity export byte data
 #[cfg(feature = "gui")]
 use svled::gui;
 #[cfg(feature = "scan")]
@@ -80,6 +85,9 @@ enum Command {
 
     #[options(help = "convert an led position json into a C++ compatible constant")]
     ConvertLedpos(ConvertLedposOptions),
+
+    #[options(help = "list functioning camera indexes")]
+    ListCams(ListCamsOptions),
 }
 
 #[derive(Debug, Options)]
@@ -139,6 +147,15 @@ struct ConvertLedposOptions {
 
     #[options(help = "output file")]
     output: Option<String>,
+}
+
+#[derive(Debug, Options)]
+struct ListCamsOptions {
+    #[options(help = "which index to start search at")]
+    lower_index: Option<i32>,
+
+    #[options(help = "which index to end search at")]
+    upper_index: Option<i32>,
 }
 
 type JsonEntry = Vec<(String, (f32, f32), (f32, f32))>;
@@ -220,6 +237,41 @@ fn main() {
         } else {
             error!("{} not found", path.display());
         }
+        return;
+    } else if let Some(Command::ListCams(ref list_cams_options)) = opts.command {
+        let lower_index = list_cams_options.lower_index.unwrap_or(0);
+        let upper_index = list_cams_options.upper_index.unwrap_or(10);
+
+        let mut working_cameras = Vec::new();
+        info!("Testing camera indices from {lower_index} to {upper_index}");
+
+        for index in lower_index..=upper_index {
+            let mut cap = match videoio::VideoCapture::new(index, videoio::CAP_ANY) {
+                Ok(c) => c,
+                Err(_) => {
+                    info!("Camera {index} is not available (error opening).");
+                    continue;
+                }
+            };
+
+            if cap.is_opened().unwrap() {
+                let mut frame = Mat::default();
+                let ret = cap.read(&mut frame).unwrap();
+
+                if ret && !frame.empty() {
+                    info!("Camera {index} is working.");
+                    working_cameras.push(index);
+                } else {
+                    info!("Camera {index} opened but failed to read frame.");
+                }
+            } else {
+                info!("Camera {index} is not available.");
+            }
+            cap.release().unwrap();
+        }
+
+        info!("\nWorking camera indices: {working_cameras:?}");
+
         return;
     }
 

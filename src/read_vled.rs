@@ -31,9 +31,7 @@ pub fn read_vled(manager: &Arc<Mutex<ManagerData>>, file: PathBuf) -> Result<(),
                 let index = match line.to_string().parse::<u16>() {
                     Ok(index) => index,
                     Err(e) => {
-                        panic!(
-                            "VLED was malformed: Attempted to convert {line} to u8: {e}"
-                        )
+                        panic!("VLED was malformed: Attempted to convert {line} to u8: {e}")
                     }
                 };
                 led_manager::set_color(manager, index, 0, 0, 0);
@@ -46,9 +44,7 @@ pub fn read_vled(manager: &Arc<Mutex<ManagerData>>, file: PathBuf) -> Result<(),
                     xs[i] = match el.to_string().parse::<u16>() {
                         Ok(el) => el,
                         Err(e) => {
-                            panic!(
-                                "VLED was malformed: Attempted to convert {el} to u8: {e}"
-                            )
+                            panic!("VLED was malformed: Attempted to convert {el} to u8: {e}")
                         }
                     };
                 }
@@ -60,9 +56,7 @@ pub fn read_vled(manager: &Arc<Mutex<ManagerData>>, file: PathBuf) -> Result<(),
                 let sleep = match line.to_string().parse::<u8>() {
                     Ok(sleep) => sleep,
                     Err(e) => {
-                        panic!(
-                            "VLED was malformed: Attempted to convert {line} to u8: {e}"
-                        )
+                        panic!("VLED was malformed: Attempted to convert {line} to u8: {e}")
                     }
                 };
                 // println!("Sleeping for {}");

@@ -61,6 +61,8 @@ pub struct AdvancedConfig {
     pub skip_confirmation: Option<bool>, // Should we skip checking if the LED was properly set? Speeds things way up at the cost of accuracy.
     pub crop_override: Option<Vec<i32>>, // When set, cropping will be skipped.
     pub demo_options: Option<DemoConfig>,
+    pub cam2_overhead: Option<bool>, // When true, assume the second camera is overhead
+    pub cam2_overhead_flip: Option<bool>, // When true, assume the overhead camera is upside down relative to the front camera
 }
 
 #[derive(Deserialize, Debug, Clone)]
