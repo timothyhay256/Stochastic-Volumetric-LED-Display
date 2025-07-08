@@ -74,8 +74,8 @@ filter_color = 0
 filter_range = 90
 color_bright = 45
 
-# video_width = 1280
-# video_height = 720
+video_width = 1280
+video_height = 720
 
 [unity_options]
 num_container = 1
@@ -102,4 +102,6 @@ get_events_widgets_pos_index = 0
 use_queue = true # When set to true, a queue and multiple threads are used in led_manager for large performance boosts. A side effect is that saving sequences to a file is unsupported due to the nature of the threads.
 queue_size = 5
 skip_confirmation = false
+cam2_overhead = true
+cam2_overhed_flip = true # When set to true, assume the overhead camera's bottom is the side opposite of the front camera.
 # crop_override = [0, 0, 1280, 720] # Optional example

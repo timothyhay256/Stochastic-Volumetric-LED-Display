@@ -199,9 +199,9 @@ pub fn get_events(
         let led_count = json.len();
         let mut y_max = i32::MIN;
 
-        for i in 0..led_count {
+        for item in json.iter().take(led_count) {
             // Get max and min values in led_pos
-            y_max = max((json[i].1 .1) as i32, y_max);
+            y_max = max((item.1 .1) as i32, y_max);
         }
 
         for i in 0..led_count {

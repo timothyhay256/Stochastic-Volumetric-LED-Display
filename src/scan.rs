@@ -1115,53 +1115,19 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
     let y2_end_guard = Arc::clone(&y2_end);
 
     let camera_active_guard = Arc::clone(&camera_active);
-    let mut actively_cropping = false;
 
     highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
-    highgui::set_mouse_callback(
+    set_crop_mouse_callback(
         window,
-        Some(Box::new(move |event, x, y, _flag| match event {
-            #[allow(non_snake_case)]
-            // EVENT_LBUTTONDOWN is defined in the OpenCV crate, so I can't change it.
-            EVENT_LBUTTONDOWN => {
-                debug!("lbuttondown");
-                actively_cropping = true;
-                if *camera_active_guard.lock().unwrap() == 0 {
-                    *x1_start_guard.lock().unwrap() = x;
-                    *y1_start_guard.lock().unwrap() = y;
-                } else if *camera_active_guard.lock().unwrap() == 1 {
-                    *x2_start_guard.lock().unwrap() = x;
-                    *y2_start_guard.lock().unwrap() = y;
-                }
-            }
-            #[allow(non_snake_case)]
-            EVENT_LBUTTONUP => {
-                debug!("lbuttonup");
-                actively_cropping = false;
-                if *camera_active_guard.lock().unwrap() == 0 {
-                    *x1_end_guard.lock().unwrap() = x;
-                    *y1_end_guard.lock().unwrap() = y;
-                } else if *camera_active_guard.lock().unwrap() == 1 {
-                    *x2_end_guard.lock().unwrap() = x;
-                    *y2_end_guard.lock().unwrap() = y;
-                }
-            }
-            #[allow(non_snake_case)]
-            EVENT_MOUSEMOVE => {
-                // debug!("mousemove");
-                if actively_cropping {
-                    if *camera_active_guard.lock().unwrap() == 0 {
-                        *x1_end_guard.lock().unwrap() = x;
-                        *y1_end_guard.lock().unwrap() = y;
-                    } else if *camera_active_guard.lock().unwrap() == 1 {
-                        *x2_end_guard.lock().unwrap() = x;
-                        *y2_end_guard.lock().unwrap() = y;
-                    }
-                }
-            }
-
-            _ => {}
-        })),
+        camera_active_guard.clone(),
+        x1_start_guard.clone(),
+        y1_start_guard.clone(),
+        x1_end_guard.clone(),
+        y1_end_guard.clone(),
+        x2_start_guard.clone(),
+        y2_start_guard.clone(),
+        x2_end_guard.clone(),
+        y2_end_guard.clone(),
     )?;
 
     let cam_guard = Arc::new(Mutex::new(videoio::VideoCapture::new(
@@ -1189,6 +1155,7 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
             )
         }
     };
+
     let x_start_result;
     let x_end_result;
     let y_start_result;
@@ -1214,6 +1181,23 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
         Ok((x_start, x_end, y_start, y_end)) => (x_start, x_end, y_start, y_end),
         Err(e) => panic!("Something went wrong during cropping: {e}"),
     };
+
+    drop(cam_guard);
+
+    highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
+    set_crop_mouse_callback(
+        window,
+        camera_active_guard.clone(),
+        x1_start_guard.clone(),
+        y1_start_guard.clone(),
+        x1_end_guard.clone(),
+        y1_end_guard.clone(),
+        x2_start_guard.clone(),
+        y2_start_guard.clone(),
+        x2_end_guard.clone(),
+        y2_end_guard.clone(),
+    )?;
+
     if let Some(index) = config.camera_index_2 {
         debug!("Cropping second camera with index {index}");
         *camera_active.lock().unwrap() = 1;
@@ -1239,6 +1223,7 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
                 panic!("Unable to open camera {index}! Please select another.")
             }
         };
+
         let loop_out = callback_loop(
             &cam_guard,
             manager,
@@ -1284,6 +1269,76 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
     Ok(pos)
 }
 
+pub fn set_crop_mouse_callback(
+    window: &str,
+    camera_active_guard: Arc<Mutex<i32>>,
+    x1_start_guard: Arc<Mutex<i32>>,
+    y1_start_guard: Arc<Mutex<i32>>,
+    x1_end_guard: Arc<Mutex<i32>>,
+    y1_end_guard: Arc<Mutex<i32>>,
+    x2_start_guard: Arc<Mutex<i32>>,
+    y2_start_guard: Arc<Mutex<i32>>,
+    x2_end_guard: Arc<Mutex<i32>>,
+    y2_end_guard: Arc<Mutex<i32>>,
+) -> opencv::Result<()> {
+    let mut actively_cropping = false;
+
+    highgui::set_mouse_callback(
+        window,
+        Some(Box::new(move |event, x, y, _flag| match event {
+            #[allow(non_snake_case)]
+            EVENT_LBUTTONDOWN => {
+                debug!("lbuttondown");
+                actively_cropping = true;
+                match *camera_active_guard.lock().unwrap() {
+                    0 => {
+                        *x1_start_guard.lock().unwrap() = x;
+                        *y1_start_guard.lock().unwrap() = y;
+                    }
+                    1 => {
+                        *x2_start_guard.lock().unwrap() = x;
+                        *y2_start_guard.lock().unwrap() = y;
+                    }
+                    _ => {}
+                }
+            }
+            #[allow(non_snake_case)]
+            EVENT_LBUTTONUP => {
+                debug!("lbuttonup");
+                actively_cropping = false;
+                match *camera_active_guard.lock().unwrap() {
+                    0 => {
+                        *x1_end_guard.lock().unwrap() = x;
+                        *y1_end_guard.lock().unwrap() = y;
+                    }
+                    1 => {
+                        *x2_end_guard.lock().unwrap() = x;
+                        *y2_end_guard.lock().unwrap() = y;
+                    }
+                    _ => {}
+                }
+            }
+            #[allow(non_snake_case)]
+            EVENT_MOUSEMOVE => {
+                if actively_cropping {
+                    match *camera_active_guard.lock().unwrap() {
+                        0 => {
+                            *x1_end_guard.lock().unwrap() = x;
+                            *y1_end_guard.lock().unwrap() = y;
+                        }
+                        1 => {
+                            *x2_end_guard.lock().unwrap() = x;
+                            *y2_end_guard.lock().unwrap() = y;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        })),
+    )
+}
+
 fn callback_loop(
     cam: &Arc<Mutex<VideoCapture>>,
     manager: &Arc<Mutex<ManagerData>>,
@@ -1313,8 +1368,15 @@ fn callback_loop(
     loop {
         let mut frame = &mut manager.vision.frame_cam_1;
         cam.read(&mut frame)?;
+
         if crop {
-            // debug!("callback_loop in crop mode");
+            debug!("callback_loop in crop mode");
+            debug!(
+                "frame width: {} height: {}",
+                frame.size()?.width,
+                frame.size()?.height
+            );
+
             let x_end = x_end.clone().unwrap();
             let y_end = y_end.clone().unwrap();
 
@@ -1340,19 +1402,25 @@ fn callback_loop(
             )
             .expect("Could not draw a rectangle");
 
+            debug!("crop rectangle is {rect:?}");
+
             if let Some(no_video) = no_video {
                 if frame.size()?.width > 0 && !no_video {
                     highgui::imshow(window, frame)?;
                 } else {
-                    warn!("frame is too small! size: {:?}", frame.size()?);
+                    error!(
+                        "frame is too small! size: {:?} rect: {:?}, ",
+                        frame.size()?,
+                        rect
+                    );
                 }
             }
 
             let key = highgui::wait_key(10)?;
             if key == 32 && key != 255 {
                 if x_start_guard != 0 && x_end_guard != 0 {
-                    // highgui::destroy_all_windows().unwrap();
-                    // highgui::destroy_all_windows().unwrap();
+                    highgui::destroy_all_windows().unwrap();
+
                     break Ok((
                         x_start_guard,
                         x_end_guard,
@@ -1499,6 +1567,7 @@ pub fn scan_area(
 
         if valid_cycle {
             if config.multi_camera {
+                debug!("calling scan_area_cycle for cam2");
                 let scan_area_result = scan_area_cycle(
                     manager,
                     config,
@@ -1514,7 +1583,7 @@ pub fn scan_area(
                     (Some(scan_area_result.0), Some(scan_area_result.1));
             }
 
-            debug!("valid_cycle: {i}");
+            debug!("calling scan_area_cycle for cam1");
             (success, failures) = scan_area_cycle(
                 manager,
                 config,
@@ -1709,15 +1778,23 @@ fn scan_area_cycle(
             brightness,
         );
     }
+
     let mut frame = Mat::default();
     {
         let mut cam = cam.unwrap().lock().unwrap();
+
+        if config.video_width.is_some() && config.video_height.is_some() {
+            cam.set(CAP_PROP_FRAME_WIDTH, config.video_width.unwrap())?;
+            cam.set(CAP_PROP_FRAME_HEIGHT, config.video_height.unwrap())?;
+        }
+
         for _ in 0..capture_frames {
             // This is still needed unfortunately. It may need to be increased if you continue to encounter issues
             cam.read(&mut frame)?;
         }
     }
-    let mut frame = Mat::roi(
+
+    let mut frame = match Mat::roi(
         &frame,
         opencv::core::Rect {
             x: x_start,
@@ -1725,7 +1802,16 @@ fn scan_area_cycle(
             width: x_end - x_start,
             height: y_end - y_start,
         },
-    )?
+    ) {
+        Ok(frame) => frame,
+        Err(e) => panic!(
+            "Tried to crop frame with x: {x_start} y: {y_start} width: {} height: {} while frame dimensions are width: {} height: {}\ngot error: {e}",
+            x_end - x_start,
+            y_end - y_start,
+            frame.size()?.width,
+            frame.size()?.height
+        )
+    }
     .try_clone()?;
 
     if scan_data.invert {
@@ -1739,61 +1825,82 @@ fn scan_area_cycle(
 
     let (_, max_val, pos) = get_brightest_cam_1_pos(frame.try_clone()?);
 
-    if max_val
-        >= scan_data.pos.cam_1_darkest.unwrap()
-            + ((scan_data.pos.cam_1_brightest.unwrap() - scan_data.pos.cam_1_darkest.unwrap())
-                * 0.5)
-    {
-        debug!("Succesful xy calibration: {pos:?} on index: {i}");
-        success += 1;
-        imgproc::circle(
-            &mut frame,
-            pos,
-            20,
-            Scalar::new(0.0, 255.0, 0.0, 255.0),
-            2,
-            LINE_8,
-            0,
-        )?;
+    led_pos[i as usize] = {
+        let status_msg = {
+            if max_val
+                >= scan_data.pos.cam_1_darkest.unwrap()
+                    + ((scan_data.pos.cam_1_brightest.unwrap()
+                        - scan_data.pos.cam_1_darkest.unwrap())
+                        * 0.5)
+            {
+                debug!("Succesful xy calibration: {pos:?} on index: {i}");
+                success += 1;
+                imgproc::circle(
+                    &mut frame,
+                    pos,
+                    20,
+                    Scalar::new(0.0, 255.0, 0.0, 255.0),
+                    2,
+                    LINE_8,
+                    0,
+                )?;
+
+                if scan_data.depth || second_cam {
+                    "SUCCESS-Z"
+                } else {
+                    "SUCCESS-XY"
+                }
+            } else {
+                debug!("Failed xy calibration: {pos:?} on index: {i}");
+                failures += 1;
+                imgproc::circle(
+                    &mut frame,
+                    pos,
+                    20,
+                    Scalar::new(0.0, 0.0, 255.0, 255.0),
+                    2,
+                    LINE_8,
+                    0,
+                )?;
+
+                if scan_data.depth {
+                    "RECALIBRATE-Z"
+                } else {
+                    "RECALIBRATE-XY"
+                }
+            }
+        };
+
         if scan_data.depth || second_cam {
-            led_pos[i as usize] = (
-                "SUCCESS-Z".to_string(),
-                led_pos[i as usize].1,
-                Some((pos.x, pos.y)),
-            );
+            if config.advanced.cam2_overhead.unwrap_or(false) {
+                if config.advanced.cam2_overhead_flip.unwrap_or(false) {
+                    (
+                        status_msg.to_string(),
+                        led_pos[i as usize].1,
+                        Some((pos.y, pos.x)),
+                    )
+                } else {
+                    (
+                        status_msg.to_string(),
+                        led_pos[i as usize].1,
+                        Some((y_start + y_end - pos.y, pos.x)),
+                    )
+                }
+            } else {
+                (
+                    status_msg.to_string(),
+                    led_pos[i as usize].1,
+                    Some((pos.x, pos.y)),
+                )
+            }
         } else {
-            led_pos[i as usize] = (
-                "SUCCESS-XY".to_string(),
+            (
+                status_msg.to_string(),
                 (pos.x, pos.y),
                 led_pos[i as usize].2,
-            );
+            )
         }
-    } else {
-        debug!("Failed xy calibration: {pos:?} on index: {i}");
-        failures += 1;
-        imgproc::circle(
-            &mut frame,
-            pos,
-            20,
-            Scalar::new(0.0, 0.0, 255.0, 255.0),
-            2,
-            LINE_8,
-            0,
-        )?;
-        if scan_data.depth {
-            led_pos[i as usize] = (
-                "RECALIBRATE-Z".to_string(),
-                led_pos[i as usize].1,
-                Some((pos.x, pos.y)),
-            );
-        } else {
-            led_pos[i as usize] = (
-                "RECALIBRATE-XY".to_string(),
-                (pos.x, pos.y),
-                led_pos[i as usize].2,
-            );
-        }
-    }
+    };
 
     // Update frame_cam_x after all our modifications
     if second_cam {
@@ -1953,7 +2060,31 @@ pub fn manual_calibrate(
             } else {
                 debug!("pos is from callback");
                 led_pos[led_index].0 = "MANUAL-Z".to_string();
-                led_pos[led_index].2 = Some((*x_click.lock().unwrap(), *y_click.lock().unwrap()));
+                led_pos[led_index].2 = {
+                    if config.advanced.cam2_overhead.unwrap_or(false) {
+                        if config.advanced.cam2_overhead_flip.unwrap_or(false) {
+                            Some((*y_click.lock().unwrap(), *x_click.lock().unwrap()))
+                        } else {
+                            let (y_start, y_end) = {
+                                if config.multi_camera {
+                                    // We always get depth from second camera if multi-camera
+                                    (
+                                        scan_data.pos.y2_start.unwrap(),
+                                        scan_data.pos.y2_end.unwrap(),
+                                    )
+                                } else {
+                                    (scan_data.pos.y1_start, scan_data.pos.y1_end)
+                                }
+                            };
+                            Some((
+                                y_start + y_end - *y_click.lock().unwrap(),
+                                *x_click.lock().unwrap(),
+                            ))
+                        }
+                    } else {
+                        Some((*x_click.lock().unwrap(), *y_click.lock().unwrap()))
+                    }
+                };
                 pos = Point::new(*x_click.lock().unwrap(), *y_click.lock().unwrap());
                 color = Scalar::new(0.0, 255.0, 0.0, 255.0);
                 *callback_called.lock().unwrap() = false;
