@@ -94,10 +94,9 @@ pub fn scan(
         };
     }
 
-    let cam = Arc::new(Mutex::new(videoio::VideoCapture::new(
-        config.camera_index_1,
-        videoio::CAP_ANY,
-    )?)); // We need to constantly poll this in the background to get the most recent frame due to OpenCV bug(?)
+    let cam = Arc::new(Mutex::new(
+        get_cam(&config, &config.camera_index_1.to_string()).unwrap(),
+    )); // We need to constantly poll this in the background to get the most recent frame due to OpenCV bug(?)
 
     if config.video_width.is_some() && config.video_height.is_some() {
         cam.lock()
@@ -164,10 +163,9 @@ pub fn scan(
 
         if config.multi_camera {
             debug!("Getting second cam limits");
-            cam2 = Some(Arc::new(Mutex::new(videoio::VideoCapture::new(
-                config.camera_index_2.unwrap(),
-                videoio::CAP_ANY,
-            )?)));
+            cam2 = Some(Arc::new(Mutex::new(
+                get_cam(&config, &config.camera_index_2.clone().unwrap()).unwrap(),
+            )));
 
             if config.video_width.is_some() && config.video_height.is_some() {
                 cam2.as_ref()
@@ -229,10 +227,9 @@ pub fn scan(
 
     if config.multi_camera && !streamlined {
         highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
-        cam2 = Some(Arc::new(Mutex::new(videoio::VideoCapture::new(
-            config.camera_index_2.unwrap(),
-            videoio::CAP_ANY,
-        )?)));
+        cam2 = Some(Arc::new(Mutex::new(
+            get_cam(&config, &config.camera_index_2.clone().unwrap()).unwrap(),
+        )));
 
         if config.video_width.is_some() && config.video_height.is_some() {
             cam2.as_ref()
@@ -681,6 +678,7 @@ fn brightest_darkest(
             get_default_algorithm_hint().unwrap(),
         )
         .unwrap(); // Used to get our HSV
+
         imgproc::cvt_color(
             &frame.clone(),
             &mut frame,
@@ -1130,10 +1128,7 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
         y2_end_guard.clone(),
     )?;
 
-    let cam_guard = Arc::new(Mutex::new(videoio::VideoCapture::new(
-        config.camera_index_1,
-        videoio::CAP_ANY,
-    )?)); // callback_loop only accepts a Arc<Mutex<VideoCapture>>
+    let cam_guard = Arc::new(Mutex::new(get_cam(config, &config.camera_index_1).unwrap())); // callback_loop only accepts a Arc<Mutex<VideoCapture>>
 
     if config.video_width.is_some() && config.video_height.is_some() {
         cam_guard
@@ -1198,13 +1193,10 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
         y2_end_guard.clone(),
     )?;
 
-    if let Some(index) = config.camera_index_2 {
+    if let Some(index) = &config.camera_index_2 {
         debug!("Cropping second camera with index {index}");
         *camera_active.lock().unwrap() = 1;
-        let cam_guard = Arc::new(Mutex::new(videoio::VideoCapture::new(
-            index,
-            videoio::CAP_ANY,
-        )?));
+        let cam_guard = Arc::new(Mutex::new(get_cam(config, &index).unwrap()));
 
         if config.video_width.is_some() && config.video_height.is_some() {
             cam_guard
@@ -1708,7 +1700,7 @@ pub fn filter(mut frame: &mut Mat, filter_color: &u32, manager: &Arc<Mutex<Manag
     )
     .unwrap();
 
-    core::add_weighted(&frame.clone(), 0.3, &mask_color, 0.7, 0.0, &mut frame, -1).unwrap();
+    core::add_weighted(&frame.clone(), 0.1, &mask_color, 0.9, 0.0, &mut frame, -1).unwrap();
 }
 
 fn scan_area_cycle(
@@ -1721,7 +1713,7 @@ fn scan_area_cycle(
     second_cam: bool,
     window: &str,
 ) -> Result<(i32, i32), Box<dyn Error>> {
-    let capture_frames = 3; // Increase me if calibration appears scrambled to ensure the video buffer is empty.
+    let capture_frames = config.advanced.capture_frames.unwrap_or(3);
 
     let mut success = 0;
     let mut failures = 0;
@@ -1791,6 +1783,16 @@ fn scan_area_cycle(
         for _ in 0..capture_frames {
             // This is still needed unfortunately. It may need to be increased if you continue to encounter issues
             cam.read(&mut frame)?;
+        }
+
+        for _ in 0..50 {
+            // Mostly only needed when using RTSP
+            if !frame.empty() {
+                break;
+            } else {
+                debug!("capturing another frame as previous was empty");
+                cam.read(&mut frame)?;
+            }
         }
     }
 
@@ -2200,4 +2202,24 @@ pub fn post_process(led_pos: &mut PosEntry, led_count: u32) {
             led_pos[i as usize].2.unwrap().0 = z_mid + (z_mid - current_z);
         }
     }
+}
+
+pub fn get_cam(config: &Config, index_or_address: &str) -> Result<VideoCapture, Box<dyn Error>> {
+    let mut cam = match index_or_address.parse::<i32>() {
+        Ok(index) => videoio::VideoCapture::new(index, videoio::CAP_ANY)
+            .unwrap_or_else(|_| panic!("Could not open camera on index {index}")),
+        Err(_) => {
+            let mut cam = videoio::VideoCapture::default()?;
+            cam.open_file(&index_or_address, videoio::CAP_ANY)
+                .unwrap_or_else(|_| panic!("Could not open RTSP at {index_or_address}"));
+            cam
+        }
+    };
+
+    if config.video_width.is_some() && config.video_height.is_some() {
+        cam.set(CAP_PROP_FRAME_WIDTH, config.video_width.unwrap())?;
+        cam.set(CAP_PROP_FRAME_HEIGHT, config.video_height.unwrap())?;
+    }
+
+    Ok(cam)
 }

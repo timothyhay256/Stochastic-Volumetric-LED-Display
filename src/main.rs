@@ -270,7 +270,7 @@ fn main() {
             cap.release().unwrap();
         }
 
-        info!("\nWorking camera indices: {working_cameras:?}");
+        info!("\nWorking cameras: {working_cameras:?}");
 
         return;
     }

@@ -23,8 +23,8 @@ use opencv::{
 };
 
 use crate::{
-    led_manager, Config, GetEventsFrameBuffer, IOHandles, LedState, ManagerData, ManagerState,
-    RuntimeConfig, UnityOptions, VisionData,
+    led_manager, scan::get_cam, Config, GetEventsFrameBuffer, IOHandles, LedState, ManagerData,
+    ManagerState, RuntimeConfig, UnityOptions, VisionData,
 };
 
 type JsonEntry = Vec<(String, (f32, f32), (f32, f32))>;
@@ -239,7 +239,7 @@ pub fn get_events(
                 let mut cam2 = None;
 
                 let cam = Arc::new(Mutex::new(
-                    videoio::VideoCapture::new(config.camera_index_1, videoio::CAP_ANY).unwrap(),
+                    get_cam(&config, &config.camera_index_1).unwrap(),
                 ));
 
                 if config.video_width.is_some() && config.video_height.is_some() {
@@ -264,11 +264,7 @@ pub fn get_events(
 
                 if config.multi_camera {
                     cam2 = Some(Arc::new(Mutex::new(
-                        videoio::VideoCapture::new(
-                            config.camera_index_2.unwrap(),
-                            videoio::CAP_ANY,
-                        )
-                        .unwrap(),
+                        get_cam(&config, &config.camera_index_2.clone().unwrap()).unwrap(),
                     )));
 
                     if config.video_width.is_some() && config.video_height.is_some() {

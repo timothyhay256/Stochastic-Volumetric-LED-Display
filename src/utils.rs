@@ -30,8 +30,8 @@ pub struct Config {
     pub record_data_file: PathBuf,
     pub record_esp_data_file: PathBuf,
     pub multi_camera: bool,
-    pub camera_index_1: i32,
-    pub camera_index_2: Option<i32>,
+    pub camera_index_1: String,
+    pub camera_index_2: Option<String>,
     pub unity_options: UnityOptions,
     pub scan_mode: u32, // 0 is default, 1 filters by color first (Useful when you aren't scanning in perfect conditions)
     pub filter_color: Option<u32>, // 0 for red, 1 for green, 2 for blue
@@ -63,6 +63,7 @@ pub struct AdvancedConfig {
     pub demo_options: Option<DemoConfig>,
     pub cam2_overhead: Option<bool>, // When true, assume the second camera is overhead
     pub cam2_overhead_flip: Option<bool>, // When true, assume the overhead camera is upside down relative to the front camera
+    pub capture_frames: Option<i32>, // How many frames to capture before using the most recent. Needed because OpenCV will not always provide the most recent frame
 }
 
 #[derive(Deserialize, Debug, Clone)]
