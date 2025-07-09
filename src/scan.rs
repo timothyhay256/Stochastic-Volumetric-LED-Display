@@ -2241,52 +2241,6 @@ pub fn position_adjustment(led_pos: &mut PosEntry, config: &Config) {
         z_min = min(position.2 .0, z_min);
         z_max = max(position.2 .0, z_max);
     }
-    // Apply perspective distortion adjustment
-
-    let x_transform = config.advanced.transform.x_perspect_distort_adjust;
-    let y_transform = config.advanced.transform.y_perspect_distort_adjust;
-    let z_transform = config.advanced.transform.z_perspect_distort_adjust;
-
-    if x_transform.is_some() || y_transform.is_some() || z_transform.is_some() {
-        for position in led_pos.iter_mut() {
-            if let Some(z_transform_amount) = z_transform {
-                let reduction_factor = ((position.2 .0 as f32 / z_max as f32)
-                    * z_transform_amount as f32)
-                    .round() as i32;
-
-                if position.1 .0 > x_max / 2 {
-                    position.1 .0 -= reduction_factor;
-                } else if position.1 .0 < x_max / 2 {
-                    position.1 .0 += reduction_factor;
-                }
-            }
-
-            if let Some(y_transform_amount) = y_transform {
-                // TODO: Sanity check
-                let reduction_factor = ((position.1 .1 as f32 / z_max as f32)
-                    * y_transform_amount as f32)
-                    .round() as i32;
-
-                if position.2 .0 > x_max / 2 {
-                    position.2 .0 -= reduction_factor;
-                } else if position.2 .0 < x_max / 2 {
-                    position.2 .0 += reduction_factor;
-                }
-            }
-
-            if let Some(x_transform_amount) = x_transform {
-                let reduction_factor = ((position.1 .0 as f32 / z_max as f32)
-                    * x_transform_amount as f32)
-                    .round() as i32;
-
-                if position.1 .1 > x_max / 2 {
-                    position.1 .1 -= reduction_factor;
-                } else if position.1 .1 < x_max / 2 {
-                    position.1 .1 += reduction_factor;
-                }
-            }
-        }
-    }
 
     // Apply stretch/shrink
 
@@ -2313,6 +2267,58 @@ pub fn position_adjustment(led_pos: &mut PosEntry, config: &Config) {
                     } else if *coordinate < center {
                         *coordinate -= stretch_factor;
                     }
+                }
+            }
+        }
+    }
+
+    // Apply perspective distortion adjustment
+
+    let x_transform = config.advanced.transform.x_perspect_distort_adjust;
+    let y_transform = config.advanced.transform.y_perspect_distort_adjust;
+    let z_transform = config.advanced.transform.z_perspect_distort_adjust;
+
+    if x_transform.is_some() || y_transform.is_some() || z_transform.is_some() {
+        for position in led_pos.iter_mut() {
+            if let Some(z_transform_amount) = z_transform {
+                // Calculates reduction based on distance from front
+                let mut reduction_factor = ((position.2 .0 as f32 / z_max as f32)
+                    * z_transform_amount as f32)
+                    .round() as i32;
+
+                // Reduces reduction based on distance from center
+                let x_mid = (x_max as f32 / 2.0).round() as i32;
+                reduction_factor *= (position.1 .0 - x_mid).abs() / x_mid;
+
+                if position.1 .0 > x_max / 2 {
+                    position.1 .0 = (position.1 .0 - reduction_factor).max(x_max / 2);
+                } else if position.1 .0 < x_max / 2 {
+                    position.1 .0 = (position.1 .0 + reduction_factor).min(x_max / 2);
+                }
+            }
+
+            if let Some(y_transform_amount) = y_transform {
+                // TODO: Sanity check
+                let reduction_factor = ((position.1 .1 as f32 / z_max as f32)
+                    * y_transform_amount as f32)
+                    .round() as i32;
+
+                if position.2 .0 > x_max / 2 {
+                    position.2 .0 -= reduction_factor;
+                } else if position.2 .0 < x_max / 2 {
+                    position.2 .0 += reduction_factor;
+                }
+            }
+
+            if let Some(x_transform_amount) = x_transform {
+                let reduction_factor = ((position.1 .0 as f32 / z_max as f32)
+                    * x_transform_amount as f32)
+                    .round() as i32;
+
+                if position.1 .1 > x_max / 2 {
+                    position.1 .1 -= reduction_factor;
+                } else if position.1 .1 < x_max / 2 {
+                    position.1 .1 += reduction_factor;
                 }
             }
         }
