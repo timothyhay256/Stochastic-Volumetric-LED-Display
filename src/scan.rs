@@ -3,6 +3,7 @@ use std::{
     error::Error,
     fs::File,
     io::Write,
+    iter::zip,
     path::Path,
     process,
     sync::{Arc, Mutex},
@@ -529,6 +530,13 @@ pub fn scan(
     highgui::destroy_all_windows().unwrap();
 
     post_process(&mut led_pos, manager_guard.lock().unwrap().config.num_led);
+
+    if let Some(adjust) = config.advanced.transform.adjust_after_scan {
+        if adjust {
+            info!("Performing position adjustment");
+            position_adjustment(&mut led_pos, &config);
+        }
+    }
 
     if !streamlined {
         loop {
@@ -2165,6 +2173,7 @@ pub fn manual_calibrate(
 }
 
 pub fn post_process(led_pos: &mut PosEntry, led_count: u32) {
+    let mut x_max = i32::MIN;
     let mut y_max = i32::MIN;
     let mut z_max = i32::MIN;
 
@@ -2174,6 +2183,7 @@ pub fn post_process(led_pos: &mut PosEntry, led_count: u32) {
 
     for i in 0..led_count {
         // Get max and min values in led_pos
+        x_max = max(led_pos[i as usize].1 .0, x_max);
         x_min = min(led_pos[i as usize].1 .0, x_min);
 
         y_max = max(led_pos[i as usize].1 .1, y_max);
@@ -2211,13 +2221,111 @@ pub fn post_process(led_pos: &mut PosEntry, led_count: u32) {
     }
 }
 
+pub fn position_adjustment(led_pos: &mut PosEntry, config: &Config) {
+    // Get mins and maxs
+    let mut x_max = i32::MIN;
+    let mut y_max = i32::MIN;
+    let mut z_max = i32::MIN;
+
+    let mut x_min = i32::MAX;
+    let mut y_min = i32::MAX;
+    let mut z_min = i32::MAX;
+
+    for position in led_pos.iter() {
+        x_max = max(position.1 .0, x_max);
+        x_min = min(position.1 .0, x_min);
+
+        y_max = max(position.1 .1, y_max);
+        y_min = min(position.1 .1, y_min);
+
+        z_min = min(position.2 .0, z_min);
+        z_max = max(position.2 .0, z_max);
+    }
+    // Apply perspective distortion adjustment
+
+    let x_transform = config.advanced.transform.x_perspect_distort_adjust;
+    let y_transform = config.advanced.transform.y_perspect_distort_adjust;
+    let z_transform = config.advanced.transform.z_perspect_distort_adjust;
+
+    if x_transform.is_some() || y_transform.is_some() || z_transform.is_some() {
+        for position in led_pos.iter_mut() {
+            if let Some(z_transform_amount) = z_transform {
+                let reduction_factor = ((position.2 .0 as f32 / z_max as f32)
+                    * z_transform_amount as f32)
+                    .round() as i32;
+
+                if position.1 .0 > x_max / 2 {
+                    position.1 .0 -= reduction_factor;
+                } else if position.1 .0 < x_max / 2 {
+                    position.1 .0 += reduction_factor;
+                }
+            }
+
+            if let Some(y_transform_amount) = y_transform {
+                // TODO: Sanity check
+                let reduction_factor = ((position.1 .1 as f32 / z_max as f32)
+                    * y_transform_amount as f32)
+                    .round() as i32;
+
+                if position.2 .0 > x_max / 2 {
+                    position.2 .0 -= reduction_factor;
+                } else if position.2 .0 < x_max / 2 {
+                    position.2 .0 += reduction_factor;
+                }
+            }
+
+            if let Some(x_transform_amount) = x_transform {
+                let reduction_factor = ((position.1 .0 as f32 / z_max as f32)
+                    * x_transform_amount as f32)
+                    .round() as i32;
+
+                if position.1 .1 > x_max / 2 {
+                    position.1 .1 -= reduction_factor;
+                } else if position.1 .1 < x_max / 2 {
+                    position.1 .1 += reduction_factor;
+                }
+            }
+        }
+    }
+
+    // Apply stretch/shrink
+
+    let x_adjust = config.advanced.transform.x_stretch_adjust;
+    let y_adjust = config.advanced.transform.y_stretch_adjust;
+    let z_adjust = config.advanced.transform.z_stretch_adjust;
+
+    if x_adjust.is_some() || y_adjust.is_some() || z_adjust.is_some() {
+        for position in led_pos.iter_mut() {
+            for (coordinate, adjust_opt, center) in [
+                (&mut position.1 .0, x_adjust, x_max / 2),
+                (&mut position.1 .1, y_adjust, y_max / 2),
+                (&mut position.2 .0, z_adjust, z_max / 2),
+            ] {
+                if let Some(adjust_amount) = adjust_opt {
+                    let dist_from_center = (*coordinate - center).abs();
+
+                    let stretch_factor = ((dist_from_center as f32 / (x_max as f32 / 2.0))
+                        * adjust_amount as f32)
+                        .round() as i32;
+
+                    if *coordinate > center {
+                        *coordinate += stretch_factor;
+                    } else if *coordinate < center {
+                        *coordinate -= stretch_factor;
+                    }
+                }
+            }
+        }
+    }
+}
+
 pub fn get_cam(config: &Config, index_or_address: &str) -> Result<VideoCapture, Box<dyn Error>> {
     let mut cam = match index_or_address.parse::<i32>() {
         Ok(index) => videoio::VideoCapture::new(index, videoio::CAP_ANY)
             .unwrap_or_else(|_| panic!("Could not open camera on index {index}")),
         Err(_) => {
             let mut cam = videoio::VideoCapture::default()?;
-            cam.open_file(&index_or_address, videoio::CAP_ANY)
+            cam.open_file(index_or_address, videoio::CAP_ANY)
                 .unwrap_or_else(|_| panic!("Could not open RTSP at {index_or_address}"));
             cam
         }
