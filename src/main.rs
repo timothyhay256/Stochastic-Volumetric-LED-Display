@@ -1,7 +1,7 @@
 use std::{
     env,
     fs::File,
-    io::Read,
+    io::{Read, Write},
     path::{Path, PathBuf},
     process,
     sync::{Arc, Mutex},
@@ -21,9 +21,11 @@ use svled::scan;
 use svled::{
     demo, driver_wizard,
     led_manager::{self, set_color},
-    read_vled, speedtest,
+    read_vled,
+    scan::post_process,
+    speedtest,
     unity::{self, start_listeners},
-    utils,
+    utils, PosEntry,
 };
 
 #[derive(Debug, Options)]
@@ -88,6 +90,9 @@ enum Command {
 
     #[options(help = "list functioning camera indexes")]
     ListCams(ListCamsOptions),
+
+    #[options(help = "re-run post processing on an position file")]
+    PostProcess(PostProcessOptions),
 }
 
 #[derive(Debug, Options)]
@@ -158,7 +163,14 @@ struct ListCamsOptions {
     upper_index: Option<i32>,
 }
 
-type JsonEntry = Vec<(String, (f32, f32), (f32, f32))>;
+#[derive(Debug, Options)]
+struct PostProcessOptions {
+    #[options(help = "path to position file", required)]
+    position_file: String,
+
+    #[options(help = "output path")]
+    output_file: Option<String>,
+}
 
 fn main() {
     let opts = MyOptions::parse_args_default_or_exit();
@@ -201,7 +213,7 @@ fn main() {
                 }
             };
 
-            let json: JsonEntry = match serde_json::from_str(&file_contents) {
+            let json: PosEntry = match serde_json::from_str(&file_contents) {
                 Ok(json) => json,
                 Err(e) => {
                     panic!(
@@ -271,6 +283,69 @@ fn main() {
         }
 
         info!("\nWorking cameras: {working_cameras:?}");
+
+        return;
+    } else if let Some(Command::PostProcess(ref post_process_options)) = opts.command {
+        let mut pos_file = match File::open(post_process_options.position_file.clone()) {
+            Ok(file) => file,
+            Err(e) => {
+                panic!(
+                    "Could not read {:?}: {}",
+                    post_process_options.position_file, e
+                )
+            }
+        };
+
+        let mut file_contents = String::new();
+        match pos_file.read_to_string(&mut file_contents) {
+            Ok(_) => {}
+            Err(e) => {
+                panic!(
+                    "Could not read position file {}: {}",
+                    post_process_options.position_file, e
+                )
+            }
+        };
+
+        let json: PosEntry = match serde_json::from_str(&file_contents) {
+            Ok(json) => json,
+            Err(e) => {
+                panic!(
+                    "{} contains invalid or incomplete calibration data: {}",
+                    post_process_options.position_file, e
+                )
+            }
+        };
+
+        post_process(&mut json.clone(), json.len().try_into().unwrap());
+
+        let name = post_process_options.output_file.clone().unwrap_or(format!(
+            "{}-postprocess.json",
+            post_process_options
+                .position_file
+                .strip_suffix(".json")
+                .unwrap_or(&post_process_options.position_file)
+        ));
+
+        let json = serde_json::to_string_pretty(&json).expect("Unable to serialize metadata!");
+        let mut file = match File::create(Path::new(&name)) {
+            Ok(file) => file,
+            Err(e) => {
+                error!("Unable to write temp-pos to {name}");
+                println!("Something went wrong trying to save the LED positions. Error: {e}");
+                process::exit(1);
+            }
+        };
+
+        match file.write_all(json.as_bytes()) {
+            Ok(_) => {}
+            Err(e) => {
+                error!("Unable to write temp-pos to {name}");
+                println!("Something went wrong trying to save the LED positions. Error: {e}");
+            }
+        }
+
+        info!("Wrote post-processed position file to {name}");
 
         return;
     }
@@ -389,7 +464,7 @@ fn main() {
             }
         };
 
-        let json: JsonEntry = match serde_json::from_str(&file_contents) {
+        let json: PosEntry = match serde_json::from_str(&file_contents) {
             Ok(json) => json,
             Err(e) => {
                 panic!(
@@ -402,14 +477,14 @@ fn main() {
 
         match demo_options.active_demo.to_lowercase().as_str() {
             "rainbow-loop" => loop {
-                demo::rainbow(&manager, &json, 80.0, 50.0, false, demo::Axis::X, true);
-                demo::rainbow(&manager, &json, 50.0, 50.0, false, demo::Axis::Y, true);
-                demo::rainbow(&manager, &json, 80.0, 50.0, false, demo::Axis::Z, true);
+                demo::rainbow(&manager, &json, 80, 50, false, demo::Axis::X, true);
+                demo::rainbow(&manager, &json, 50, 50, false, demo::Axis::Y, true);
+                demo::rainbow(&manager, &json, 80, 50, false, demo::Axis::Z, true);
             },
             "rainbow" => {
-                demo::rainbow(&manager, &json, 80.0, 50.0, false, demo::Axis::X, true);
-                demo::rainbow(&manager, &json, 50.0, 50.0, false, demo::Axis::Y, true);
-                demo::rainbow(&manager, &json, 80.0, 50.0, false, demo::Axis::Z, true);
+                demo::rainbow(&manager, &json, 80, 50, false, demo::Axis::X, true);
+                demo::rainbow(&manager, &json, 50, 50, false, demo::Axis::Y, true);
+                demo::rainbow(&manager, &json, 80, 50, false, demo::Axis::Z, true);
             }
             option => {
                 error!("Invalid option {option}");

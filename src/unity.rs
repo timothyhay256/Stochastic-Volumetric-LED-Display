@@ -24,10 +24,8 @@ use opencv::{
 
 use crate::{
     led_manager, scan::get_cam, Config, GetEventsFrameBuffer, IOHandles, LedState, ManagerData,
-    ManagerState, RuntimeConfig, UnityOptions, VisionData,
+    ManagerState, PosEntry, RuntimeConfig, UnityOptions, VisionData,
 };
-
-type JsonEntry = Vec<(String, (f32, f32), (f32, f32))>;
 
 pub fn signal_restart(unity_ip: Ipv4Addr, unity_port: u32) {
     let mut stream = match TcpStream::connect(format!("{unity_ip}:{unity_port}")) {
@@ -77,7 +75,7 @@ pub fn send_pos(unity: UnityOptions) -> std::io::Result<()> {
             }
         };
 
-        let json: JsonEntry = match serde_json::from_str(&file_contents) {
+        let json: PosEntry = match serde_json::from_str(&file_contents) {
             Ok(json) => json,
             Err(e) => {
                 panic!(
@@ -110,9 +108,9 @@ pub fn send_pos(unity: UnityOptions) -> std::io::Result<()> {
             stream.write_all(
                 format!(
                     "{},{},{}",
-                    led.1 .0 * unity.scale,
-                    led.1 .1 * unity.scale,
-                    led.2 .0 * unity.scale
+                    led.1 .0 as f32 * unity.scale,
+                    led.1 .1 as f32 * unity.scale,
+                    led.2 .0 as f32 * unity.scale
                 )
                 .as_bytes(),
             )?;
@@ -149,7 +147,7 @@ pub fn get_events(
     let socket = UdpSocket::bind(format!("{ip}:{port}"))?;
 
     // load positions if we are streaming video with widgets
-    let mut json: JsonEntry;
+    let mut json: PosEntry;
     let mut json_hashmap: Arc<Mutex<JsonHashmap>> = Arc::new(Mutex::new(Default::default()));
 
     let mut frame_cam_1: Mat = Default::default();
@@ -201,16 +199,16 @@ pub fn get_events(
 
         for item in json.iter().take(led_count) {
             // Get max and min values in led_pos
-            y_max = max((item.1 .1) as i32, y_max);
+            y_max = max(item.1 .1, y_max);
         }
 
         for i in 0..led_count {
-            let y_mid = y_max / 2;
-            let current_y = json[i].1 .1;
+            let y_mid: f32 = (y_max / 2) as f32;
+            let current_y: f32 = json[i].1 .1 as f32;
 
             json[i].1 .1 = match current_y {
-                y if y > y_mid as f32 => y_mid as f32 - (y - y_mid as f32),
-                y if y < y_mid as f32 => y_mid as f32 + (y_mid as f32 - y),
+                y if y > y_mid => (y_mid - (y - y_mid)).round() as i32,
+                y if y < y_mid => (y_mid + (y_mid - y)).round() as i32,
                 _ => json[i].1 .1,
             };
         }
@@ -218,7 +216,17 @@ pub fn get_events(
         json_hashmap = Arc::new(Mutex::new(
             json.into_iter()
                 .enumerate()
-                .map(|(i, (_key, val1, val2))| (i, (val1, val2, (0u8, 0u8, 0u8), false)))
+                .map(|(i, (_key, val1, val2))| {
+                    (
+                        i,
+                        (
+                            (val1.0 as f32, val1.1 as f32),
+                            (val2.0 as f32, val2.1 as f32),
+                            (0u8, 0u8, 0u8),
+                            false,
+                        ),
+                    )
+                })
                 .collect(),
         ));
     }

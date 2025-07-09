@@ -202,6 +202,8 @@ pub struct Task {
     pub controller_queue_length: Option<u8>,
 }
 
+pub type PosEntry = Vec<(String, (i32, i32), (i32, i32))>;
+
 pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Config) {
     // Load and validate config
     if !config_path.exists() {
