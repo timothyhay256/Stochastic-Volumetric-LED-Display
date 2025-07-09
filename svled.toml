@@ -1,11 +1,11 @@
 num_led = 2000                                # Number of LEDS TOTAL, not per strip.
 num_strips = 40
-# num_led = 50
-# num_strips = 1
 
+[communication]
 communication_mode = 2                        # 1 indicates UDP, 2 indicates serial
 host = "192.168.86.53"                        # UDP host
 port = 8888                                   # UDP port (Default is 8888)
+baud_rate = 3000000                                  # UDP port (Default is 8888)
 
 serial_port_paths = [
     "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_0C:4E:A0:30:7E:FC-if00",
@@ -50,58 +50,62 @@ serial_port_paths = [
     "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:3D:AE:50:17:70-if00"
 ]
 
-
-
-# serial_port_paths = ["/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:3D:AE:52:32:18-if00"]
-# serial_port_paths = ["/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:88:E0:D7:3E:00-if00"]
-
-baud_rate = 3000000                            # Serial baud rate (Default is 921600)
-# baud_rate = 921600
-# 3000000
+[recording]
 record_data = true                            # If true, all commands will be recorded during the session
 record_esp_data = true                        # If true, all commands will be recorded in a format that can be read by the ESP
-unity_controls_recording = false               # If true, above two will be ignored and controlled by Unity
-
-record_data_file = "record_data.vled"          # File to record vled data to
+unity_controls_recording = false              # If true, above two will be ignored and controlled by Unity
+record_data_file = "record_data.vled"         # File to record vled data to
 record_esp_data_file = "record_esp_data.bvled" # File to record bvled data to
 
-multi_camera = true 
-camera_index_1 = 0
-camera_index_2 = 2
-
-scan_mode = 0
-filter_color = 0
-filter_range = 90
-color_bright = 45
-
+[camera]
+multi_camera = true
+camera_index_1 = "0"                           # Can either be an index, or an RTSP address.
+camera_index_2 = "0"
 video_width = 1280
 video_height = 720
+
+[scan]
+scan_mode = 1
+filter_color = 0
+filter_range = 90
+color_bright = 255
 
 [unity_options]
 num_container = 1
 unity_ip = "127.0.0.1"
 unity_ports = [5001, 6002, 6003]
 unity_serial_baudrate = 921600
-unity_position_files = ["jar.json"]
-# scale = 0.0006
-scale = 0.08
+unity_position_files = ["largetank.json"]
+scale = 0.0008
 
-[advanced]
+[advanced.communication]
 serial_read_timeout = 5
-print_send_back = false
 udp_read_timeout = 100
 con_fail_limit = 2
-no_controller = false
-# hsv_red_override = []  # Format: [upper_h, upper_s, upper_v, lower_h, lower_s, lower_v]
-# hsv_green_override = []
-hsv_blue_override = [61, 0, 245, 95, 255, 255]
+use_queue = true
+queue_size = 3
+skip_confirmation = false
+
+[advanced.camera]
 no_video = false
 get_events_streams_video = false
 get_events_video_widgets = false
 get_events_widgets_pos_index = 0
-use_queue = true # When set to true, a queue and multiple threads are used in led_manager for large performance boosts. A side effect is that saving sequences to a file is unsupported due to the nature of the threads.
-queue_size = 5
-skip_confirmation = false
+capture_frames = 30
 cam2_overhead = true
-cam2_overhed_flip = true # When set to true, assume the overhead camera's bottom is the side opposite of the front camera.
-# crop_override = [0, 0, 1280, 720] # Optional example
+cam2_overhead_flip = true
+
+[advanced.hsv_overrides]
+# hsv_red_override = []
+# hsv_green_override = []
+hsv_blue_override = [61, 0, 245, 95, 255, 255]
+
+[advanced.transform]
+# crop_override = [0, 0, 1280, 720]
+x_perspect_distort_adjust = 0.5
+# y_perspect_distort_adjust = ...
+# z_perspect_distort_adjust = ...
+
+[advanced.misc]
+print_send_back = false
+no_controller = false

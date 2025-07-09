@@ -57,8 +57,8 @@ pub fn rainbow(
         for (i, entry) in led_pos.iter().enumerate() {
             let val = get_axis_value(entry);
             if (j - fuzz) <= val && val <= (j + fuzz) {
-                let hue_pos = (val - lowest) / (highest - lowest);
-                let (r, g, b) = hsv_to_rgb(hue_pos, 1, 1);
+                let hue_pos = (val - lowest) as f32 / (highest - lowest) as f32;
+                let (r, g, b) = hsv_to_rgb(hue_pos, 1.0, 1.0);
                 led_manager::set_color(manager, i.try_into().unwrap(), r, g, b);
             }
         }
@@ -119,26 +119,33 @@ pub fn rainbow_fill(manager: &Arc<Mutex<ManagerData>>, led_pos: &LedPos, axis: A
 
     for (i, entry) in led_pos.iter().enumerate() {
         let val = get_axis_value(entry);
-        let hue_pos = (val - lowest) / range + offset;
-        let (r, g, b) = hsv_to_rgb(hue_pos, 1, 1);
+        let hue_pos = (val - lowest) as f32 / (range + offset) as f32;
+        let (r, g, b) = hsv_to_rgb(hue_pos, 1.0, 1.0);
         led_manager::set_color(manager, i.try_into().unwrap(), r, g, b);
     }
 }
 
-fn hsv_to_rgb(h: i32, s: i32, v: i32) -> (u8, u8, u8) {
-    let i = h * 6;
-    let f = h * 6 - i;
-    let p = v * (1 - s);
-    let q = v * (1 - f * s);
-    let t = v * (1 - (1 - f) * s);
-    let (r, g, b) = match i as u32 % 6 {
+fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (u8, u8, u8) {
+    let h = h.fract() * 6.0; // keep hue in [0,6)
+    let i = h.floor() as u32;
+    let f = h - h.floor();
+
+    let p = v * (1.0 - s);
+    let q = v * (1.0 - f * s);
+    let t = v * (1.0 - (1.0 - f) * s);
+
+    let (r, g, b) = match i {
         0 => (v, t, p),
         1 => (q, v, p),
         2 => (p, v, t),
         3 => (p, q, v),
         4 => (t, p, v),
-        5 => (v, p, q),
-        _ => (0, 0, 0),
+        5 | _ => (v, p, q),
     };
-    ((r * 255) as u8, (g * 255) as u8, (b * 255) as u8)
+
+    (
+        (r * 255.0).round() as u8,
+        (g * 255.0).round() as u8,
+        (b * 255.0).round() as u8,
+    )
 }

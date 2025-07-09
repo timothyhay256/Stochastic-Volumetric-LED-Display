@@ -16,60 +16,125 @@ use serialport::SerialPort;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Config {
-    // TODO: All of these should also be passable via commandline
     pub num_led: u32,
     pub num_strips: u32,
-    pub communication_mode: i8,
-    pub host: Ipv4Addr,
-    pub port: i32,
-    pub serial_port_paths: Vec<String>,
-    pub baud_rate: u32,
+    pub communication: CommunicationConfig,
+    pub recording: RecordingConfig,
+    pub camera: CameraConfig,
+    pub scan: ScanConfig,
+    pub unity_options: UnityOptions,
+    pub advanced: AdvancedConfig,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct ScanConfig {
+    /// 0 is default, 1 filters by color first (Useful when you aren't scanning in perfect conditions)
+    pub scan_mode: u32,
+    /// 0 for red, 1 for green, 2 for blue
+    pub filter_color: Option<u32>,
+    /// Range for color filter
+    pub filter_range: Option<u8>,
+    /// LED brightness during scan
+    pub color_bright: Option<u8>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct CameraConfig {
+    pub multi_camera: bool,
+    pub camera_index_1: String,
+    pub camera_index_2: Option<String>,
+    pub video_width: Option<f64>,
+    pub video_height: Option<f64>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct RecordingConfig {
     pub record_data: bool,
     pub record_esp_data: bool,
     pub unity_controls_recording: bool,
     pub record_data_file: PathBuf,
     pub record_esp_data_file: PathBuf,
-    pub multi_camera: bool,
-    pub camera_index_1: String,
-    pub camera_index_2: Option<String>,
-    pub unity_options: UnityOptions,
-    pub scan_mode: u32, // 0 is default, 1 filters by color first (Useful when you aren't scanning in perfect conditions)
-    pub filter_color: Option<u32>, // 0 for red, 1 for green, 2 for blue
-    pub filter_range: Option<u8>, // Range for color filter
-    pub color_bright: Option<u8>,
-    pub video_width: Option<f64>,
-    pub video_height: Option<f64>,
-    pub advanced: AdvancedConfig,
 }
 
 #[derive(Deserialize, Debug, Clone)]
-pub struct AdvancedConfig {
+pub struct CommunicationConfig {
+    pub communication_mode: i8,
+    pub host: Ipv4Addr,
+    pub port: i32,
+    pub serial_port_paths: Vec<String>,
+    pub baud_rate: u32,
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct AdvancedCommConfig {
+    /// Timeout in milliseconds for serial reads
     pub serial_read_timeout: Option<u32>,
-    pub print_send_back: Option<bool>,
+    /// Timeout in milliseconds for UDP reads
+    pub udp_read_timeout: Option<u32>,
+    /// Limit of consecutive connection failures before giving up
     pub con_fail_limit: Option<u32>,
-    pub udp_read_timeout: u32,
-    pub no_controller: Option<bool>,
-    pub hsv_red_override: Option<Vec<u8>>, // Override the filter band for the red color when using a color filter. Should be formatted like <upper_h, upper_s, upper_v, lower_h, lower_s, lower_v>
+    /// Should set_color queue writes?
+    pub use_queue: Option<bool>,
+    pub queue_size: Option<usize>,
+    /// Should we skip checking if the LED was properly set? Speeds things way up at the cost of accuracy. Not recommended.
+    pub skip_confirmation: Option<bool>,
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct AdvancedCameraConfig {
+    /// When set in conjunction with streamlined being true, no video feed will show.
+    pub no_video: Option<bool>,
+    /// When set to true, get_events will stream to frame_cam_1/2
+    pub get_events_streams_video: Option<bool>,
+    /// When set to true, get_events video stream will include circles around illuminated LEDs for visualization purposes
+    pub get_events_video_widgets: Option<bool>,
+    /// Which pos file to use for visualization
+    pub get_events_widgets_pos_index: Option<i32>,
+    /// How many frames to capture before using the most recent. Needed because OpenCV will not always provide the most recent frame
+    pub capture_frames: Option<i32>,
+    /// When true, assume the second camera is overhead
+    pub cam2_overhead: Option<bool>,
+    /// When true, assume the overhead camera is upside down relative to the front camera
+    pub cam2_overhead_flip: Option<bool>,
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct HsvOverrideConfig {
+    /// Override the filter band for the red color when using a color filter.
+    /// Should be formatted like <upper_h, upper_s, upper_v, lower_h, lower_s, lower_v>
+    pub hsv_red_override: Option<Vec<u8>>,
     pub hsv_green_override: Option<Vec<u8>>,
     pub hsv_blue_override: Option<Vec<u8>>,
-    pub no_video: Option<bool>, // When set in conjunction with streamlined being true, no video feed will show.
-    pub get_events_streams_video: Option<bool>, // When set to true, get_events will stream to frame_cam_1/2
-    pub get_events_video_widgets: Option<bool>, // When set to true, get_events video stream will include circles around illuminated LEDs for visualization purposes
-    pub get_events_widgets_pos_index: Option<i32>, // Which pos file to use for visualization
-    pub use_queue: Option<bool>,                // Should set_color queue writes?
-    pub queue_size: Option<usize>,
-    pub skip_confirmation: Option<bool>, // Should we skip checking if the LED was properly set? Speeds things way up at the cost of accuracy.
-    pub crop_override: Option<Vec<i32>>, // When set, cropping will be skipped.
-    pub demo_options: Option<DemoConfig>,
-    pub cam2_overhead: Option<bool>, // When true, assume the second camera is overhead
-    pub cam2_overhead_flip: Option<bool>, // When true, assume the overhead camera is upside down relative to the front camera
-    pub capture_frames: Option<i32>, // How many frames to capture before using the most recent. Needed because OpenCV will not always provide the most recent frame
 }
 
-#[derive(Deserialize, Debug, Clone)]
-pub struct DemoConfig {
-    // Used for gyroscope demo
-    pub gyro_port: i32,
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct ImageTransformConfig {
+    /// When set, cropping will be skipped.
+    pub crop_override: Option<Vec<i32>>,
+    /// Offsets distant LEDs toward the center to reduce perspective distortion, making the layout appear more orthographic.
+    pub x_perspect_distort_adjust: Option<f32>,
+    pub y_perspect_distort_adjust: Option<f32>,
+    pub z_perspect_distort_adjust: Option<f32>,
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct MiscConfig {
+    pub print_send_back: Option<bool>,
+    pub no_controller: Option<bool>,
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct AdvancedConfig {
+    #[serde(default)]
+    pub communication: AdvancedCommConfig,
+    #[serde(default)]
+    pub camera: AdvancedCameraConfig,
+    #[serde(default)]
+    pub hsv_overrides: HsvOverrideConfig,
+    #[serde(default)]
+    pub transform: ImageTransformConfig,
+    #[serde(default)]
+    pub misc: MiscConfig,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -104,7 +169,7 @@ pub struct RuntimeConfig {
     pub record_data_file: PathBuf,
     pub record_esp_data_file: PathBuf,
     pub print_send_back: Option<bool>,
-    pub udp_read_timeout: u32,
+    pub udp_read_timeout: Option<u32>,
     pub con_fail_limit: Option<u32>,
     pub no_controller: Option<bool>,
     pub scan_mode: u32,
@@ -189,7 +254,7 @@ pub struct LedConfig {
     pub num_led: u32,
     pub num_strips: u32,
     pub serial_read_timeout: Option<u32>,
-    pub udp_read_timeout: u32,
+    pub udp_read_timeout: Option<u32>,
     pub host: Ipv4Addr,
     pub con_fail_limit: Option<u32>,
     pub print_send_back: Option<bool>,
@@ -205,6 +270,7 @@ pub struct Task {
 pub type PosEntry = Vec<(String, (i32, i32), (i32, i32))>;
 
 pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Config) {
+    // TODO: Make this an implmentation
     // Load and validate config
     if !config_path.exists() {
         panic!("Could not find svled.toml! Please create one according to the documentation in the current directory.");
@@ -220,126 +286,110 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
     let config_holder: Config = toml::from_str(&config_file_contents)
         .expect("The config file was not formatted properly and could not be read.");
 
-    let num_led = config_holder.num_led;
-    let num_strips = config_holder.num_strips;
-    let communication_mode = config_holder.communication_mode;
-    let host = config_holder.host;
-    let port = config_holder.port;
-    let serial_port_paths = config_holder.serial_port_paths.clone();
-    let baud_rate = config_holder.baud_rate;
-    let serial_read_timeout = config_holder.advanced.serial_read_timeout;
-
-    let record_data = config_holder.record_data;
-    let record_esp_data = config_holder.record_esp_data;
-    let unity_controls_recording = config_holder.unity_controls_recording;
-    let record_data_file = config_holder.record_data_file.clone();
-    let record_esp_data_file = config_holder.record_esp_data_file.clone();
-    let udp_read_timeout = config_holder.advanced.udp_read_timeout;
-    let con_fail_limit = config_holder.advanced.con_fail_limit;
-
-    let multi_camera = config_holder.multi_camera;
-
-    let print_send_back = config_holder.advanced.print_send_back;
-
-    let no_controller = config_holder.advanced.no_controller;
-
-    let scan_mode = config_holder.scan_mode;
-    let filter_color = config_holder.filter_color;
-    let filter_range = config_holder.filter_range;
-
-    let hsv_red_override = config_holder.advanced.hsv_red_override.clone();
-    let hsv_green_override = config_holder.advanced.hsv_green_override.clone();
-    let hsv_blue_override = config_holder.advanced.hsv_blue_override.clone();
-
-    let no_video = config_holder.advanced.no_video;
-
-    let skip_confirmation = config_holder.advanced.skip_confirmation;
-
-    let use_queue = config_holder.advanced.use_queue;
-    let queue_size = config_holder.advanced.queue_size;
-
     // Validate config and inform user of settings
 
-    if let Some(no_controller) = no_controller {
+    if let Some(no_controller) = config_holder.advanced.misc.no_controller {
         if !no_controller {
-            if communication_mode == 2 {
-                for path in serial_port_paths.iter() {
+            if config_holder.communication.communication_mode == 2 {
+                for path in config_holder.communication.serial_port_paths.iter() {
                     if Path::new(&path).exists() {
                         info!("Using serial for communication on {path}!");
                     } else {
                         panic!("Serial port {path} does not exist!");
                     }
                 }
-            } else if communication_mode == 1 {
-                info!("Using udp for communication at {host} on port {port}");
+            } else if config_holder.communication.communication_mode == 1 {
+                info!(
+                    "Using udp for communication at {} on port {}",
+                    config_holder.communication.host, config_holder.communication.port
+                );
             }
         }
     }
 
-    if unity_controls_recording || record_data || record_esp_data {
-        if Path::new(&record_data_file).exists() && record_data {
+    if config_holder.recording.unity_controls_recording
+        || config_holder.recording.record_data
+        || config_holder.recording.record_esp_data
+    {
+        if Path::new(&config_holder.recording.record_data_file).exists()
+            && config_holder.recording.record_data
+        {
             warn!(
                 "{} will be overwritten once you start recording!",
-                record_data_file.display()
+                config_holder.recording.record_data_file.display()
             );
         }
-        if Path::new(&record_esp_data_file).exists() && record_esp_data {
+        if Path::new(&config_holder.recording.record_esp_data_file).exists()
+            && config_holder.recording.record_esp_data
+        {
             warn!(
                 "{} will be overwritten once you start recording!",
-                record_esp_data_file.display()
+                config_holder.recording.record_esp_data_file.display()
             )
         }
     }
-    if unity_controls_recording {
+    if config_holder.recording.unity_controls_recording {
         info!("Unity will control recording of data.");
-    } else if record_data {
+    } else if config_holder.recording.record_data {
         info!(
             "All data will be recorded during this session in VLED format to {}",
-            record_data_file.display()
+            config_holder.recording.record_data_file.display()
         );
-    } else if record_esp_data {
+    } else if config_holder.recording.record_esp_data {
         info!(
             "All data will be recorded during this session in bVLED format to {}",
-            record_esp_data_file.display()
+            config_holder.recording.record_esp_data_file.display()
         );
     } else {
         warn!("No bVLED or VLED data will be recorded!");
     }
 
-    if multi_camera {
+    if config_holder.camera.multi_camera {
         info!("Using multiple cameras!");
     }
 
     (
         ManagerData {
             config: RuntimeConfig {
-                num_led,
-                num_strips,
-                communication_mode,
-                host,
-                port,
-                serial_port_paths: serial_port_paths.clone(), // So we can create new ManagerDatas
-                baud_rate,
-                serial_read_timeout,
-                record_data,
-                record_data_file: record_data_file.clone(),
-                record_esp_data,
-                unity_controls_recording,
-                record_esp_data_file: record_esp_data_file.clone(),
-                print_send_back,
-                udp_read_timeout,
-                con_fail_limit,
-                no_controller,
-                scan_mode,
-                filter_color,
-                filter_range,
-                hsv_red_override: hsv_red_override.clone(),
-                hsv_green_override: hsv_green_override.clone(),
-                hsv_blue_override: hsv_blue_override.clone(),
-                no_video,
-                skip_confirmation,
-                use_queue,
-                queue_size,
+                num_led: config_holder.num_led,
+                num_strips: config_holder.num_strips,
+                communication_mode: config_holder.communication.communication_mode,
+                host: config_holder.communication.host,
+                port: config_holder.communication.port,
+                serial_port_paths: config_holder.communication.serial_port_paths.clone(), // So we can create new ManagerDatas
+                baud_rate: config_holder.communication.baud_rate,
+                serial_read_timeout: config_holder.advanced.communication.serial_read_timeout,
+                record_data: config_holder.recording.record_data,
+                record_data_file: config_holder.recording.record_data_file.clone(),
+                record_esp_data: config_holder.recording.record_esp_data,
+                unity_controls_recording: config_holder.recording.unity_controls_recording,
+                record_esp_data_file: config_holder.recording.record_esp_data_file.clone(),
+                print_send_back: config_holder.advanced.misc.print_send_back,
+                udp_read_timeout: config_holder.advanced.communication.udp_read_timeout,
+                con_fail_limit: config_holder.advanced.communication.con_fail_limit,
+                no_controller: config_holder.advanced.misc.no_controller,
+                scan_mode: config_holder.scan.scan_mode,
+                filter_color: config_holder.scan.filter_color,
+                filter_range: config_holder.scan.filter_range,
+                hsv_red_override: config_holder
+                    .advanced
+                    .hsv_overrides
+                    .hsv_red_override
+                    .clone(),
+                hsv_green_override: config_holder
+                    .advanced
+                    .hsv_overrides
+                    .hsv_green_override
+                    .clone(),
+                hsv_blue_override: config_holder
+                    .advanced
+                    .hsv_overrides
+                    .hsv_blue_override
+                    .clone(),
+                no_video: config_holder.advanced.camera.no_video,
+                skip_confirmation: config_holder.advanced.communication.skip_confirmation,
+                use_queue: config_holder.advanced.communication.use_queue,
+                queue_size: config_holder.advanced.communication.queue_size,
                 led_config: None,
             },
             state: ManagerState {
