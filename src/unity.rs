@@ -156,9 +156,18 @@ pub fn get_events(
     let owned_config = config.clone();
     let owned_manager = Arc::clone(&manager);
 
-    if config.advanced.get_events_video_widgets.unwrap_or(false) {
+    if config
+        .advanced
+        .camera
+        .get_events_video_widgets
+        .unwrap_or(false)
+    {
         // If one isn't set, assume the first pos file
-        let pos_index = config.advanced.get_events_widgets_pos_index.unwrap_or(0);
+        let pos_index = config
+            .advanced
+            .camera
+            .get_events_widgets_pos_index
+            .unwrap_or(0);
 
         let mut pos_file = match File::open(unity.unity_position_files[pos_index as usize].clone())
         {
@@ -231,7 +240,13 @@ pub fn get_events(
         ));
     }
 
-    if config.advanced.get_events_streams_video.unwrap_or(false) && frame_buffer.is_some() {
+    if config
+        .advanced
+        .camera
+        .get_events_streams_video
+        .unwrap_or(false)
+        && frame_buffer.is_some()
+    {
         info!("Spawning get_events_streams_video thread.");
         warn!("This should only be used in demos due to decreased performance!");
 
@@ -247,17 +262,17 @@ pub fn get_events(
                 let mut cam2 = None;
 
                 let cam = Arc::new(Mutex::new(
-                    get_cam(&config, &config.camera_index_1).unwrap(),
+                    get_cam(&config, &config.camera.camera_index_1).unwrap(),
                 ));
 
-                if config.video_width.is_some() && config.video_height.is_some() {
+                if config.camera.video_width.is_some() && config.camera.video_height.is_some() {
                     cam.lock()
                         .unwrap()
-                        .set(CAP_PROP_FRAME_WIDTH, config.video_width.unwrap())
+                        .set(CAP_PROP_FRAME_WIDTH, config.camera.video_width.unwrap())
                         .unwrap();
                     cam.lock()
                         .unwrap()
-                        .set(CAP_PROP_FRAME_HEIGHT, config.video_height.unwrap())
+                        .set(CAP_PROP_FRAME_HEIGHT, config.camera.video_height.unwrap())
                         .unwrap();
                 }
 
@@ -270,23 +285,23 @@ pub fn get_events(
                     }
                 };
 
-                if config.multi_camera {
+                if config.camera.multi_camera {
                     cam2 = Some(Arc::new(Mutex::new(
-                        get_cam(&config, &config.camera_index_2.clone().unwrap()).unwrap(),
+                        get_cam(&config, &config.camera.camera_index_2.clone().unwrap()).unwrap(),
                     )));
 
-                    if config.video_width.is_some() && config.video_height.is_some() {
+                    if config.camera.video_width.is_some() && config.camera.video_height.is_some() {
                         cam2.as_ref()
                             .unwrap()
                             .lock()
                             .unwrap()
-                            .set(CAP_PROP_FRAME_WIDTH, config.video_width.unwrap())
+                            .set(CAP_PROP_FRAME_WIDTH, config.camera.video_width.unwrap())
                             .unwrap();
                         cam2.as_ref()
                             .unwrap()
                             .lock()
                             .unwrap()
-                            .set(CAP_PROP_FRAME_HEIGHT, config.video_height.unwrap())
+                            .set(CAP_PROP_FRAME_HEIGHT, config.camera.video_height.unwrap())
                             .unwrap();
                     }
 
@@ -304,12 +319,17 @@ pub fn get_events(
                     cam.lock().unwrap().read(&mut frame_cam_1).unwrap();
 
                     if let Some(cam2) = &mut cam2 {
-                        if config.multi_camera {
+                        if config.camera.multi_camera {
                             cam2.lock().unwrap().read(&mut frame_cam_2).unwrap();
                         }
                     }
 
-                    if config.advanced.get_events_video_widgets.unwrap_or(false) {
+                    if config
+                        .advanced
+                        .camera
+                        .get_events_video_widgets
+                        .unwrap_or(false)
+                    {
                         for (_key, (xy, z, rgb, _enabled)) in json_hashmap_guard
                             .lock()
                             .unwrap()
@@ -439,31 +459,43 @@ pub fn start_listeners(config_holder: &Config, manager: &Arc<Mutex<ManagerData>>
                 config: RuntimeConfig {
                     num_led: config_holder.num_led,
                     num_strips: config_holder.num_strips,
-                    communication_mode: config_holder.communication_mode,
-                    host: config_holder.host,
-                    port: config_holder.port,
+                    communication_mode: config_holder.communication.communication_mode,
+                    host: config_holder.communication.host,
+                    port: config_holder.communication.port,
                     serial_port_paths: manager.config.serial_port_paths.clone(),
-                    baud_rate: config_holder.baud_rate,
+                    baud_rate: config_holder.communication.baud_rate,
                     serial_read_timeout: manager.config.serial_read_timeout,
                     record_data: manager.config.record_data,
                     record_data_file: manager.config.record_data_file.clone(),
                     record_esp_data: manager.config.record_esp_data,
                     unity_controls_recording: manager.config.unity_controls_recording,
                     record_esp_data_file: manager.config.record_esp_data_file.clone(),
-                    print_send_back: config_holder.advanced.print_send_back,
-                    udp_read_timeout: config_holder.advanced.udp_read_timeout,
-                    con_fail_limit: config_holder.advanced.con_fail_limit,
-                    no_controller: config_holder.advanced.no_controller,
-                    scan_mode: config_holder.scan_mode,
-                    filter_color: config_holder.filter_color,
-                    filter_range: config_holder.filter_range,
-                    hsv_red_override: config_holder.advanced.hsv_red_override.clone(),
-                    hsv_green_override: config_holder.advanced.hsv_green_override.clone(),
-                    hsv_blue_override: config_holder.advanced.hsv_blue_override.clone(),
-                    no_video: config_holder.advanced.no_video,
-                    skip_confirmation: config_holder.advanced.skip_confirmation,
-                    use_queue: config_holder.advanced.use_queue,
-                    queue_size: config_holder.advanced.queue_size,
+                    print_send_back: config_holder.advanced.misc.print_send_back,
+                    udp_read_timeout: config_holder.advanced.communication.udp_read_timeout,
+                    con_fail_limit: config_holder.advanced.communication.con_fail_limit,
+                    no_controller: config_holder.advanced.misc.no_controller,
+                    scan_mode: config_holder.scan.scan_mode,
+                    filter_color: config_holder.scan.filter_color,
+                    filter_range: config_holder.scan.filter_range,
+                    hsv_red_override: config_holder
+                        .advanced
+                        .hsv_overrides
+                        .hsv_red_override
+                        .clone(),
+                    hsv_green_override: config_holder
+                        .advanced
+                        .hsv_overrides
+                        .hsv_green_override
+                        .clone(),
+                    hsv_blue_override: config_holder
+                        .advanced
+                        .hsv_overrides
+                        .hsv_blue_override
+                        .clone(),
+                    no_video: config_holder.advanced.camera.no_video,
+                    skip_confirmation: config_holder.advanced.communication.skip_confirmation,
+                    use_queue: config_holder.advanced.communication.use_queue,
+                    queue_size: config_holder.advanced.communication.queue_size,
                     led_config: None, // This will be constructed as needed by led_manager
                 },
                 state: ManagerState {

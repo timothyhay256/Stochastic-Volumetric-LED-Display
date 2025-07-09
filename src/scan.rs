@@ -67,7 +67,7 @@ pub fn scan(
     }
 
     let window = "Please wait...";
-    if let Some(no_video) = config.advanced.no_video {
+    if let Some(no_video) = config.advanced.camera.no_video {
         if !no_video {
             highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
         }
@@ -100,16 +100,16 @@ pub fn scan(
     }
 
     let cam = Arc::new(Mutex::new(
-        get_cam(&config, &config.camera_index_1.to_string()).unwrap(),
+        get_cam(&config, &config.camera.camera_index_1.to_string()).unwrap(),
     )); // We need to constantly poll this in the background to get the most recent frame due to OpenCV bug(?)
 
-    if config.video_width.is_some() && config.video_height.is_some() {
+    if config.camera.video_width.is_some() && config.camera.video_height.is_some() {
         cam.lock()
             .unwrap()
-            .set(CAP_PROP_FRAME_WIDTH, config.video_width.unwrap())?;
+            .set(CAP_PROP_FRAME_WIDTH, config.camera.video_width.unwrap())?;
         cam.lock()
             .unwrap()
-            .set(CAP_PROP_FRAME_HEIGHT, config.video_height.unwrap())?;
+            .set(CAP_PROP_FRAME_HEIGHT, config.camera.video_height.unwrap())?;
     }
 
     let mut cam2: Option<Arc<Mutex<VideoCapture>>> = None;
@@ -122,7 +122,7 @@ pub fn scan(
         false => {
             panic!(
                 "Unable to open camera {}! Please select another.",
-                config.camera_index_1
+                config.camera.camera_index_1
             )
         }
     };
@@ -166,23 +166,23 @@ pub fn scan(
             pos.y2_end = Some(crop_data.1 .3);
         }
 
-        if config.multi_camera {
+        if config.camera.multi_camera {
             debug!("Getting second cam limits");
             cam2 = Some(Arc::new(Mutex::new(
-                get_cam(&config, &config.camera_index_2.clone().unwrap()).unwrap(),
+                get_cam(&config, &config.camera.camera_index_2.clone().unwrap()).unwrap(),
             )));
 
-            if config.video_width.is_some() && config.video_height.is_some() {
+            if config.camera.video_width.is_some() && config.camera.video_height.is_some() {
                 cam2.as_ref()
                     .unwrap()
                     .lock()
                     .unwrap()
-                    .set(CAP_PROP_FRAME_WIDTH, config.video_width.unwrap())?;
+                    .set(CAP_PROP_FRAME_WIDTH, config.camera.video_width.unwrap())?;
                 cam2.as_ref()
                     .unwrap()
                     .lock()
                     .unwrap()
-                    .set(CAP_PROP_FRAME_HEIGHT, config.video_height.unwrap())?;
+                    .set(CAP_PROP_FRAME_HEIGHT, config.camera.video_height.unwrap())?;
             }
 
             pos.x2_end = Some(
@@ -230,23 +230,23 @@ pub fn scan(
         hsv_brightest[2] as f32 / 255.0 * 100.0
     );
 
-    if config.multi_camera && !streamlined {
+    if config.camera.multi_camera && !streamlined {
         highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
         cam2 = Some(Arc::new(Mutex::new(
-            get_cam(&config, &config.camera_index_2.clone().unwrap()).unwrap(),
+            get_cam(&config, &config.camera.camera_index_2.clone().unwrap()).unwrap(),
         )));
 
-        if config.video_width.is_some() && config.video_height.is_some() {
+        if config.camera.video_width.is_some() && config.camera.video_height.is_some() {
             cam2.as_ref()
                 .unwrap()
                 .lock()
                 .unwrap()
-                .set(CAP_PROP_FRAME_WIDTH, config.video_width.unwrap())?;
+                .set(CAP_PROP_FRAME_WIDTH, config.camera.video_width.unwrap())?;
             cam2.as_ref()
                 .unwrap()
                 .lock()
                 .unwrap()
-                .set(CAP_PROP_FRAME_HEIGHT, config.video_height.unwrap())?;
+                .set(CAP_PROP_FRAME_HEIGHT, config.camera.video_height.unwrap())?;
         }
 
         cam2_guard = Arc::clone(cam2.as_ref().unwrap());
@@ -256,7 +256,7 @@ pub fn scan(
             false => {
                 panic!(
                     "Unable to open camera {}! Please select another.",
-                    config.camera_index_2.unwrap()
+                    config.camera.camera_index_2.unwrap()
                 )
             }
         };
@@ -292,7 +292,7 @@ pub fn scan(
         // );
     }
 
-    if config.scan_mode == 1 {
+    if config.scan.scan_mode == 1 {
         debug!("Setting upper and lower bounds for LED");
 
         let mut manager = manager_guard.lock().unwrap();
@@ -317,7 +317,7 @@ pub fn scan(
                 _ => panic!("{filter_color} is not a valid filter color"),
             };
 
-            let range = config.filter_range.unwrap();
+            let range = config.scan.filter_range.unwrap();
             let hue_range = range / 4; // Only use half range for Hue
 
             let h = hsv_brightest.0[0];
@@ -368,13 +368,13 @@ pub fn scan(
         }
     };
 
-    if !config.multi_camera {
+    if !config.camera.multi_camera {
         info!("{success} succesful calibrations, {failures} failed calibrations");
     } else {
         info!("First camera: {success} succesful calibrations, {failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.", success_cam_2.unwrap(), failures_cam_2.unwrap());
     }
 
-    if failures > 0 && !streamlined && !config.multi_camera {
+    if failures > 0 && !streamlined && !config.camera.multi_camera {
         // Rescan XY from the back if there are failures
         {
             data.lock().unwrap().invert = true;
@@ -402,7 +402,7 @@ pub fn scan(
                 panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
             }
         };
-        if !config.multi_camera {
+        if !config.camera.multi_camera {
             info!("{cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations");
         } else {
             info!("First camera: {cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.", cam_2_success.unwrap(), cam_2_failures.unwrap());
@@ -423,7 +423,7 @@ pub fn scan(
         )?;
     }
 
-    if !config.multi_camera {
+    if !config.camera.multi_camera {
         if failures == 0 && !streamlined {
             info!(
                 "Please rotate the container 90 degrees to calibrate Z. Press space to continue."
@@ -462,7 +462,7 @@ pub fn scan(
             }
         };
 
-        if !config.multi_camera {
+        if !config.camera.multi_camera {
             info!("{success} succesful calibrations, {failures} failed calibrations");
         } else {
             info!("First camera: {success} succesful calibrations, {failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.", success_cam_2.unwrap(), failures_cam_2.unwrap());
@@ -495,7 +495,7 @@ pub fn scan(
                     panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
                 }
             };
-            if !config.multi_camera {
+            if !config.camera.multi_camera {
                 info!(
                     "{cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations"
                 );
@@ -522,7 +522,7 @@ pub fn scan(
     }
     {
         cam.lock().unwrap().release().unwrap();
-        if config.multi_camera {
+        if config.camera.multi_camera {
             cam2.unwrap().lock().unwrap().release().unwrap();
         }
     }
@@ -611,7 +611,7 @@ fn brightest_darkest(
     let filter_color = manager.lock().unwrap().config.filter_color.unwrap();
     let scan_mode = manager.lock().unwrap().config.scan_mode;
 
-    let brightness = config.color_bright.unwrap();
+    let brightness = config.scan.color_bright.unwrap();
     if scan_mode == 1 {
         debug!("using color filter for brightest darkest");
         if filter_color == 0 {
@@ -903,7 +903,7 @@ pub fn select_brightest(
             let s = hsv.0[1];
             let v = hsv.0[2];
 
-            let range = config.filter_range.unwrap();
+            let range = config.scan.filter_range.unwrap();
             let hue_range = range / 4; // Only use half range for Hue
 
             {
@@ -999,7 +999,7 @@ pub fn select_brightest(
 
         core::add_weighted(&frame.clone(), 0.5, &mask_color, 0.7, 0.0, frame, -1).unwrap();
 
-        if let Some(no_video) = config.advanced.no_video {
+        if let Some(no_video) = config.advanced.camera.no_video {
             if frame.size()?.width > 0 && !no_video {
                 highgui::imshow(window, frame)?;
             } else {
@@ -1055,9 +1055,9 @@ pub fn select_brightest(
 }
 
 pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPos, Box<dyn Error>> {
-    if config.advanced.crop_override.is_some() {
-        let crop_override = config.advanced.crop_override.clone().unwrap();
-        if config.multi_camera {
+    if config.advanced.transform.crop_override.is_some() {
+        let crop_override = config.advanced.transform.crop_override.clone().unwrap();
+        if config.camera.multi_camera {
             if crop_override.len() == 8 {
                 return Ok(CropPos {
                     x1_start: crop_override[0],
@@ -1133,17 +1133,19 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
         y2_end_guard.clone(),
     )?;
 
-    let cam_guard = Arc::new(Mutex::new(get_cam(config, &config.camera_index_1).unwrap())); // callback_loop only accepts a Arc<Mutex<VideoCapture>>
+    let cam_guard = Arc::new(Mutex::new(
+        get_cam(config, &config.camera.camera_index_1).unwrap(),
+    )); // callback_loop only accepts a Arc<Mutex<VideoCapture>>
 
-    if config.video_width.is_some() && config.video_height.is_some() {
+    if config.camera.video_width.is_some() && config.camera.video_height.is_some() {
         cam_guard
             .lock()
             .unwrap()
-            .set(CAP_PROP_FRAME_WIDTH, config.video_width.unwrap())?;
+            .set(CAP_PROP_FRAME_WIDTH, config.camera.video_width.unwrap())?;
         cam_guard
             .lock()
             .unwrap()
-            .set(CAP_PROP_FRAME_HEIGHT, config.video_height.unwrap())?;
+            .set(CAP_PROP_FRAME_HEIGHT, config.camera.video_height.unwrap())?;
     }
 
     match videoio::VideoCapture::is_opened(&cam_guard.lock().unwrap())? {
@@ -1151,7 +1153,7 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
         false => {
             panic!(
                 "Unable to open camera {}! Please select another.",
-                config.camera_index_1
+                config.camera.camera_index_1
             )
         }
     };
@@ -1198,20 +1200,20 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
         y2_end_guard.clone(),
     )?;
 
-    if let Some(index) = &config.camera_index_2 {
+    if let Some(index) = &config.camera.camera_index_2 {
         debug!("Cropping second camera with index {index}");
         *camera_active.lock().unwrap() = 1;
         let cam_guard = Arc::new(Mutex::new(get_cam(config, &index).unwrap()));
 
-        if config.video_width.is_some() && config.video_height.is_some() {
+        if config.camera.video_width.is_some() && config.camera.video_height.is_some() {
             cam_guard
                 .lock()
                 .unwrap()
-                .set(CAP_PROP_FRAME_WIDTH, config.video_width.unwrap())?;
+                .set(CAP_PROP_FRAME_WIDTH, config.camera.video_width.unwrap())?;
             cam_guard
                 .lock()
                 .unwrap()
-                .set(CAP_PROP_FRAME_HEIGHT, config.video_height.unwrap())?;
+                .set(CAP_PROP_FRAME_HEIGHT, config.camera.video_height.unwrap())?;
         }
 
         match videoio::VideoCapture::is_opened(&cam_guard.lock().unwrap())? {
@@ -1539,12 +1541,12 @@ pub fn scan_area(
     let cam_1_window = "Camera 1";
     let cam_2_window = "Camera 2";
 
-    if let Some(no_video) = config.advanced.no_video {
+    if let Some(no_video) = config.advanced.camera.no_video {
         if !no_video {
             highgui::named_window(cam_1_window, highgui::WINDOW_AUTOSIZE)?;
         }
 
-        if config.multi_camera && !no_video {
+        if config.camera.multi_camera && !no_video {
             highgui::named_window(cam_2_window, highgui::WINDOW_AUTOSIZE)?;
         }
     }
@@ -1563,7 +1565,7 @@ pub fn scan_area(
         };
 
         if valid_cycle {
-            if config.multi_camera {
+            if config.camera.multi_camera {
                 debug!("calling scan_area_cycle for cam2");
                 let scan_area_result = scan_area_cycle(
                     manager,
@@ -1718,7 +1720,7 @@ fn scan_area_cycle(
     second_cam: bool,
     window: &str,
 ) -> Result<(i32, i32), Box<dyn Error>> {
-    let capture_frames = config.advanced.capture_frames.unwrap_or(3);
+    let capture_frames = config.advanced.camera.capture_frames.unwrap_or(3);
 
     let mut success = 0;
     let mut failures = 0;
@@ -1743,7 +1745,7 @@ fn scan_area_cycle(
     let filter_color = manager.lock().unwrap().config.filter_color.unwrap();
     let scan_mode = manager.lock().unwrap().config.scan_mode;
 
-    let brightness = config.color_bright.unwrap();
+    let brightness = config.scan.color_bright.unwrap();
 
     if scan_mode == 1 {
         debug!("using color filter");
@@ -1780,9 +1782,9 @@ fn scan_area_cycle(
     {
         let mut cam = cam.unwrap().lock().unwrap();
 
-        if config.video_width.is_some() && config.video_height.is_some() {
-            cam.set(CAP_PROP_FRAME_WIDTH, config.video_width.unwrap())?;
-            cam.set(CAP_PROP_FRAME_HEIGHT, config.video_height.unwrap())?;
+        if config.camera.video_width.is_some() && config.camera.video_height.is_some() {
+            cam.set(CAP_PROP_FRAME_WIDTH, config.camera.video_width.unwrap())?;
+            cam.set(CAP_PROP_FRAME_HEIGHT, config.camera.video_height.unwrap())?;
         }
 
         for _ in 0..capture_frames {
@@ -1879,8 +1881,8 @@ fn scan_area_cycle(
         };
 
         if scan_data.depth || second_cam {
-            if config.advanced.cam2_overhead.unwrap_or(false) {
-                if config.advanced.cam2_overhead_flip.unwrap_or(false) {
+            if config.advanced.camera.cam2_overhead.unwrap_or(false) {
+                if config.advanced.camera.cam2_overhead_flip.unwrap_or(false) {
                     (
                         status_msg.to_string(),
                         led_pos[i as usize].1,
@@ -1916,7 +1918,7 @@ fn scan_area_cycle(
         manager.lock().unwrap().vision.frame_cam_1 = frame.clone();
     }
 
-    if let Some(no_video) = config.advanced.no_video {
+    if let Some(no_video) = config.advanced.camera.no_video {
         if !no_video {
             highgui::set_window_title(window, &("LED index: ".to_owned() + &i.to_string()))?;
             highgui::imshow(window, &frame)?;
@@ -2068,12 +2070,12 @@ pub fn manual_calibrate(
                 debug!("pos is from callback");
                 led_pos[led_index].0 = "MANUAL-Z".to_string();
                 led_pos[led_index].2 = {
-                    if config.advanced.cam2_overhead.unwrap_or(false) {
-                        if config.advanced.cam2_overhead_flip.unwrap_or(false) {
+                    if config.advanced.camera.cam2_overhead.unwrap_or(false) {
+                        if config.advanced.camera.cam2_overhead_flip.unwrap_or(false) {
                             (*y_click.lock().unwrap(), *x_click.lock().unwrap())
                         } else {
                             let (y_start, y_end) = {
-                                if config.multi_camera {
+                                if config.camera.multi_camera {
                                     // We always get depth from second camera if multi-camera
                                     (
                                         scan_data.pos.y2_start.unwrap(),
@@ -2113,7 +2115,7 @@ pub fn manual_calibrate(
         debug!("setting cricle at {pos:?}");
         imgproc::circle(&mut frame, pos, 20, color, 2, LINE_8, 0)?;
 
-        if let Some(no_video) = config.advanced.no_video {
+        if let Some(no_video) = config.advanced.camera.no_video {
             if frame.size()?.width > 0 && !no_video {
                 highgui::imshow(window, &frame)?;
             }
@@ -2221,9 +2223,9 @@ pub fn get_cam(config: &Config, index_or_address: &str) -> Result<VideoCapture, 
         }
     };
 
-    if config.video_width.is_some() && config.video_height.is_some() {
-        cam.set(CAP_PROP_FRAME_WIDTH, config.video_width.unwrap())?;
-        cam.set(CAP_PROP_FRAME_HEIGHT, config.video_height.unwrap())?;
+    if config.camera.video_width.is_some() && config.camera.video_height.is_some() {
+        cam.set(CAP_PROP_FRAME_WIDTH, config.camera.video_width.unwrap())?;
+        cam.set(CAP_PROP_FRAME_HEIGHT, config.camera.video_height.unwrap())?;
     }
 
     Ok(cam)

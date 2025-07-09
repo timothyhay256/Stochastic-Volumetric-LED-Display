@@ -346,7 +346,10 @@ fn send_color_command(manager_or_config: SendCommandArgs, n: u16, r: u8, g: u8, 
             match udp_socket.as_mut() {
                 Some(udp_socket) => {
                     udp_socket
-                        .set_read_timeout(Some(Duration::new(0, config.udp_read_timeout * 1000000)))
+                        .set_read_timeout(Some(Duration::new(
+                            0,
+                            config.udp_read_timeout.unwrap_or(5) * 1000000,
+                        )))
                         .expect("set_read_timeout call failed");
 
                     let mut bytes: [u8; 5] = [0; 5];
