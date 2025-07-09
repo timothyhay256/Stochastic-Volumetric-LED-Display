@@ -22,10 +22,9 @@ use opencv::{
     Result,
 };
 
-use crate::{led_manager, Config, CropPos, ManagerData, ScanData};
+use crate::{led_manager, Config, CropPos, ManagerData, PosEntry, ScanData};
 
 type ScanResult = Result<(i32, i32, Option<i32>, Option<i32>), Box<dyn Error>>;
-type PosEntry = Vec<(String, (i32, i32), Option<(i32, i32)>)>;
 type CropData = Option<((i32, i32, i32, i32), (i32, i32, i32, i32))>;
 type CallbackResult = (i32, i32, Option<i32>, Option<i32>);
 
@@ -36,8 +35,14 @@ pub fn scan(
     crop_data: CropData,
 ) -> Result<()> {
     // streamlined skips cropping and ALL prompts, thus requiring multiple cameras to function
-    let mut led_pos =
-        vec![("UNCALIBRATED".to_string(), (0, 0), Some((0, 0))); config.num_led as usize];
+    let mut led_pos = vec![
+        (
+            "UNCALIBRATED".to_string(),
+            (i32::MIN, i32::MIN),
+            (i32::MIN, i32::MIN)
+        );
+        config.num_led as usize
+    ];
     let num_led;
     let scan_mode;
     let filter_color;
@@ -1879,20 +1884,20 @@ fn scan_area_cycle(
                     (
                         status_msg.to_string(),
                         led_pos[i as usize].1,
-                        Some((pos.y, pos.x)),
+                        (pos.y, pos.x),
                     )
                 } else {
                     (
                         status_msg.to_string(),
                         led_pos[i as usize].1,
-                        Some((y_start + y_end - pos.y, pos.x)),
+                        (y_start + y_end - pos.y, pos.x),
                     )
                 }
             } else {
                 (
                     status_msg.to_string(),
                     led_pos[i as usize].1,
-                    Some((pos.x, pos.y)),
+                    (pos.x, pos.y),
                 )
             }
         } else {
@@ -2053,11 +2058,11 @@ pub fn manual_calibrate(
             if !*callback_called.lock().unwrap() {
                 debug!("pos is from depth, callback uncalled.");
                 pos = match led_pos[led_index].2 {
-                    Some(pos) => Point::new(pos.0, pos.1),
-                    None => {
+                    (i32::MIN, i32::MIN) => {
                         error!("led_pos does not contain any depth data, setting to 0, 0!");
                         Point::new(0, 0)
                     }
+                    pos => Point::new(pos.0, pos.1),
                 };
             } else {
                 debug!("pos is from callback");
@@ -2065,7 +2070,7 @@ pub fn manual_calibrate(
                 led_pos[led_index].2 = {
                     if config.advanced.cam2_overhead.unwrap_or(false) {
                         if config.advanced.cam2_overhead_flip.unwrap_or(false) {
-                            Some((*y_click.lock().unwrap(), *x_click.lock().unwrap()))
+                            (*y_click.lock().unwrap(), *x_click.lock().unwrap())
                         } else {
                             let (y_start, y_end) = {
                                 if config.multi_camera {
@@ -2078,13 +2083,13 @@ pub fn manual_calibrate(
                                     (scan_data.pos.y1_start, scan_data.pos.y1_end)
                                 }
                             };
-                            Some((
+                            (
                                 y_start + y_end - *y_click.lock().unwrap(),
                                 *x_click.lock().unwrap(),
-                            ))
+                            )
                         }
                     } else {
-                        Some((*x_click.lock().unwrap(), *y_click.lock().unwrap()))
+                        (*x_click.lock().unwrap(), *y_click.lock().unwrap())
                     }
                 };
                 pos = Point::new(*x_click.lock().unwrap(), *y_click.lock().unwrap());
@@ -2172,15 +2177,15 @@ pub fn post_process(led_pos: &mut PosEntry, led_count: u32) {
         y_max = max(led_pos[i as usize].1 .1, y_max);
         y_min = min(led_pos[i as usize].1 .1, y_min);
 
-        z_min = min(led_pos[i as usize].2.unwrap().0, z_min);
-        z_max = max(led_pos[i as usize].2.unwrap().0, z_max);
+        z_min = min(led_pos[i as usize].2 .0, z_min);
+        z_max = max(led_pos[i as usize].2 .0, z_max);
     }
 
     for i in 0..led_count {
         // Normalize values
         led_pos[i as usize].1 .0 -= x_min;
         led_pos[i as usize].1 .1 -= y_min;
-        led_pos[i as usize].2.unwrap().0 = led_pos[i as usize].2.unwrap().0 - z_min;
+        led_pos[i as usize].2 .0 -= z_min;
     }
 
     for i in 0..led_count {
@@ -2188,7 +2193,7 @@ pub fn post_process(led_pos: &mut PosEntry, led_count: u32) {
         let current_y = led_pos[i as usize].1 .1;
 
         let z_mid = z_max / 2;
-        let current_z = led_pos[i as usize].2.unwrap().0;
+        let current_z = led_pos[i as usize].2 .0;
 
         led_pos[i as usize].1 .1 = match current_y {
             y if y > y_mid => y_mid - (y - y_mid),
@@ -2197,9 +2202,9 @@ pub fn post_process(led_pos: &mut PosEntry, led_count: u32) {
         };
 
         if current_z > z_mid {
-            led_pos[i as usize].2.unwrap().0 = z_mid - (current_z - z_mid);
+            led_pos[i as usize].2 .0 = z_mid - (current_z - z_mid);
         } else if current_z < z_mid {
-            led_pos[i as usize].2.unwrap().0 = z_mid + (z_mid - current_z);
+            led_pos[i as usize].2 .0 = z_mid + (z_mid - current_z);
         }
     }
 }
