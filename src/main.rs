@@ -22,7 +22,7 @@ use svled::{
     demo, driver_wizard,
     led_manager::{self, set_color},
     read_vled,
-    scan::post_process,
+    scan::{position_adjustment, post_process},
     speedtest,
     unity::{self, start_listeners},
     utils, PosEntry,
@@ -91,8 +91,8 @@ enum Command {
     #[options(help = "list functioning camera indexes")]
     ListCams(ListCamsOptions),
 
-    #[options(help = "re-run post processing on an position file")]
-    PostProcess(PostProcessOptions),
+    #[options(help = "perform perspective adjustment")]
+    AdjustPerspective(AdjustPerspectiveOptions),
 }
 
 #[derive(Debug, Options)]
@@ -164,7 +164,7 @@ struct ListCamsOptions {
 }
 
 #[derive(Debug, Options)]
-struct PostProcessOptions {
+struct AdjustPerspectiveOptions {
     #[options(help = "path to position file", required)]
     position_file: String,
 
@@ -285,13 +285,15 @@ fn main() {
         info!("\nWorking cameras: {working_cameras:?}");
 
         return;
-    } else if let Some(Command::PostProcess(ref post_process_options)) = opts.command {
-        let mut pos_file = match File::open(post_process_options.position_file.clone()) {
+    } else if let Some(Command::AdjustPerspective(ref perspective_adjust_options)) = opts.command {
+        let config_holder = utils::load_validate_conf(config_path).2;
+
+        let mut pos_file = match File::open(perspective_adjust_options.position_file.clone()) {
             Ok(file) => file,
             Err(e) => {
                 panic!(
                     "Could not read {:?}: {}",
-                    post_process_options.position_file, e
+                    perspective_adjust_options.position_file, e
                 )
             }
         };
@@ -302,30 +304,33 @@ fn main() {
             Err(e) => {
                 panic!(
                     "Could not read position file {}: {}",
-                    post_process_options.position_file, e
+                    perspective_adjust_options.position_file, e
                 )
             }
         };
 
-        let json: PosEntry = match serde_json::from_str(&file_contents) {
+        let mut json: PosEntry = match serde_json::from_str(&file_contents) {
             Ok(json) => json,
             Err(e) => {
                 panic!(
                     "{} contains invalid or incomplete calibration data: {}",
-                    post_process_options.position_file, e
+                    perspective_adjust_options.position_file, e
                 )
             }
         };
 
-        post_process(&mut json.clone(), json.len().try_into().unwrap());
+        position_adjustment(&mut json, &config_holder);
 
-        let name = post_process_options.output_file.clone().unwrap_or(format!(
-            "{}-postprocess.json",
-            post_process_options
-                .position_file
-                .strip_suffix(".json")
-                .unwrap_or(&post_process_options.position_file)
-        ));
+        let name = perspective_adjust_options
+            .output_file
+            .clone()
+            .unwrap_or(format!(
+                "{}-postprocess.json",
+                perspective_adjust_options
+                    .position_file
+                    .strip_suffix(".json")
+                    .unwrap_or(&perspective_adjust_options.position_file)
+            ));
 
         let json = serde_json::to_string_pretty(&json).expect("Unable to serialize metadata!");
         let mut file = match File::create(Path::new(&name)) {
@@ -345,7 +350,7 @@ fn main() {
             }
         }
 
-        info!("Wrote post-processed position file to {name}");
+        info!("Wrote perspective-adjusted position file to {name}");
 
         return;
     }

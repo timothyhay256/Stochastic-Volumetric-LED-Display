@@ -109,12 +109,18 @@ pub struct HsvOverrideConfig {
 
 #[derive(Deserialize, Debug, Clone, Default)]
 pub struct ImageTransformConfig {
+    /// When true, transform adjustments will be auto applied after scan.
+    pub adjust_after_scan: Option<bool>,
     /// When set, cropping will be skipped.
     pub crop_override: Option<Vec<i32>>,
     /// Offsets distant LEDs toward the center to reduce perspective distortion, making the layout appear more orthographic.
-    pub x_perspect_distort_adjust: Option<f32>,
-    pub y_perspect_distort_adjust: Option<f32>,
-    pub z_perspect_distort_adjust: Option<f32>,
+    pub x_perspect_distort_adjust: Option<i32>,
+    pub y_perspect_distort_adjust: Option<i32>,
+    pub z_perspect_distort_adjust: Option<i32>,
+    /// Amount to stretch (or shrink) from center on a specified axis
+    pub x_stretch_adjust: Option<i32>,
+    pub y_stretch_adjust: Option<i32>,
+    pub z_stretch_adjust: Option<i32>,
 }
 
 #[derive(Deserialize, Debug, Clone, Default)]
