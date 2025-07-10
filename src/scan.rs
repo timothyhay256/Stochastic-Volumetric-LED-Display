@@ -3,7 +3,6 @@ use std::{
     error::Error,
     fs::File,
     io::Write,
-    iter::zip,
     path::Path,
     process,
     sync::{Arc, Mutex},
@@ -128,13 +127,20 @@ pub fn scan(
         }
     };
 
-    thread::spawn(move || {
-        loop {
-            let mut frame = Mat::default();
-            cam_guard.lock().unwrap().read(&mut frame).unwrap();
-            thread::sleep(Duration::from_millis(1)); // Give us a chance to grab the lock
-        }
-    });
+    if !config
+        .advanced
+        .camera
+        .no_background_frame_consumer
+        .unwrap_or(false)
+    {
+        thread::spawn(move || {
+            loop {
+                let mut frame = Mat::default();
+                cam_guard.lock().unwrap().read(&mut frame).unwrap();
+                thread::sleep(Duration::from_millis(1)); // Give us a chance to grab the lock
+            }
+        });
+    }
 
     if streamlined {
         debug!("process is streamlined");
@@ -2297,30 +2303,30 @@ pub fn position_adjustment(led_pos: &mut PosEntry, config: &Config) {
                 }
             }
 
-            if let Some(y_transform_amount) = y_transform {
-                // TODO: Sanity check
-                let reduction_factor = ((position.1 .1 as f32 / z_max as f32)
-                    * y_transform_amount as f32)
-                    .round() as i32;
+            // TODO: Implement for X and Y aswell
+            // if let Some(y_transform_amount) = y_transform {
+            //     let reduction_factor = ((position.1 .1 as f32 / z_max as f32)
+            //         * y_transform_amount as f32)
+            //         .round() as i32;
 
-                if position.2 .0 > x_max / 2 {
-                    position.2 .0 -= reduction_factor;
-                } else if position.2 .0 < x_max / 2 {
-                    position.2 .0 += reduction_factor;
-                }
-            }
+            //     if position.2 .0 > x_max / 2 {
+            //         position.2 .0 -= reduction_factor;
+            //     } else if position.2 .0 < x_max / 2 {
+            //         position.2 .0 += reduction_factor;
+            //     }
+            // }
 
-            if let Some(x_transform_amount) = x_transform {
-                let reduction_factor = ((position.1 .0 as f32 / z_max as f32)
-                    * x_transform_amount as f32)
-                    .round() as i32;
+            // if let Some(x_transform_amount) = x_transform {
+            //     let reduction_factor = ((position.1 .0 as f32 / z_max as f32)
+            //         * x_transform_amount as f32)
+            //         .round() as i32;
 
-                if position.1 .1 > x_max / 2 {
-                    position.1 .1 -= reduction_factor;
-                } else if position.1 .1 < x_max / 2 {
-                    position.1 .1 += reduction_factor;
-                }
-            }
+            //     if position.1 .1 > x_max / 2 {
+            //         position.1 .1 -= reduction_factor;
+            //     } else if position.1 .1 < x_max / 2 {
+            //         position.1 .1 += reduction_factor;
+            //     }
+            // }
         }
     }
 }
