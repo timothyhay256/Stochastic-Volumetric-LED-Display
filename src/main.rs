@@ -19,10 +19,11 @@ use svled::gui;
 #[cfg(feature = "scan")]
 use svled::scan;
 use svled::{
-    demo, driver_wizard,
+    demo::{self, render_jpg_onto_leds},
+    driver_wizard,
     led_manager::{self, set_color},
     read_vled,
-    scan::{position_adjustment, post_process},
+    scan::position_adjustment,
     speedtest,
     unity::{self, start_listeners},
     utils, PosEntry,
@@ -140,6 +141,9 @@ struct DriverWizardOptions {}
 struct DemoOptions {
     #[options(help = "demo to run (rainbow, rainbow-loop)", required)]
     active_demo: String,
+
+    #[options(help = "image to render")]
+    image_path: Option<String>,
 }
 
 #[derive(Debug, Options)]
@@ -491,6 +495,17 @@ fn main() {
                 demo::rainbow(&manager, &json, 50, 50, false, demo::Axis::Y, true);
                 demo::rainbow(&manager, &json, 80, 50, false, demo::Axis::Z, true);
             }
+            "image" => {
+                render_jpg_onto_leds(
+                    &demo_options.image_path.clone().unwrap(),
+                    &json,
+                    &manager,
+                    Some(0..=250),
+                );
+            }
+            // "image-sequence" => {
+            //     render_jpg_sequence("bad-apple", "output_", &json, &manager, Some(0..=250));
+            // }
             option => {
                 error!("Invalid option {option}");
             }

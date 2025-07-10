@@ -376,8 +376,8 @@ pub fn get_events(
 
     loop {
         let mut buf = [0; 16];
-        socket.recv_from(&mut buf)?;
-        let msg = match str::from_utf8(&buf) {
+        let (len, _addr) = socket.recv_from(&mut buf)?;
+        let msg = match str::from_utf8(&buf[..len]) {
             Ok(msg) => msg,
             Err(e) => {
                 error!(
@@ -386,15 +386,18 @@ pub fn get_events(
                 "FAIL"
             }
         };
+
         let mut msg = msg.to_string();
         if msg.contains("E") {
-            // println!("{msg}");
             // Clear color of index `EN`
             msg.remove(0);
-            let index = match msg.to_string().parse::<u16>() {
+            let index = match msg.to_string().trim().parse::<u16>() {
                 Ok(index) => index,
                 Err(e) => {
-                    panic!("Unity packet was malformed: Attempted to convert {msg} to u8: {e}")
+                    panic!(
+                        "Unity packet was malformed: Attempted to convert {} to u16: {e}",
+                        msg.to_string().trim()
+                    )
                 }
             };
             led_manager::set_color(&manager, index, 0, 0, 0);
@@ -403,7 +406,6 @@ pub fn get_events(
             if let Some(value) = json_hashmap.lock().unwrap().get_mut(&(index as usize)) {
                 value.3 = false;
             }
-            info!("dimming {index}");
         } else if msg.contains("|") {
             // Set index n with r g b from string n|r|g|b
             let mut xs: [u16; 4] = [0; 4];
@@ -444,6 +446,12 @@ pub fn get_events(
 }
 
 pub fn start_listeners(config_holder: &Config, manager: &Arc<Mutex<ManagerData>>) {
+    // info!("Clearing string");
+
+    // for n in 0..config_holder.num_led {
+    //     led_manager::set_color(manager, n as u16, 0, 0, 0);
+    // }
+
     info!("Spawning listening threads");
 
     let mut children = Vec::new();

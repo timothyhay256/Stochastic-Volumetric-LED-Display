@@ -96,6 +96,8 @@ pub struct AdvancedCameraConfig {
     pub cam2_overhead: Option<bool>,
     /// When true, assume the overhead camera is upside down relative to the front camera
     pub cam2_overhead_flip: Option<bool>,
+    /// When true, don't spawn a thread to consume frames in the background. Defaults to false.
+    pub no_background_frame_consumer: Option<bool>,
 }
 
 #[derive(Deserialize, Debug, Clone, Default)]
