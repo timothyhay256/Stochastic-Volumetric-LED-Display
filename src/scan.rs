@@ -268,20 +268,27 @@ pub fn scan(
             }
         };
 
-        match thread::Builder::new()
-            .name("frame_consumer".to_string())
-            .spawn(move || {
-                loop {
-                    let mut frame = Mat::default();
-                    cam2_guard.lock().unwrap().read(&mut frame).unwrap();
-                    thread::sleep(Duration::from_millis(1)); // Give us a chance to grab the lock
+        if !config
+            .advanced
+            .camera
+            .no_background_frame_consumer
+            .unwrap_or(false)
+        {
+            match thread::Builder::new()
+                .name("frame_consumer".to_string())
+                .spawn(move || {
+                    loop {
+                        let mut frame = Mat::default();
+                        cam2_guard.lock().unwrap().read(&mut frame).unwrap();
+                        thread::sleep(Duration::from_millis(1)); // Give us a chance to grab the lock
+                    }
+                }) {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("Failed to spawn frame_consumer! Scan results may be inaccurate! Error: {e}")
                 }
-            }) {
-            Ok(_) => {}
-            Err(e) => {
-                error!("Failed to spawn frame_consumer! Scan results may be inaccurate! Error: {e}")
-            }
-        };
+            };
+        }
         // let initial_cal_var = brightest_darkest(cam2.as_ref().unwrap(), &config, manager_guard, pos.x1_start, pos.y1_start, pos.x1_end, pos.y1_end, !streamlined);
         // (pos.cam_2_brightest, pos.cam_2_darkest) = (
         //     Some(match initial_cal_var {
@@ -1198,7 +1205,7 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
         Err(e) => panic!("Something went wrong during cropping: {e}"),
     };
 
-    drop(cam_guard);
+    // drop(cam_guard);
 
     highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
     set_crop_mouse_callback(
@@ -1217,7 +1224,7 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
     if let Some(index) = &config.camera.camera_index_2 {
         debug!("Cropping second camera with index {index}");
         *camera_active.lock().unwrap() = 1;
-        let cam_guard = Arc::new(Mutex::new(get_cam(config, &index).unwrap()));
+        // let cam_guard = Arc::new(Mutex::new(get_cam(config, index).unwrap()));
 
         if config.camera.video_width.is_some() && config.camera.video_height.is_some() {
             cam_guard
@@ -1422,7 +1429,7 @@ fn callback_loop(
                     highgui::imshow(window, frame)?;
                 } else {
                     error!(
-                        "frame is too small! size: {:?} rect: {:?}, ",
+                        "frame is too small or no_video is true! size: {:?} rect: {:?}, ",
                         frame.size()?,
                         rect
                     );
@@ -1579,6 +1586,19 @@ pub fn scan_area(
         };
 
         if valid_cycle {
+            debug!("calling scan_area_cycle for cam1");
+            (success, failures) = scan_area_cycle(
+                manager,
+                config,
+                Some(cam),
+                scan_data,
+                led_pos,
+                i,
+                false,
+                cam_1_window,
+            )
+            .unwrap();
+
             if config.camera.multi_camera {
                 debug!("calling scan_area_cycle for cam2");
                 let scan_area_result = scan_area_cycle(
@@ -1595,19 +1615,6 @@ pub fn scan_area(
                 (cam_2_success, cam_2_failures) =
                     (Some(scan_area_result.0), Some(scan_area_result.1));
             }
-
-            debug!("calling scan_area_cycle for cam1");
-            (success, failures) = scan_area_cycle(
-                manager,
-                config,
-                Some(cam),
-                scan_data,
-                led_pos,
-                i,
-                false,
-                cam_1_window,
-            )
-            .unwrap();
         }
     }
     Ok((success, failures, cam_2_success, cam_2_failures))
@@ -1801,19 +1808,19 @@ fn scan_area_cycle(
             cam.set(CAP_PROP_FRAME_HEIGHT, config.camera.video_height.unwrap())?;
         }
 
+        for _ in 0..300 {
+            // Mostly only needed when using RTSP
+            if frame.size()?.width == 0 || frame.size()?.height == 0 {
+                debug!("capturing another frame as previous was empty");
+                cam.read(&mut frame)?;
+            } else {
+                break;
+            }
+        }
+
         for _ in 0..capture_frames {
             // This is still needed unfortunately. It may need to be increased if you continue to encounter issues
             cam.read(&mut frame)?;
-        }
-
-        for _ in 0..50 {
-            // Mostly only needed when using RTSP
-            if !frame.empty() {
-                break;
-            } else {
-                debug!("capturing another frame as previous was empty");
-                cam.read(&mut frame)?;
-            }
         }
     }
 
