@@ -1,13 +1,11 @@
 use std::{
-    fs,
     sync::{Arc, Mutex},
     thread::sleep,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
-use image::{io::Reader as ImageReader, GenericImageView, Pixel};
+use image::{GenericImageView, Pixel};
 use log::error;
-use regex::Regex;
 
 use crate::{led_manager, set_color, ManagerData, PosEntry};
 type LedPos = [(String, (i32, i32), (i32, i32))];

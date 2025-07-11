@@ -4,7 +4,8 @@ use std::{
     io::{BufWriter, Read, Write},
     net::{Ipv4Addr, UdpSocket},
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::{atomic::AtomicBool, Arc, Mutex},
+    thread::JoinHandle,
     time::SystemTime,
 };
 
@@ -153,7 +154,6 @@ pub struct UnityOptions {
     pub unity_position_files: Vec<PathBuf>,
     pub scale: f32,
 }
-#[derive(Debug)]
 pub struct ManagerData {
     pub config: RuntimeConfig,
     pub state: ManagerState,
@@ -193,13 +193,14 @@ pub struct RuntimeConfig {
     pub led_config: Option<LedConfig>, // Exists so that we don't have to create a new struct every time we call set_color. Acts just as a holder for other items from RuntimeConfig
 }
 
-#[derive(Debug)]
 pub struct ManagerState {
     pub first_run: bool,
     pub call_time: SystemTime,
-    pub keepalive: bool,
+    pub keepalive: Arc<AtomicBool>,
+    pub keepalive_get_events: bool,
     pub led_state: LedState,
     pub led_thread_channels: Vec<Sender<Task>>,
+    pub all_thread_handles: Vec<JoinHandle<()>>,
 }
 
 #[derive(Debug)]
@@ -403,7 +404,8 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
             state: ManagerState {
                 first_run: true,
                 call_time: SystemTime::now(),
-                keepalive: true,
+                keepalive_get_events: true,
+                keepalive: Arc::new(AtomicBool::new(true)),
                 led_state: {
                     LedState {
                         failures: 0,
@@ -411,6 +413,7 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
                     }
                 },
                 led_thread_channels: Vec::new(),
+                all_thread_handles: Vec::new(),
             },
             io: IOHandles {
                 data_file_buf: None,

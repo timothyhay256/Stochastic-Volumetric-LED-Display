@@ -10,6 +10,7 @@ use std::{
     time::Duration,
 };
 
+use anyhow::{anyhow, Result};
 use chrono::Local; // TODO: Play with different camera backends
 use inquire;
 use log::{debug, error, info, warn}; // TODO: Properly get HSV for each camera
@@ -19,7 +20,6 @@ use opencv::{
     imgproc::{self, COLOR_BGR2GRAY, COLOR_BGR2HSV, LINE_8},
     prelude::*,
     videoio::{self, VideoCapture, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH},
-    Result,
 };
 
 use crate::{led_manager, Config, CropPos, ManagerData, PosEntry, ScanData};
@@ -93,9 +93,7 @@ pub fn scan(
         info!("Starting crop");
         pos = match crop(&config, manager_guard) {
             Ok(pos) => pos,
-            Err(e) => {
-                panic!("There was a problem while trying to crop: {e}")
-            }
+            Err(e) => return Err(anyhow!("There was a problem while trying to crop: {e}")),
         };
     }
 
@@ -117,13 +115,17 @@ pub fn scan(
     let cam_guard = Arc::clone(&cam);
     let cam2_guard: Arc<Mutex<VideoCapture>>;
 
-    match videoio::VideoCapture::is_opened(&cam_guard.lock().unwrap())? {
+    let keepalive = Arc::new(Mutex::new(true));
+
+    let thread1_keepalive_guard = Arc::clone(&keepalive);
+
+    match videoio::VideoCapture::is_opened(&cam.lock().unwrap())? {
         true => {}
         false => {
-            panic!(
+            return Err(anyhow!(
                 "Unable to open camera {}! Please select another.",
                 config.camera.camera_index_1
-            )
+            ))
         }
     };
 
@@ -134,7 +136,7 @@ pub fn scan(
         .unwrap_or(false)
     {
         thread::spawn(move || {
-            loop {
+            while *thread1_keepalive_guard.lock().unwrap() {
                 let mut frame = Mat::default();
                 cam_guard.lock().unwrap().read(&mut frame).unwrap();
                 thread::sleep(Duration::from_millis(1)); // Give us a chance to grab the lock
@@ -261,10 +263,10 @@ pub fn scan(
         match videoio::VideoCapture::is_opened(&cam2_guard.lock().unwrap())? {
             true => {}
             false => {
-                panic!(
+                return Err(anyhow!(
                     "Unable to open camera {}! Please select another.",
                     config.camera.camera_index_2.unwrap()
-                )
+                ))
             }
         };
 
@@ -274,10 +276,11 @@ pub fn scan(
             .no_background_frame_consumer
             .unwrap_or(false)
         {
+            let thread2_keepalive_guard = Arc::clone(&keepalive);
             match thread::Builder::new()
                 .name("frame_consumer".to_string())
                 .spawn(move || {
-                    loop {
+                    while *thread2_keepalive_guard.lock().unwrap() {
                         let mut frame = Mat::default();
                         cam2_guard.lock().unwrap().read(&mut frame).unwrap();
                         thread::sleep(Duration::from_millis(1)); // Give us a chance to grab the lock
@@ -534,12 +537,13 @@ pub fn scan(
             }
         }
     }
-    {
-        cam.lock().unwrap().release().unwrap();
-        if config.camera.multi_camera {
-            cam2.unwrap().lock().unwrap().release().unwrap();
-        }
+
+    *keepalive.lock().unwrap() = false;
+    cam.lock().unwrap().release().unwrap();
+    if config.camera.multi_camera {
+        cam2.unwrap().lock().unwrap().release().unwrap();
     }
+
     highgui::destroy_all_windows().unwrap();
 
     post_process(&mut led_pos, manager_guard.lock().unwrap().config.num_led);
@@ -614,6 +618,7 @@ pub fn scan(
 
         info!("Scan exiting!");
     }
+
     Ok(())
 }
 
@@ -2226,11 +2231,11 @@ pub fn post_process(led_pos: &mut PosEntry, led_count: u32) {
             _ => led_pos[i as usize].1 .1, // when current_y == y_mid, no change
         };
 
-        if current_z > z_mid {
-            led_pos[i as usize].2 .0 = z_mid - (current_z - z_mid);
-        } else if current_z < z_mid {
-            led_pos[i as usize].2 .0 = z_mid + (z_mid - current_z);
-        }
+        // if current_z > z_mid {
+        //     led_pos[i as usize].2 .0 = z_mid - (current_z - z_mid);
+        // } else if current_z < z_mid {
+        //     led_pos[i as usize].2 .0 = z_mid + (z_mid - current_z);
+        // }
     }
 }
 

@@ -4,11 +4,11 @@ use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
     process,
-    sync::{Arc, Mutex},
+    sync::{atomic::Ordering, Arc, Mutex},
 };
 
 use gumdrop::Options;
-use log::{error, info};
+use log::{debug, error, info};
 use opencv::{
     core::{Mat, MatTraitConst},
     videoio::{self, VideoCaptureTrait, VideoCaptureTraitConst},
@@ -367,23 +367,6 @@ fn main() {
         config_load_result.2,
     );
 
-    let ctrlc_manager = Arc::clone(&manager);
-
-    ctrlc::set_handler(move || {
-        info!("Exiting cleanly...");
-
-        let mut manager = ctrlc_manager.lock().unwrap();
-
-        if let Some(file_buf) = &mut manager.io.data_file_buf {
-            file_buf.flush().unwrap();
-        }
-
-        if let Some(file_buf) = &mut manager.io.esp_data_file_buf {
-            file_buf.flush().unwrap();
-        }
-    })
-    .expect("Error setting Ctrl-C handler");
-
     if let Some(Command::Speedtest(ref _speedtest_options)) = opts.command {
         info!("Performing speedtest...");
 
@@ -411,6 +394,40 @@ fn main() {
             };
         }
     } else if let Some(Command::Unity(ref _unity_options)) = opts.command {
+        let ctrlc_manager = Arc::clone(&manager);
+
+        ctrlc::set_handler(move || {
+            info!("Exiting cleanly...");
+
+            let mut manager = ctrlc_manager.lock().unwrap();
+
+            if let Some(file_buf) = &mut manager.io.data_file_buf {
+                debug!("Flushing data_file_buf");
+                file_buf.flush().unwrap();
+            }
+
+            if let Some(file_buf) = &mut manager.io.esp_data_file_buf {
+                debug!("Flushing esp_data_file_buf");
+                file_buf.flush().unwrap();
+            }
+
+            debug!("signaling to exit any threads");
+            manager.state.keepalive.store(false, Ordering::Relaxed);
+            manager.state.keepalive_get_events = false;
+
+            debug!("joining handles");
+            for handle in std::mem::take(&mut manager.state.all_thread_handles) {
+                if let Err(e) = handle.join() {
+                    error!("Thread panicked: {e:?}");
+                }
+            }
+
+            drop(manager);
+
+            debug!("finished joining handles");
+        })
+        .expect("Error setting Ctrl-C handler");
+
         // Validate Unity section of config, if we are using Unity.
 
         for i in 0..=unity_options.num_container - 1 {
@@ -435,7 +452,12 @@ fn main() {
 
         info!("Spawning listening threads");
 
-        start_listeners(&config_holder, &manager);
+        manager
+            .lock()
+            .unwrap()
+            .state
+            .all_thread_handles
+            .append(&mut start_listeners(&config_holder, &manager));
     } else if let Some(Command::SendPos(ref _sendpos_options)) = opts.command {
         info!("Sending positions to Unity");
 
@@ -448,7 +470,52 @@ fn main() {
     } else if let Some(Command::ConnectUnity(ref _connectunity_options)) = opts.command {
         info!("Spawning listening threads");
 
-        start_listeners(&config_holder, &manager);
+        let ctrlc_manager = Arc::clone(&manager);
+
+        ctrlc::set_handler(move || {
+            info!("Exiting cleanly...");
+
+            let mut manager = ctrlc_manager.lock().unwrap();
+
+            if let Some(file_buf) = &mut manager.io.data_file_buf {
+                debug!("Flushing data_file_buf");
+                file_buf.flush().unwrap();
+            }
+
+            if let Some(file_buf) = &mut manager.io.esp_data_file_buf {
+                debug!("Flushing esp_data_file_buf");
+                file_buf.flush().unwrap();
+            }
+
+            debug!("signaling to exit any threads");
+            manager.state.keepalive.store(false, Ordering::Relaxed);
+            manager.state.keepalive_get_events = false;
+
+            drop(manager);
+
+            debug!("finished joining handles");
+        })
+        .expect("Error setting Ctrl-C handler");
+
+        let mut listener_thread_handles = start_listeners(&config_holder, &manager);
+
+        {
+            let mut guard = manager.lock().unwrap();
+            guard
+                .state
+                .all_thread_handles
+                .append(&mut listener_thread_handles);
+        }
+
+        let all_handles = {
+            let mut guard = manager.lock().unwrap();
+            std::mem::take(&mut guard.state.all_thread_handles)
+        };
+
+        for handle in all_handles {
+            info!("joining thread");
+            handle.join().unwrap();
+        }
     } else if let Some(Command::DriverWizard(ref _driver_wizard_options)) = opts.command {
         info!("Starting driver configuration wizard!");
         driver_wizard::wizard();

@@ -8,7 +8,7 @@ use std::{
     thread, time,
 };
 
-use log::{error, info, warn};
+use log::{info, warn};
 use time::Instant;
 
 use crate::{led_manager, ManagerData};
@@ -62,7 +62,7 @@ pub fn read_vled(manager: &Arc<Mutex<ManagerData>>, file: PathBuf) -> Result<(),
                 // println!("Sleeping for {}");
                 thread::sleep(time::Duration::from_millis(sleep as u64));
             } else {
-                error!("Unable to parse invalid line of vled file.");
+                warn!("Unable to parse invalid line of vled file: {line}");
             }
 
             if start.elapsed().as_secs() >= 1 {
