@@ -6,8 +6,11 @@ use std::{
     io::prelude::*,
     net::{Ipv4Addr, TcpStream, UdpSocket},
     str,
-    sync::{Arc, Mutex},
-    thread,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
+    thread::{self, JoinHandle},
     time::{Duration, SystemTime},
 };
 
@@ -105,17 +108,20 @@ pub fn send_pos(unity: UnityOptions) -> std::io::Result<()> {
         for led in json.iter() {
             pb_count += 1;
             pb.set_position(pb_count);
-            stream.write_all(
-                format!(
-                    "{},{},{}",
-                    led.1 .0 as f32 * unity.scale,
-                    led.1 .1 as f32 * unity.scale,
-                    led.2 .0 as f32 * unity.scale
+            stream
+                .write_all(
+                    format!(
+                        "{},{},{}",
+                        led.1 .0 as f32 * unity.scale,
+                        led.1 .1 as f32 * unity.scale,
+                        led.2 .0 as f32 * unity.scale
+                    )
+                    .as_bytes(),
                 )
-                .as_bytes(),
-            )?;
+                .unwrap();
+
             let mut response: [u8; 3] = [0; 3];
-            stream.read_exact(&mut response)?;
+            stream.read_exact(&mut response).unwrap();
 
             if match str::from_utf8(&response) {
                 Ok(v) => v,
@@ -138,6 +144,7 @@ pub fn get_events(
     config: &Config,
     port: &u32,
     frame_buffer: &Option<Arc<Mutex<GetEventsFrameBuffer>>>, // Seperate buffer for frames to reduce locks on manager
+    keepalive: Arc<AtomicBool>,
 ) -> Result<(), Box<dyn Error>> {
     type JsonHashmap = HashMap<usize, ((f32, f32), (f32, f32), (u8, u8, u8), bool)>; // <index, xy, zy, rgb, illuminated>
 
@@ -341,7 +348,7 @@ pub fn get_events(
                                 Point::new(xy.0 as i32, xy.1 as i32),
                                 20,
                                 Scalar::new(rgb.2 as f64, rgb.1 as f64, rgb.0 as f64, 0.0f64),
-                                2,
+                                3,
                                 LINE_8,
                                 0,
                             )
@@ -352,7 +359,7 @@ pub fn get_events(
                                 Point::new(z.0 as i32, xy.1 as i32),
                                 20,
                                 Scalar::new(rgb.2 as f64, rgb.1 as f64, rgb.0 as f64, 0.0f64),
-                                2,
+                                3,
                                 LINE_8,
                                 0,
                             )
@@ -364,7 +371,7 @@ pub fn get_events(
                         let mut frame_buffer = owned_frame_buffer.lock().unwrap();
                         frame_buffer.shared_frame_1 = frame_cam_1.clone();
                         frame_buffer.shared_frame_2 = frame_cam_2.clone();
-                        if !owned_manager.lock().unwrap().state.keepalive {
+                        if !owned_manager.lock().unwrap().state.keepalive_get_events {
                             info!("get_events_streams_video thread exiting");
                             break;
                         }
@@ -374,70 +381,90 @@ pub fn get_events(
             .unwrap();
     }
 
-    loop {
+    socket.set_read_timeout(Some(Duration::from_millis(100)))?;
+
+    while keepalive.load(Ordering::Relaxed) {
         let mut buf = [0; 16];
-        let (len, _addr) = socket.recv_from(&mut buf)?;
-        let msg = match str::from_utf8(&buf[..len]) {
-            Ok(msg) => msg,
-            Err(e) => {
-                error!(
-                    "Received invalid packet from Unity:{buf:?} which resulted in the following: {e}"
-                );
-                "FAIL"
-            }
-        };
-
-        let mut msg = msg.to_string();
-        if msg.contains("E") {
-            // Clear color of index `EN`
-            msg.remove(0);
-            let index = match msg.to_string().trim().parse::<u16>() {
-                Ok(index) => index,
-                Err(e) => {
-                    panic!(
-                        "Unity packet was malformed: Attempted to convert {} to u16: {e}",
-                        msg.to_string().trim()
-                    )
-                }
-            };
-            led_manager::set_color(&manager, index, 0, 0, 0);
-
-            // Indicate this isn't illuminated
-            if let Some(value) = json_hashmap.lock().unwrap().get_mut(&(index as usize)) {
-                value.3 = false;
-            }
-        } else if msg.contains("|") {
-            // Set index n with r g b from string n|r|g|b
-            let mut xs: [u16; 4] = [0; 4];
-            let nrgb = msg.trim_matches(char::is_control).split("|");
-            for (i, el) in nrgb.enumerate() {
-                xs[i] = match el.parse::<u16>() {
-                    Ok(el) => el,
+        match socket.recv_from(&mut buf) {
+            Ok((len, _addr)) => {
+                let msg = match str::from_utf8(&buf[..len]) {
+                    Ok(msg) => msg,
                     Err(e) => {
-                        panic!("Unity packet was malformed: Attempted to convert {el} to u8: {e}")
+                        error!(
+                            "Received invalid packet from Unity:{buf:?} which resulted in the following: {e}"
+                        );
+                        "FAIL"
                     }
                 };
-            }
 
-            if xs[1] != 0 || xs[2] != 0 || xs[3] != 0 {
-                // Indicate this is illuminated
-                if let Some(value) = json_hashmap.lock().unwrap().get_mut(&(xs[0] as usize)) {
-                    value.3 = true;
-                    value.2 = (xs[1] as u8, xs[2] as u8, xs[3] as u8);
-                }
-            } else {
-                // Indicate this isn't illuminated
-                if let Some(value) = json_hashmap.lock().unwrap().get_mut(&(xs[0] as usize)) {
-                    value.3 = false;
+                let mut msg = msg.to_string();
+                if msg.contains("E") {
+                    // Clear color of index `EN`
+                    msg.remove(0);
+                    let index = match msg.to_string().trim().parse::<u16>() {
+                        Ok(index) => index,
+                        Err(e) => {
+                            panic!(
+                                "Unity packet was malformed: Attempted to convert {} to u16: {e}",
+                                msg.to_string().trim()
+                            )
+                        }
+                    };
+                    led_manager::set_color(&manager, index, 0, 0, 0);
+
+                    // Indicate this isn't illuminated
+                    if let Some(value) = json_hashmap.lock().unwrap().get_mut(&(index as usize)) {
+                        value.3 = false;
+                    }
+                } else if msg.contains("|") {
+                    // Set index n with r g b from string n|r|g|b
+                    let mut xs: [u16; 4] = [0; 4];
+                    let nrgb = msg.trim_matches(char::is_control).split("|");
+                    for (i, el) in nrgb.enumerate() {
+                        xs[i] = match el.parse::<u16>() {
+                            Ok(el) => el,
+                            Err(e) => {
+                                panic!("Unity packet was malformed: Attempted to convert {el} to u8: {e}")
+                            }
+                        };
+                    }
+
+                    if xs[1] != 0 || xs[2] != 0 || xs[3] != 0 {
+                        // Indicate this is illuminated
+                        if let Some(value) = json_hashmap.lock().unwrap().get_mut(&(xs[0] as usize))
+                        {
+                            value.3 = true;
+                            value.2 = (xs[1] as u8, xs[2] as u8, xs[3] as u8);
+                        }
+                    } else {
+                        // Indicate this isn't illuminated
+                        if let Some(value) = json_hashmap.lock().unwrap().get_mut(&(xs[0] as usize))
+                        {
+                            value.3 = false;
+                        }
+                    }
+                    led_manager::set_color(&manager, xs[0], xs[1] as u8, xs[2] as u8, xs[3] as u8);
+                } else {
+                    error!("Unity packet was malformed! Packet: {msg}");
                 }
             }
-            led_manager::set_color(&manager, xs[0], xs[1] as u8, xs[2] as u8, xs[3] as u8);
-        } else {
-            error!("Unity packet was malformed! Packet: {msg}");
+            Err(e)
+                if e.kind() == std::io::ErrorKind::WouldBlock
+                    || e.kind() == std::io::ErrorKind::TimedOut =>
+            {
+                // Timeout reached, loop again to check keepalive
+                continue;
+            }
+            Err(e) => {
+                error!("Socket recv_from error: {e}");
+                break;
+            }
         }
-        if !manager.lock().unwrap().state.keepalive {
+
+        // TODO: Remove after Open Sauce (legacy for OS demo code)
+        if !manager.lock().unwrap().state.keepalive_get_events {
             info!("get_events exiting.");
-            manager.lock().unwrap().state.keepalive = true;
+            manager.lock().unwrap().state.keepalive_get_events = true;
             break;
         }
     }
@@ -445,7 +472,10 @@ pub fn get_events(
     Ok(())
 }
 
-pub fn start_listeners(config_holder: &Config, manager: &Arc<Mutex<ManagerData>>) {
+pub fn start_listeners(
+    config_holder: &Config,
+    manager: &Arc<Mutex<ManagerData>>,
+) -> Vec<JoinHandle<()>> {
     // info!("Clearing string");
 
     // for n in 0..config_holder.num_led {
@@ -509,12 +539,14 @@ pub fn start_listeners(config_holder: &Config, manager: &Arc<Mutex<ManagerData>>
                 state: ManagerState {
                     first_run: true,
                     call_time: SystemTime::now(),
-                    keepalive: true,
+                    keepalive_get_events: true,
+                    keepalive: Arc::new(AtomicBool::new(true)),
                     led_state: LedState {
                         failures: 0,
                         queue_lengths: Vec::new(),
                     },
                     led_thread_channels: Vec::new(),
+                    all_thread_handles: Vec::new(),
                 },
                 io: IOHandles {
                     data_file_buf: None,
@@ -531,6 +563,9 @@ pub fn start_listeners(config_holder: &Config, manager: &Arc<Mutex<ManagerData>>
 
         let owned_options = config_holder.unity_options.clone();
         let owned_config = config_holder.clone();
+        let owned_keepalive = Arc::clone(&manager.lock().unwrap().state.keepalive);
+
+        info!("pushing child");
         children.push(
             thread::Builder::new()
                 .name("get_events".to_string())
@@ -542,9 +577,10 @@ pub fn start_listeners(config_holder: &Config, manager: &Arc<Mutex<ManagerData>>
                         &owned_config,
                         &owned_options.unity_ports.clone()[i as usize],
                         &None,
+                        owned_keepalive,
                     ) {
                         Ok(_) => {
-                            debug!("thread exited??")
+                            debug!("get_events thread exited.")
                         }
                         Err(e) => {
                             panic!("get_events thread crashed with error: {e}")
@@ -554,13 +590,5 @@ pub fn start_listeners(config_holder: &Config, manager: &Arc<Mutex<ManagerData>>
                 .unwrap(),
         )
     }
-
-    for child in children {
-        match child.join() {
-            Ok(_) => {}
-            Err(e) => {
-                error!("Couldn't join child thread {e:?}")
-            }
-        };
-    }
+    children
 }

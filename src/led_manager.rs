@@ -4,12 +4,12 @@ use std::{
     net::UdpSocket,
     path::{Path, PathBuf},
     process,
-    sync::{Arc, Mutex},
+    sync::{atomic::Ordering, Arc, Mutex},
     thread,
     time::{Duration, SystemTime},
 };
 
-use crossbeam_channel::{bounded, Receiver, Sender};
+use crossbeam_channel::{bounded, Receiver, RecvTimeoutError, Sender};
 use log::{debug, error, info, warn};
 use serialport::SerialPort;
 
@@ -25,9 +25,10 @@ enum SendCommandArgs<'a> {
     ChannelConfigState(ConnectionType<'a>, &'a LedConfig, &'a mut LedState),
 }
 
-fn dispatch_threads(manager: &ManagerData) -> Vec<Sender<Task>> {
+fn dispatch_threads(manager: &mut ManagerData) -> Vec<Sender<Task>> {
     let config = manager.config.clone();
     let mut channels = Vec::new();
+    let handles = &mut manager.state.all_thread_handles;
 
     for path in config.serial_port_paths.clone() {
         let (tx, rx): (Sender<Task>, Receiver<Task>) = bounded(config.queue_size.unwrap_or(20));
@@ -51,6 +52,7 @@ fn dispatch_threads(manager: &ManagerData) -> Vec<Sender<Task>> {
 
         let baud_rate = config.baud_rate;
         let serial_read_timeout = config.serial_read_timeout;
+        let keepalive = Arc::clone(&manager.state.keepalive);
 
         let mut serial_port = match serialport::new(&path, baud_rate)
             .timeout(Duration::from_millis(
@@ -63,24 +65,36 @@ fn dispatch_threads(manager: &ManagerData) -> Vec<Sender<Task>> {
         };
 
         debug!("Dispatching thread!");
-        thread::spawn(move || {
+        let my_keepalive = Arc::clone(&keepalive);
+
+        handles.push(thread::spawn(move || {
             let mut owned_state = LedState {
                 failures: 0,
                 queue_lengths: Vec::new(),
             };
 
-            while let Ok(cmd) = rx.recv() {
-                send_color_command(
-                    SendCommandArgs::ChannelConfigState(
-                        ConnectionType::Serial(&mut *serial_port),
-                        &owned_led_config,
-                        &mut owned_state,
-                    ),
-                    cmd.command.0,
-                    cmd.command.1,
-                    cmd.command.2,
-                    cmd.command.3,
-                );
+            while my_keepalive.load(Ordering::Relaxed) {
+                match rx.recv_timeout(Duration::from_millis(100)) {
+                    Ok(cmd) => {
+                        send_color_command(
+                            SendCommandArgs::ChannelConfigState(
+                                ConnectionType::Serial(&mut *serial_port),
+                                &owned_led_config,
+                                &mut owned_state,
+                            ),
+                            cmd.command.0,
+                            cmd.command.1,
+                            cmd.command.2,
+                            cmd.command.3,
+                        );
+                    }
+                    Err(RecvTimeoutError::Timeout) => {
+                        // just loop again and check `keepalive`
+                    }
+                    Err(RecvTimeoutError::Disconnected) => {
+                        break;
+                    }
+                }
             }
 
             let mut queue_total_lengths: u32 = 0;
@@ -99,7 +113,7 @@ fn dispatch_threads(manager: &ManagerData) -> Vec<Sender<Task>> {
                 );
                 debug!("socket worker thread exiting!");
             }
-        });
+        }));
     }
 
     channels
@@ -148,7 +162,8 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
                     }
                 },
             ));
-        } else if record_esp_data && manager.io.esp_data_file_buf.is_none() {
+        }
+        if record_esp_data && manager.io.esp_data_file_buf.is_none() {
             manager.io.esp_data_file_buf = Some(BufWriter::new(
                 match crate::utils::check_and_create_file(&manager.config.record_esp_data_file) {
                     Ok(file) => file,
@@ -165,26 +180,20 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
         match end.duration_since(manager.state.call_time) {
             Ok(duration) => {
                 manager.state.call_time = SystemTime::now(); // Reset timer
-                    if record_data {
-                        match manager.io.data_file_buf.as_mut() {
+                if record_data {
+                    match manager.io.data_file_buf.as_mut() {
                             Some(data_file_buf) => {
                                 let millis = duration.as_millis();
                                 if millis >= 3 {
                                     writeln!(data_file_buf, "T:{}", &millis.to_string()).expect("Could not write to data_file_buf!");
                                 }
-                                
-                                if n == 1 && r == 2 && g == 3 && b == 4 {
-                                    warn!("Modifying instruction to disk by 1 to prevent parsing error!"); // This is a timing instruction, so we cannot let it be written.
-                                    writeln!(data_file_buf, "{}|{}|{}|{}", n, r + 1, g, b).expect("Could not write to data_file_buf!");
-                                } else {
-                                    writeln!(data_file_buf, "{n}|{r}|{g}|{b}").expect("Could not write to data_file_buf!");
-                                }
+                                writeln!(data_file_buf, "{n}|{r}|{g}|{b}").expect("Could not write to data_file_buf!");
                             }
                             None => error!("record_data is true, but data_file_buf is None! Something has gone very wrong, please report this.")
                         }
-                    }
-                    if record_esp_data {
-                        match manager.io.esp_data_file_buf.as_mut() {
+                }
+                if record_esp_data {
+                    match manager.io.esp_data_file_buf.as_mut() {
                             Some(esp_data_file_buf) => {
                                 let mut millis = duration.as_millis();
 
@@ -206,8 +215,7 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
                             }
                             None => error!("record_esp_data is true, but esp_data_file_buf is None!, Something has gone very wrong, please report this.")
                         }
-                    }
-                
+                }
             }
             Err(e) => println!("Error: {e}"),
         }
@@ -239,7 +247,7 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
                 }
             }
         } else if manager.state.led_thread_channels.is_empty() {
-            manager.state.led_thread_channels = dispatch_threads(&manager);
+            manager.state.led_thread_channels = dispatch_threads(&mut manager);
         } else {
             let mut n = n;
 
