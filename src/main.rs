@@ -367,6 +367,23 @@ fn main() {
         config_load_result.2,
     );
 
+    let ctrlc_manager = Arc::clone(&manager);
+
+    ctrlc::set_handler(move || {
+        info!("Exiting cleanly...");
+
+        let mut manager = ctrlc_manager.lock().unwrap();
+
+        if let Some(file_buf) = &mut manager.io.data_file_buf {
+            file_buf.flush().unwrap();
+        }
+
+        if let Some(file_buf) = &mut manager.io.esp_data_file_buf {
+            file_buf.flush().unwrap();
+        }
+    })
+    .expect("Error setting Ctrl-C handler");
+
     if let Some(Command::Speedtest(ref _speedtest_options)) = opts.command {
         info!("Performing speedtest...");
 

@@ -75,7 +75,7 @@ num_container = 1
 unity_ip = "127.0.0.1"
 unity_ports = [5001, 6002, 6003]
 unity_serial_baudrate = 921600
-unity_position_files = ["largetank.json"]
+unity_position_files = ["largetank-postprocess.json"]
 scale = 0.0008
 
 [advanced.communication]
@@ -102,9 +102,13 @@ hsv_blue_override = [61, 0, 245, 95, 255, 255]
 
 [advanced.transform]
 # crop_override = [0, 0, 1280, 720]
-x_perspect_distort_adjust = 0.5
-# y_perspect_distort_adjust = ...
-# z_perspect_distort_adjust = ...
+# x_perspect_distort_adjust = 5
+# y_perspect_distort_adjust = 0
+z_perspect_distort_adjust = 200
+
+x_stretch_adjust = 200
+# y_stretch_adjust = 5
+# z_stretch_adjust = 5
 
 [advanced.misc]
 print_send_back = false
