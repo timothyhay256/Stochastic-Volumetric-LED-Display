@@ -108,75 +108,71 @@ fn dispatch_threads(manager: &ManagerData) -> Vec<Sender<Task>> {
 pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, b: u8) {
     let mut manager = manager_guard.lock().unwrap();
 
-    if let Some(use_queue) = manager.config.use_queue {
-        if !use_queue {
-            let record_data;
-            let record_esp_data;
+    let record_data;
+    let record_esp_data;
 
-            // Unity controls if we record commands to a file using a file in the tmp dir
-            if manager.config.unity_controls_recording {
-                let unity_start_anim_path: PathBuf =
-                    [env::temp_dir().to_str().unwrap(), "start_animate"]
-                        .iter()
-                        .collect();
-                record_data = Path::new(&unity_start_anim_path.into_os_string()).exists();
+    // Unity controls if we record commands to a file using a file in the tmp dir
+    if manager.config.unity_controls_recording {
+        let unity_start_anim_path: PathBuf = [env::temp_dir().to_str().unwrap(), "start_animate"]
+            .iter()
+            .collect();
+        record_data = Path::new(&unity_start_anim_path.into_os_string()).exists();
 
-                let unity_start_anim_byte_path: PathBuf =
-                    [env::temp_dir().to_str().unwrap(), "start_animate_byte"]
-                        .iter()
-                        .collect();
-                record_esp_data = Path::new(&unity_start_anim_byte_path.into_os_string()).exists();
-            } else {
-                record_data = manager.config.record_data;
-                record_esp_data = manager.config.record_esp_data;
-            }
+        let unity_start_anim_byte_path: PathBuf =
+            [env::temp_dir().to_str().unwrap(), "start_animate_byte"]
+                .iter()
+                .collect();
+        record_esp_data = Path::new(&unity_start_anim_byte_path.into_os_string()).exists();
+    } else {
+        record_data = manager.config.record_data;
+        record_esp_data = manager.config.record_esp_data;
+    }
 
-            if manager.state.first_run {
-                manager.state.first_run = false;
-                manager.state.call_time = SystemTime::now();
-            }
+    if manager.state.first_run {
+        manager.state.first_run = false;
+        manager.state.call_time = SystemTime::now();
+    }
 
-            // If we want to record data
-            if record_data || record_esp_data {
-                if record_data && manager.io.data_file_buf.is_none() {
-                    manager.io.data_file_buf = Some(BufWriter::new(
-                        match crate::utils::check_and_create_file(&manager.config.record_data_file)
-                        {
-                            Ok(file) => file,
-                            Err(e) => {
-                                panic!(
-                                    "Could not open {} for writing animation: {}",
-                                    manager.config.record_data_file.display(),
-                                    e
-                                );
-                            }
-                        },
-                    ));
-                } else if record_esp_data && manager.io.esp_data_file_buf.is_none() {
-                    manager.io.esp_data_file_buf = Some(BufWriter::new(
-                        match crate::utils::check_and_create_file(
-                            &manager.config.record_esp_data_file,
-                        ) {
-                            Ok(file) => file,
-                            Err(e) => {
-                                panic!(
-                                    "Could not open {} for writing animation: {}",
-                                    manager.config.record_esp_data, e
-                                )
-                            }
-                        },
-                    ));
-                }
-                let end = SystemTime::now();
-                match end.duration_since(manager.state.call_time) {
-                    Ok(duration) => {
-                        manager.state.call_time = SystemTime::now(); // Reset timer
-                        let mut millis = duration.as_millis();
-                        if millis >= 1 {
-                            if record_data {
-                                match manager.io.data_file_buf.as_mut() {
+    // If we want to record data
+    if record_data || record_esp_data {
+        if record_data && manager.io.data_file_buf.is_none() {
+            manager.io.data_file_buf = Some(BufWriter::new(
+                match crate::utils::check_and_create_file(&manager.config.record_data_file) {
+                    Ok(file) => file,
+                    Err(e) => {
+                        panic!(
+                            "Could not open {} for writing animation: {}",
+                            manager.config.record_data_file.display(),
+                            e
+                        );
+                    }
+                },
+            ));
+        } else if record_esp_data && manager.io.esp_data_file_buf.is_none() {
+            manager.io.esp_data_file_buf = Some(BufWriter::new(
+                match crate::utils::check_and_create_file(&manager.config.record_esp_data_file) {
+                    Ok(file) => file,
+                    Err(e) => {
+                        panic!(
+                            "Could not open {} for writing animation: {}",
+                            manager.config.record_esp_data, e
+                        )
+                    }
+                },
+            ));
+        }
+        let end = SystemTime::now();
+        match end.duration_since(manager.state.call_time) {
+            Ok(duration) => {
+                manager.state.call_time = SystemTime::now(); // Reset timer
+                    if record_data {
+                        match manager.io.data_file_buf.as_mut() {
                             Some(data_file_buf) => {
-                                writeln!(data_file_buf, "T:{}", &millis.to_string()).expect("Could not write to data_file_buf!");
+                                let millis = duration.as_millis();
+                                if millis >= 3 {
+                                    writeln!(data_file_buf, "T:{}", &millis.to_string()).expect("Could not write to data_file_buf!");
+                                }
+                                
                                 if n == 1 && r == 2 && g == 3 && b == 4 {
                                     warn!("Modifying instruction to disk by 1 to prevent parsing error!"); // This is a timing instruction, so we cannot let it be written.
                                     writeln!(data_file_buf, "{}|{}|{}|{}", n, r + 1, g, b).expect("Could not write to data_file_buf!");
@@ -186,10 +182,12 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
                             }
                             None => error!("record_data is true, but data_file_buf is None! Something has gone very wrong, please report this.")
                         }
-                            }
-                            if record_esp_data {
-                                match manager.io.esp_data_file_buf.as_mut() {
+                    }
+                    if record_esp_data {
+                        match manager.io.esp_data_file_buf.as_mut() {
                             Some(esp_data_file_buf) => {
+                                let mut millis = duration.as_millis();
+
                                 while millis > 255 {
                                     // Delay marker + max duration
                                     write!(esp_data_file_buf, "0xFE, 0xFF, ").expect("Failed to write delay");
@@ -208,13 +206,15 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
                             }
                             None => error!("record_esp_data is true, but esp_data_file_buf is None!, Something has gone very wrong, please report this.")
                         }
-                            }
-                        }
                     }
-                    Err(e) => println!("Error: {e}"),
-                }
+                
             }
+            Err(e) => println!("Error: {e}"),
+        }
+    }
 
+    if let Some(use_queue) = manager.config.use_queue {
+        if !use_queue {
             if manager.config.led_config.is_none() {
                 manager.config.led_config = Some(LedConfig {
                     skip_confirmation: manager.config.skip_confirmation,

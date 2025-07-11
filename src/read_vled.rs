@@ -53,10 +53,10 @@ pub fn read_vled(manager: &Arc<Mutex<ManagerData>>, file: PathBuf) -> Result<(),
             } else if line.contains("T") {
                 line.remove(0);
                 line.remove(0);
-                let sleep = match line.to_string().parse::<u8>() {
+                let sleep = match line.to_string().parse::<u64>() {
                     Ok(sleep) => sleep,
                     Err(e) => {
-                        panic!("VLED was malformed: Attempted to convert {line} to u8: {e}")
+                        panic!("VLED was malformed: Attempted to convert {line} to u64: {e}")
                     }
                 };
                 // println!("Sleeping for {}");
