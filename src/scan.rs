@@ -1205,7 +1205,7 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
         Err(e) => panic!("Something went wrong during cropping: {e}"),
     };
 
-    // drop(cam_guard);
+    drop(cam_guard);
 
     highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
     set_crop_mouse_callback(
@@ -1224,7 +1224,7 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
     if let Some(index) = &config.camera.camera_index_2 {
         debug!("Cropping second camera with index {index}");
         *camera_active.lock().unwrap() = 1;
-        // let cam_guard = Arc::new(Mutex::new(get_cam(config, index).unwrap()));
+        let cam_guard = Arc::new(Mutex::new(get_cam(config, index).unwrap()));
 
         if config.camera.video_width.is_some() && config.camera.video_height.is_some() {
             cam_guard
