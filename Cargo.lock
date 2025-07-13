@@ -1152,6 +1152,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f791803201ab277ace03903de1594460708d2d54df6053f2d9e82f592b19e3b"
 
 [[package]]
+name = "ctrlc"
+version = "3.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46f93780a459b7d656ef7f071fe699c4d3d2cb201c4b24d085b6ddc505276e73"
+dependencies = [
+ "nix 0.30.1",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "cursor-icon"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4499,8 +4509,10 @@ dependencies = [
 name = "svled"
 version = "0.1.2"
 dependencies = [
+ "anyhow",
  "chrono",
  "crossbeam-channel",
+ "ctrlc",
  "env_logger",
  "gumdrop",
  "image",
@@ -5809,9 +5821,9 @@ dependencies = [
 
 [[package]]
 name = "winnow"
-version = "0.7.11"
+version = "0.7.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74c7b26e3480b707944fc872477815d29a8e429d2f93a1ce000f5fa84a15cbcd"
+checksum = "f3edebf492c8125044983378ecb5766203ad3b4c2f7a922bd7dd207f6d443e95"
 dependencies = [
  "memchr",
 ]
