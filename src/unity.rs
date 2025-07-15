@@ -381,10 +381,12 @@ pub fn get_events(
             .unwrap();
     }
 
-    socket.set_read_timeout(Some(Duration::from_millis(100)))?;
+    socket.set_nonblocking(true)?;
+    let mut buf = [0; 16];
 
     while keepalive.load(Ordering::Relaxed) {
-        let mut buf = [0; 16];
+        let mut hashmap_lock = json_hashmap.lock().unwrap();
+
         match socket.recv_from(&mut buf) {
             Ok((len, _addr)) => {
                 let msg = match str::from_utf8(&buf[..len]) {
@@ -413,7 +415,7 @@ pub fn get_events(
                     led_manager::set_color(&manager, index, 0, 0, 0);
 
                     // Indicate this isn't illuminated
-                    if let Some(value) = json_hashmap.lock().unwrap().get_mut(&(index as usize)) {
+                    if let Some(value) = hashmap_lock.get_mut(&(index as usize)) {
                         value.3 = false;
                     }
                 } else if msg.contains("|") {
@@ -431,19 +433,21 @@ pub fn get_events(
 
                     if xs[1] != 0 || xs[2] != 0 || xs[3] != 0 {
                         // Indicate this is illuminated
-                        if let Some(value) = json_hashmap.lock().unwrap().get_mut(&(xs[0] as usize))
-                        {
+                        if let Some(value) = hashmap_lock.get_mut(&(xs[0] as usize)) {
                             value.3 = true;
                             value.2 = (xs[1] as u8, xs[2] as u8, xs[3] as u8);
                         }
                     } else {
                         // Indicate this isn't illuminated
-                        if let Some(value) = json_hashmap.lock().unwrap().get_mut(&(xs[0] as usize))
-                        {
+                        if let Some(value) = hashmap_lock.get_mut(&(xs[0] as usize)) {
                             value.3 = false;
                         }
                     }
                     led_manager::set_color(&manager, xs[0], xs[1] as u8, xs[2] as u8, xs[3] as u8);
+                } else if msg.contains("CLEAR") {
+                    for i in 0..config.num_led {
+                        led_manager::set_color(&manager, i.try_into().unwrap(), 0, 0, 0);
+                    }
                 } else {
                     error!("Unity packet was malformed! Packet: {msg}");
                 }
@@ -452,7 +456,6 @@ pub fn get_events(
                 if e.kind() == std::io::ErrorKind::WouldBlock
                     || e.kind() == std::io::ErrorKind::TimedOut =>
             {
-                // Timeout reached, loop again to check keepalive
                 continue;
             }
             Err(e) => {
@@ -461,10 +464,12 @@ pub fn get_events(
             }
         }
 
+        let mut manager_lock = manager.lock().unwrap();
+
         // TODO: Remove after Open Sauce (legacy for OS demo code)
-        if !manager.lock().unwrap().state.keepalive_get_events {
+        if !manager_lock.state.keepalive_get_events {
             info!("get_events exiting.");
-            manager.lock().unwrap().state.keepalive_get_events = true;
+            manager_lock.state.keepalive_get_events = true;
             break;
         }
     }
