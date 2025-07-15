@@ -1,6 +1,3 @@
-#[cfg(feature = "gui")]
-pub mod gui;
-
 #[cfg(feature = "scan")]
 pub mod scan;
 
@@ -11,9 +8,6 @@ pub mod read_vled;
 pub mod speedtest;
 pub mod unity;
 pub mod utils;
-
-// #[cfg(feature = "gui")]
-// pub use gui::main;
 
 pub use demo::rainbow;
 pub use driver_wizard::wizard;
