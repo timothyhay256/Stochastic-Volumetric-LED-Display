@@ -119,6 +119,7 @@ fn dispatch_threads(manager: &mut ManagerData) -> Vec<Sender<Task>> {
     channels
 }
 
+// TODO: Don't resend redundant packets
 pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, b: u8) {
     let mut manager = manager_guard.lock().unwrap();
 
