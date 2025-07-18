@@ -13,7 +13,16 @@ https://github.com/user-attachments/assets/2d306b9b-878b-488d-bfa9-6dc4f7c6ec3e
 
 If you want to use this project, you will need a couple of things:
  - LEDs - anything that is supported by FastLED will work fine.
- - Any microcontroller supported by FastLED an PlatformIO. You may need a dual core controller depending on the number of LEDs and features that you want  
+ - Any microcontroller supported by FastLED and PlatformIO. You may need a dual core controller depending on the number of LEDs and features that you want.  
  
-Once you have the hardware, go to the [Wiki.](https://github.com/timothyhay256/Stochastic-volumetric-LED-display/wiki/Setting-up-LEDs)
+Once you have the hardware, go to the [Wiki.](https://github.com/timothyhay256/Stochastic-volumetric-LED-display/wiki/Setting-up-LEDs)  
 
+## Commercial Licensing
+
+This project is licensed under the GNU General Public License version 3 or later (GPLv3 or later) for open-source use.
+
+**Proprietary/Commercial License Available**  
+If you are a company or organization wishing to use this software in a proprietary, closed-source product or with different licensing terms, commercial licenses are available.
+
+Please contact me at: svled@stay-silly.org  
+Custom licensing is available at a minor cost, depending on your use case.
