@@ -13,9 +13,6 @@ use opencv::{
     core::{Mat, MatTraitConst},
     videoio::{self, VideoCaptureTrait, VideoCaptureTraitConst},
 };
-// TODO: Depreceate unity export byte data
-#[cfg(feature = "gui")]
-use svled::gui;
 #[cfg(feature = "scan")]
 use svled::scan;
 use svled::{
@@ -69,10 +66,6 @@ enum Command {
 
     #[options(help = "connect to Unity")]
     ConnectUnity(ConnectUnity),
-
-    #[cfg(feature = "gui")]
-    #[options(help = "launch the GUI")]
-    Gui(GuiOptions),
 
     #[options(help = "interactively create a ino/cpp file for your LED driver")]
     DriverWizard(DriverWizardOptions),
@@ -129,10 +122,6 @@ struct SendPosOptions {}
 
 #[derive(Debug, Options)]
 struct ConnectUnity {}
-
-#[cfg(feature = "gui")]
-#[derive(Debug, Options)]
-struct GuiOptions {}
 
 #[derive(Debug, Options)]
 struct DriverWizardOptions {}
@@ -599,11 +588,6 @@ fn main() {
             led_manager::set_color(&manager, n as u16, 0, 0, 0);
         }
     }
-
-    // #[cfg(feature = "gui")]
-    // if let Some(Command::Gui(ref _gui_options)) = opts.command {
-    //     gui::main(config_holder.clone()).unwrap();
-    // }
 
     #[cfg(feature = "scan")]
     if let Some(Command::Calibrate(ref _calibrate_options)) = opts.command {
