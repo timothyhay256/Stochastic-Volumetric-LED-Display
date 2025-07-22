@@ -1808,10 +1808,10 @@ fn scan_area_cycle(
     {
         let mut cam = cam.unwrap().lock().unwrap();
 
-        if config.camera.video_width.is_some() && config.camera.video_height.is_some() {
-            cam.set(CAP_PROP_FRAME_WIDTH, config.camera.video_width.unwrap())?;
-            cam.set(CAP_PROP_FRAME_HEIGHT, config.camera.video_height.unwrap())?;
-        }
+        // if config.camera.video_width.is_some() && config.camera.video_height.is_some() {
+        //     cam.set(CAP_PROP_FRAME_WIDTH, config.camera.video_width.unwrap())?;
+        //     cam.set(CAP_PROP_FRAME_HEIGHT, config.camera.video_height.unwrap())?;
+        // }
 
         for _ in 0..300 {
             // Mostly only needed when using RTSP
@@ -2231,11 +2231,11 @@ pub fn post_process(led_pos: &mut PosEntry, led_count: u32) {
             _ => led_pos[i as usize].1 .1, // when current_y == y_mid, no change
         };
 
-        // if current_z > z_mid {
-        //     led_pos[i as usize].2 .0 = z_mid - (current_z - z_mid);
-        // } else if current_z < z_mid {
-        //     led_pos[i as usize].2 .0 = z_mid + (z_mid - current_z);
-        // }
+        if current_z > z_mid {
+            led_pos[i as usize].2 .0 = z_mid - (current_z - z_mid);
+        } else if current_z < z_mid {
+            led_pos[i as usize].2 .0 = z_mid + (z_mid - current_z);
+        }
     }
 }
 

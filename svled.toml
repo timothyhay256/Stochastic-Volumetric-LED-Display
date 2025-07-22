@@ -1,5 +1,5 @@
-num_led = 2000                                # Number of LEDS TOTAL, not per strip.
-num_strips = 40
+num_led = 100                                # Number of LEDS TOTAL, not per strip.
+num_strips = 1
 
 [communication]
 communication_mode = 2                        # 1 indicates UDP, 2 indicates serial
@@ -7,48 +7,7 @@ host = "192.168.86.53"                        # UDP host
 port = 8888                                   # UDP port (Default is 8888)
 baud_rate = 3000000                                  # UDP port (Default is 8888)
 
-serial_port_paths = [
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_0C:4E:A0:30:7E:FC-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_94:A9:90:6E:93:E0-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:3D:AE:50:29:54-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_0C:4E:A0:30:A2:18-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_94:A9:90:6F:80:DC-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:3D:AE:50:AB:B4-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_0C:4E:A0:31:CE:74-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_94:A9:90:6F:8B:C0-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:3D:AE:51:AB:1C-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_0C:4E:A0:32:82:9C-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_94:A9:90:6F:E1:70-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:3D:AE:51:C0:6C-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_58:8C:81:AC:9E:CC-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_94:A9:90:70:CF:D8-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:3D:AE:52:25:D8-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_58:8C:81:AC:A7:CC-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_94:A9:90:71:6F:6C-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:3D:AE:52:38:34-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_58:8C:81:AC:A9:9C-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_94:A9:90:7B:07:BC-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:3D:AE:52:84:14-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_58:8C:81:AC:AA:30-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_94:A9:90:7B:59:40-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:88:E0:D7:3E:00-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_58:8C:81:AC:AB:98-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_94:A9:90:7B:61:D4-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:88:E0:D9:0B:10-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_58:8C:81:AF:D8:7C-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_94:A9:90:7B:6A:90-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:88:E0:D9:0D:04-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_58:8C:81:AF:DD:60-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_94:A9:90:7C:70:3C-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:88:E0:EF:E9:78-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_58:8C:81:B0:65:C0-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:3D:AE:4F:E9:98-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:88:E0:F1:AD:04-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_90:E5:B1:0D:FF:C8-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:3D:AE:4F:F0:C4-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_94:A9:90:6E:8B:30-if00",
-    "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_98:3D:AE:50:17:70-if00"
-]
+serial_port_paths = ["/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_94:A9:90:7B:49:70-if00"]
 
 [recording]
 record_data = true                            # If true, all commands will be recorded during the session
@@ -59,14 +18,15 @@ record_esp_data_file = "record_esp_data.bvled" # File to record bvled data to
 
 [camera]
 multi_camera = true
-camera_index_1 = "0"                           # Can either be an index, or an RTSP address.
-camera_index_2 = "0"
+camera_index_1 = "4"                           # Can either be an index, or an RTSP address.
+camera_index_2 = "6"
 video_width = 1280
 video_height = 720
+no_background_frame_consumer=true
 
 [scan]
 scan_mode = 1
-filter_color = 0
+filter_color = 2
 filter_range = 90
 color_bright = 255
 
@@ -75,11 +35,11 @@ num_container = 1
 unity_ip = "127.0.0.1"
 unity_ports = [5001, 6002, 6003]
 unity_serial_baudrate = 921600
-unity_position_files = ["largetank-postprocess.json"]
+unity_position_files = ["largetanksecond.json"]
 scale = 0.0008
 
 [advanced.communication]
-serial_read_timeout = 5
+serial_read_timeout = 15
 udp_read_timeout = 100
 con_fail_limit = 2
 use_queue = true
@@ -91,7 +51,7 @@ no_video = false
 get_events_streams_video = false
 get_events_video_widgets = false
 get_events_widgets_pos_index = 0
-capture_frames = 30
+capture_frames = 4
 cam2_overhead = true
 cam2_overhead_flip = true
 
@@ -104,9 +64,9 @@ hsv_blue_override = [61, 0, 245, 95, 255, 255]
 # crop_override = [0, 0, 1280, 720]
 # x_perspect_distort_adjust = 5
 # y_perspect_distort_adjust = 0
-z_perspect_distort_adjust = 200
+#z_perspect_distort_adjust = 200
 
-x_stretch_adjust = 200
+#x_stretch_adjust = 200
 # y_stretch_adjust = 5
 # z_stretch_adjust = 5
 
