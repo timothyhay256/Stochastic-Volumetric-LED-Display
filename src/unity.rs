@@ -382,80 +382,88 @@ pub fn get_events(
     }
 
     socket.set_nonblocking(true)?;
-    let mut buf = [0; 16];
+    let mut buf = [0; 4096];
 
     while keepalive.load(Ordering::Relaxed) {
         let mut hashmap_lock = json_hashmap.lock().unwrap();
 
         match socket.recv_from(&mut buf) {
             Ok((len, _addr)) => {
-                let msg = match str::from_utf8(&buf[..len]) {
-                    Ok(msg) => msg,
+                let data = &buf[..len];
+
+                let text = match std::str::from_utf8(data) {
+                    Ok(s) => s,
                     Err(e) => {
-                        error!(
-                            "Received invalid packet from Unity:{buf:?} which resulted in the following: {e}"
-                        );
-                        "FAIL"
+                        error!("Invalid UTF-8 packet: {:?}", e);
+                        continue;
                     }
                 };
 
-                let mut msg = msg.to_string();
-                if msg.contains("E") {
-                    // Clear color of index `EN`
-                    msg.remove(0);
-                    let index = match msg.to_string().trim().parse::<u16>() {
-                        Ok(index) => index,
-                        Err(e) => {
-                            panic!(
-                                "Unity packet was malformed: Attempted to convert {} to u16: {e}",
-                                msg.to_string().trim()
-                            )
-                        }
-                    };
-                    led_manager::set_color(&manager, index, 0, 0, 0);
-
-                    // Indicate this isn't illuminated
-                    if let Some(value) = hashmap_lock.get_mut(&(index as usize)) {
-                        value.3 = false;
+                for line in text.lines() {
+                    let line = line.trim();
+                    if line.is_empty() {
+                        continue;
                     }
-                } else if msg.contains("|") {
-                    // Set index n with r g b from string n|r|g|b
-                    let mut xs: [u16; 4] = [0; 4];
-                    let nrgb = msg.trim_matches(char::is_control).split("|");
-                    for (i, el) in nrgb.enumerate() {
-                        xs[i] = match el.parse::<u16>() {
-                            Ok(el) => el,
+
+                    if line.contains("CLEAR") {
+                        for i in 0..config.num_led {
+                            led_manager::set_color(&manager, i.try_into().unwrap(), 0, 0, 0);
+                        }
+                    } else if line.contains("E") {
+                        // Clear color of index `EN`
+                        let mut line = line.to_string();
+                        line.remove(0);
+                        let index = match line.to_string().trim().parse::<u16>() {
+                            Ok(index) => index,
                             Err(e) => {
-                                panic!("Unity packet was malformed: Attempted to convert {el} to u8: {e}")
+                                panic!(
+                                    "Unity packet was malformed: Attempted to convert {} to u16: {e}",
+                                    line.to_string().trim()
+                                )
                             }
                         };
-                    }
+                        led_manager::set_color(&manager, index, 0, 0, 0);
 
-                    if xs[1] != 0 || xs[2] != 0 || xs[3] != 0 {
-                        // Indicate this is illuminated
-                        if let Some(value) = hashmap_lock.get_mut(&(xs[0] as usize)) {
-                            value.3 = true;
-                            value.2 = (xs[1] as u8, xs[2] as u8, xs[3] as u8);
-                        }
-                    } else {
                         // Indicate this isn't illuminated
-                        if let Some(value) = hashmap_lock.get_mut(&(xs[0] as usize)) {
+                        if let Some(value) = hashmap_lock.get_mut(&(index as usize)) {
                             value.3 = false;
                         }
+                    } else if line.contains("|") {
+                        // Set index n with r g b from string n|r|g|b
+                        let mut xs: [u16; 4] = [0; 4];
+                        let nrgb = line.trim_matches(char::is_control).split("|");
+                        for (i, el) in nrgb.enumerate() {
+                            xs[i] = match el.parse::<u16>() {
+                                Ok(el) => el,
+                                Err(e) => {
+                                    panic!("Unity packet was malformed: Attempted to convert {el} to u8: {e}")
+                                }
+                            };
+                        }
+
+                        if xs[1] != 0 || xs[2] != 0 || xs[3] != 0 {
+                            // Indicate this is illuminated
+                            if let Some(value) = hashmap_lock.get_mut(&(xs[0] as usize)) {
+                                value.3 = true;
+                                value.2 = (xs[1] as u8, xs[2] as u8, xs[3] as u8);
+                            }
+                        } else {
+                            // Indicate this isn't illuminated
+                            if let Some(value) = hashmap_lock.get_mut(&(xs[0] as usize)) {
+                                value.3 = false;
+                            }
+                        }
+                        led_manager::set_color(&manager, xs[0], xs[1] as u8, xs[2] as u8, xs[3] as u8);
+                    } else {
+                        error!("Unity packet was malformed! Packet: {line}");
                     }
-                    led_manager::set_color(&manager, xs[0], xs[1] as u8, xs[2] as u8, xs[3] as u8);
-                } else if msg.contains("CLEAR") {
-                    for i in 0..config.num_led {
-                        led_manager::set_color(&manager, i.try_into().unwrap(), 0, 0, 0);
-                    }
-                } else {
-                    error!("Unity packet was malformed! Packet: {msg}");
                 }
             }
             Err(e)
                 if e.kind() == std::io::ErrorKind::WouldBlock
                     || e.kind() == std::io::ErrorKind::TimedOut =>
             {
+                thread::sleep(Duration::from_millis(1));
                 continue;
             }
             Err(e) => {
