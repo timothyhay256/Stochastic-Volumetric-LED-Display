@@ -79,6 +79,8 @@ pub struct AdvancedCommConfig {
     pub queue_size: Option<usize>,
     /// Should we skip checking if the LED was properly set? Speeds things way up at the cost of accuracy. Not recommended.
     pub skip_confirmation: Option<bool>,
+    ///  How many writes to perform during the speedtest
+    pub speedtest_writes: Option<u32>,
 }
 
 #[derive(Deserialize, Debug, Clone, Default)]

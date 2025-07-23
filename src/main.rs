@@ -1,5 +1,4 @@
 use std::{
-    env,
     fs::File,
     io::{Read, Write},
     path::{Path, PathBuf},
@@ -7,8 +6,9 @@ use std::{
     sync::{atomic::Ordering, Arc, Mutex},
 };
 
+use env_logger::Builder;
 use gumdrop::Options;
-use log::{debug, error, info};
+use log::{debug, error, info, LevelFilter};
 use opencv::{
     core::{Mat, MatTraitConst},
     videoio::{self, VideoCaptureTrait, VideoCaptureTraitConst},
@@ -33,7 +33,7 @@ struct MyOptions {
     #[options(help = "be verbose")]
     verbose: bool,
     #[options(help = "specify a specific config file")]
-    config: String,
+    config: Option<String>,
 
     // The `command` option will delegate option parsing to the command type,
     // starting at the first free argument.
@@ -167,20 +167,19 @@ struct AdjustPerspectiveOptions {
 
 fn main() {
     let opts = MyOptions::parse_args_default_or_exit();
-    let mut config_path = Path::new("svled.toml");
 
-    if opts.verbose {
-        env::set_var("RUST_LOG", "debug");
+    let path = opts.config.unwrap_or("svled.toml".to_string());
+    let config_path = Path::new(&path);
+
+    let mut builder = Builder::new();
+
+    builder.filter_level(if opts.verbose {
+        LevelFilter::Debug
     } else {
-        env::set_var("RUST_LOG", "info");
-    }
+        LevelFilter::Info
+    }).format_timestamp_secs();
 
-    env_logger::init();
-
-    if !opts.config.is_empty() {
-        info!("Using config {}", opts.config);
-        config_path = Path::new(&opts.config);
-    }
+    builder.init();
 
     if let Some(Command::ConvertLedpos(ref convert_ledpos_options)) = opts.command {
         let path = Path::new(&convert_ledpos_options.input);
@@ -359,7 +358,7 @@ fn main() {
     if let Some(Command::Speedtest(ref _speedtest_options)) = opts.command {
         info!("Performing speedtest...");
 
-        speedtest::speedtest(&manager, config_holder.num_led, 40000);
+        speedtest::speedtest(&manager, config_holder.num_led, config_holder.advanced.communication.speedtest_writes.unwrap_or(1000));
     } else if let Some(Command::ReadVled(ref readvled_options)) = opts.command {
         if !readvled_options.vled_file.is_file() {
             error!("You must pass a valid vled file with --vled-file!");

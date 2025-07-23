@@ -1,5 +1,12 @@
-# Required options
+# Configuration
 
+By default, the  program will attempt to read from `svled.toml` within the local directory. To pass a config file, you can use `--config` or `-c`.
+
+### Options
+
+These options are **required** to be set.
+
+```
 num_led = 2000                                # Number of LEDS TOTAL, not per strip.
 num_strips = 40                               # Number of strips
 
@@ -8,6 +15,7 @@ communication_mode = 2                        # 1 indicates UDP, 2 indicates ser
 host = "192.168.86.53"                        # UDP host
 port = 8888                                   # UDP port (Default is 8888)
 baud_rate = 921600                            # Baud rate (Default is 921600)
+
 serial_port_paths = ["/path/to/serial-port"]  # Path to serial port
 
 [recording]
@@ -36,10 +44,11 @@ unity_ip = "127.0.0.1"                        # Where to connect to Unity/Houdin
 unity_ports = [5001]                          # Port(s) to send LED info on (Default is 5001)
 unity_position_files = ["largetank.json"]     # Position file to send to Unity
 scale = 0.0008                                # Position scale
+```
+### Advanced options
 
-
-# Advanced options
-
+These should be enough to get started. However, if you need more advanced options, there are many more optional options:
+```
 [advanced.communication]
 serial_read_timeout = 5                       # Timeout for reading back confirmation from the controller         
 udp_read_timeout = 100                        # Timeout for using UDP
@@ -47,7 +56,6 @@ con_fail_limit = 15                           # How many consecutive timeouts be
 use_queue = true                              # Use an dedicated thread per LED controller with a queue
 queue_size = 50                               # Size of queue
 skip_confirmation = false                     # Skip waiting for controller to confirm that it received the command
-speedtest_writes = 1000                       # Number of writes to perform during a speedtest. Defaults to 1000 if not set
 
 [advanced.camera]
 no_video = false                              # Disable any video output
@@ -65,15 +73,24 @@ hsv_green_override = []
 hsv_blue_override = []
 
 [advanced.transform]
-adjust_after_scan = false                     # Auto apply transforms after scan is complete, in addition to post processing
 crop_override = []                            # Automatically use specified crop, formatted in [x_lower, y_lower, x_upper, y_upper]
 x_perspect_distort_adjust = 0                 # Adjust for perspective distortion on the X axis, where the max distortion will be offset by the specified amount to make the resulting positions more orthographic
 y_perspect_distort_adjust = 0
 z_perspect_distort_adjust = 0
-x_stretch_adjust = 0                          # Stretch the LEDs position on a specified axis by n units
-y_stretch_adjust = 0
-z_stretch_adjust = 0
 
 [advanced.misc]
 print_send_back = false                       # Print the command the controller received, must be specified in the ESPs code aswell. Only useful for debugging
 no_controller = false                         # Don't check if the controller is valid. Useful for debugging
+```
+
+### Notes
+
+When using `use_queue`, you can get a massive performance boost at when using multiple controllers (as one thread is spawned per controller) at the cost of potential accuracy if the queue length is set too high. Commands will be sent to their appropriate queue, while the thread assigned to that queue will drain it and send it out to the controller.
+
+`queue_length` shouldn't be too high, as the higher it is, the more inaccuracy in the display you will get.
+
+`skip_confirmation` should really be avoided, since the program will likely end up sending the next command while the device is processing the current one.
+
+`capture_frames` can be decreased to improve scanning performance, but if it is too low, and your camera has a high enough frame rate, you may get completely scrambled and useless data.
+
+`x(yz)_perspect_distort_adjust` is only really useful when using a very large amount of LEDs. It should be used in conjunction with `TODO` to prevent the LEDs becoming very squished.
