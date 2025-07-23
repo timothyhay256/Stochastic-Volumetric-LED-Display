@@ -1,3 +1,3 @@
 [submodule "unity/Stochastic-Volumetric-LED-Display-Unity"]
-	path = unity/Stochastic-Volumetric-LED-Display-Unity
+	path = unity-project/Stochastic-Volumetric-LED-Display-Unity
 	url = https://github.com/timothyhay256/Stochastic-Volumetric-LED-Display-Unity
