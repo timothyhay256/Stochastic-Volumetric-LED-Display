@@ -213,6 +213,14 @@ pub fn scan(
         }
     }
 
+    let streamlined = {
+        if config.scan.scan_mode == 1 {
+            false
+        } else {
+            streamlined
+        }
+    };
+
     let hsv_brightest: core::VecN<u8, 3>;
 
     (pos.cam_1_brightest, pos.cam_1_darkest, hsv_brightest) = match brightest_darkest(
