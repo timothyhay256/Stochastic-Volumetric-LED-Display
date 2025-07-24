@@ -78,9 +78,13 @@ RUN sudo apt-get install -y \
 # Build and install OpenCV from source
 RUN set -eux; \
     wget https://github.com/opencv/opencv/archive/refs/tags/4.12.0.zip && \
+    wget -O opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/refs/tags/4.12.0.zip && \
     unzip 4.12.0.zip && \
+    unzip opencv_contrib.zip && \
     rm 4.12.0.zip && \
+    rm opencv_contrib.zip && \
     mv opencv-4.12.0 OpenCV && \
+    mv opencv_contrib-4.12.0 OpenCV_contrib && \
     mkdir -p OpenCV/build && \
     cd OpenCV/build && \
     # cmake -DWITH_QT=ON \
@@ -91,11 +95,11 @@ RUN set -eux; \
     #       -DWITH_XINE=ON \
     #       -DBUILD_EXAMPLES=ON .. && \
     cmake .. \
-            -DCPACK_BINARY_DEB=ON \
+            # -DCPACK_BINARY_DEB=ON \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr/local \
             -DOPENCV_GENERATE_PKGCONFIG=ON \
-            # -DOPENCV_EXTRA_MODULES_PATH=~/OpenCV/opencv_contrib-4.12.0/modules \
+            -DOPENCV_EXTRA_MODULES_PATH=../../OpenCV_contrib/modules \
             -DOPENCV_VCSVERSION=4.12.0 \
             -DEXTRA_MODULES_VCSVERSION=4.12.0 \
             -DBUILD_opencv_python3=ON \
@@ -116,7 +120,7 @@ RUN set -eux; \
     # dpkg -i OpenCV-*.deb && \
     ldconfig
 
-RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/opencv.conf && ldconfig
+# RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/opencv.conf && ldconfig
 
 # Create the image that will be used for crosscompilation
 FROM ubuntu:22.04
@@ -152,9 +156,6 @@ RUN echo '#!/bin/bash\n\
 RPI_ROOT="/rpi-root"\n\
 export PKG_CONFIG_SYSROOT_DIR="$RPI_ROOT"\n\
 export PKG_CONFIG_LIBDIR="$RPI_ROOT/usr/lib/arm-linux-gnueabihf/pkgconfig"\n\
-export PKG_CONFIG_PATH="/usr/local/lib/arm-linux-gnueabihf/pkgconfig:$PKG_CONFIG_PATH"\n\
-export LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"\n\
-export OPENCV_DIR="/usr/local"\n\
 export CC="clang-rpi"\n\
 export CXX="clang-rpi"\n\
 cargo build -vv --target arm-unknown-linux-gnueabihf' > /usr/local/bin/cargo-xbuild && chmod +x /usr/local/bin/cargo-xbuild
