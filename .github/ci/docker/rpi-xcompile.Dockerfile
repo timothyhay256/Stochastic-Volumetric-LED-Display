@@ -49,6 +49,7 @@ RUN set -xeu && \
 # Build OpenCV from source for most recent version (There are breaking changes betweeen the required version and the version Debian packages)
 
 # # Install dependencies for building OpenCV
+
 # RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 #     build-essential cmake \
 #     qt5-default libvtk6-dev \
@@ -61,6 +62,17 @@ RUN set -xeu && \
 #     doxygen \
 #     unzip wget && \
 #     apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN sudo apt-get install -y \
+	build-essential ccache cmake unzip pkg-config curl \
+	libjpeg-dev libpng-dev libtiff-dev \
+	libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \
+	libxvidcore-dev libx264-dev libjasper1 libjasper-dev \
+	libgtk-3-dev libcanberra-gtk* \
+	libatlas-base-dev gfortran \
+	libeigen3-dev libtbb-dev \
+	python3-dev python3-numpy python-dev python-numpy
+
 
 # Build and install OpenCV from source
 RUN set -eux; \
