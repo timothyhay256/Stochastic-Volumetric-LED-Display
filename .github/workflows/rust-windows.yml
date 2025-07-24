@@ -1,0 +1,24 @@
+name: Build for Windows x86_64
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-x86_64:
+    name: Build for x86_64 Windows
+    runs-on: [self-hosted, Windows]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build release (x86_64)
+        run: cargo build --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-x86_64
+          path: target/release/svled

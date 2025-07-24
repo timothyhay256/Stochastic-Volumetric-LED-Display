@@ -21,7 +21,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-x86_64
-          path: target/release/
+          path: target/release/svled
 
   build-rpi:
     name: Cross-compile for Raspberry Pi (armv7)
