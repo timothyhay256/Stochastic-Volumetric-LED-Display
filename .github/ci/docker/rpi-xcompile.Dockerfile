@@ -111,9 +111,9 @@ RUN set -eux; \
             -DWITH_EIGEN=ON && \
     make -j"$(nproc)" && \
     make install && \
-    cpack -G DEB && \
-    make uninstall && \
-    dpkg -i OpenCV-*.deb && \
+    # cpack -G DEB && \
+    # make uninstall && \
+    # dpkg -i OpenCV-*.deb && \
     ldconfig
 
 # Create the image that will be used for crosscompilation
