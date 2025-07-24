@@ -9,7 +9,7 @@ on:
 jobs:
   build-x86_64:
     name: Build for x86_64 Linux
-    runs-on: selfhosted
+    runs-on: self-hosted
 
     steps:
       - uses: actions/checkout@v4
@@ -30,7 +30,7 @@ jobs:
 
   build-rpi:
     name: Cross-compile for Raspberry Pi (armv7)
-    runs-on: selfhosted
+    runs-on: self-hosted
 
     steps:
       - uses: actions/checkout@v4
