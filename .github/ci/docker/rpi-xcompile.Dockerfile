@@ -83,15 +83,37 @@ RUN set -eux; \
     mv opencv-4.12.0 OpenCV && \
     mkdir -p OpenCV/build && \
     cd OpenCV/build && \
-    cmake -DWITH_QT=ON \
-          -DWITH_OPENGL=ON \
-          -DFORCE_VTK=ON \
-          -DWITH_TBB=ON \
-          -DWITH_GDAL=ON \
-          -DWITH_XINE=ON \
-          -DBUILD_EXAMPLES=ON .. && \
+    # cmake -DWITH_QT=ON \
+    #       -DWITH_OPENGL=ON \
+    #       -DFORCE_VTK=ON \
+    #       -DWITH_TBB=ON \
+    #       -DWITH_GDAL=ON \
+    #       -DWITH_XINE=ON \
+    #       -DBUILD_EXAMPLES=ON .. && \
+    cmake .. \
+            -DCPACK_BINARY_DEB=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr/local \
+            -DOPENCV_GENERATE_PKGCONFIG=ON \
+            -DOPENCV_EXTRA_MODULES_PATH=~/OpenCV/opencv_contrib-${VERSION}/modules \
+            -DOPENCV_VCSVERSION=${VERSION} \
+            -DEXTRA_MODULES_VCSVERSION=${VERSION} \
+            -DBUILD_opencv_python3=ON \
+            -DBUILD_PERF_TESTS=OFF \
+            -DBUILD_EXAMPLES=OFF \
+            -DBUILD_TESTS=OFF \
+            -DBUILD_PACKAGE=ON \
+            -DINSTALL_CREATE_DISTRIB=ON \
+            -DENABLE_NEON=ON \
+            -DENABLE_VFPV3=ON \
+            -DOPENCV_ENABLE_NONFREE=ON \
+            -DWITH_TBB=ON \
+            -DWITH_EIGEN=ON && \
     make -j"$(nproc)" && \
     make install && \
+    cpack -G DEB && \
+    make uninstall && \
+    dpkg -i OpenCV-*.deb && \
     ldconfig
 
 # Create the image that will be used for crosscompilation
