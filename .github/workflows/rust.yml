@@ -30,6 +30,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Whoami
+        run: Whoami
+
       - name: Set up Docker Buildx (for qemu)
         uses: docker/setup-qemu-action@v3
 
@@ -39,9 +42,6 @@ jobs:
       - name: Build Raspberry Pi Docker image
         run: |
           docker build -f .github/ci/docker/rpi-xcompile.Dockerfile -t rust-rpi-builder .
-
-      - name: Whoami
-        run: Whoami
 
       - name: Cross-compile using Docker
         run: |
