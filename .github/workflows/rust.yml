@@ -40,6 +40,9 @@ jobs:
         run: |
           docker build -f .github/ci/docker/rpi-xcompile.Dockerfile -t rust-rpi-builder .
 
+      - name: Whoami
+        run: Whoami
+
       - name: Cross-compile using Docker
         run: |
           docker run --rm \
