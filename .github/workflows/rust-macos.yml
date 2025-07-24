@@ -9,7 +9,7 @@ on:
 jobs:
   build-x86_64:
     name: Build for x86_64 MacOS
-    runs-on: [self-hosted
+    runs-on: [self-hosted, MacOS]
 
     steps:
       - uses: actions/checkout@v4
