@@ -116,6 +116,8 @@ RUN set -eux; \
     # dpkg -i OpenCV-*.deb && \
     ldconfig
 
+RUN find / -name "opencv4.pc"
+
 # Create the image that will be used for crosscompilation
 FROM ubuntu:22.04
 
