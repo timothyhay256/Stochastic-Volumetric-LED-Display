@@ -95,7 +95,7 @@ RUN set -eux; \
     #       -DWITH_XINE=ON \
     #       -DBUILD_EXAMPLES=ON .. && \
     cmake .. \
-            # -DCPACK_BINARY_DEB=ON \
+            -DCPACK_BINARY_DEB=ON \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr/local \
             -DOPENCV_GENERATE_PKGCONFIG=ON \
@@ -115,9 +115,9 @@ RUN set -eux; \
             -DWITH_EIGEN=ON && \
     make -j"$(nproc)" && \
     make install && \
-    # cpack -G DEB && \
-    # make uninstall && \
-    # dpkg -i OpenCV-*.deb && \
+    cpack -G DEB && \
+    make uninstall && \
+    dpkg -i OpenCV-*.deb && \
     ldconfig
 
 # RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/opencv.conf && ldconfig
