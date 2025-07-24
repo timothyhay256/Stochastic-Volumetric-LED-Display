@@ -71,6 +71,7 @@ RUN sudo apt-get install -y \
 	libgtk-3-dev libcanberra-gtk* \
 	libatlas-base-dev gfortran \
 	libeigen3-dev libtbb-dev \
+    libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev \
 	python3-dev python3-numpy python-dev 
 
 
