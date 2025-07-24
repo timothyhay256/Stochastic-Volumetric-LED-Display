@@ -67,7 +67,7 @@ RUN set -eux; \
     wget https://github.com/opencv/opencv/archive/refs/tags/4.12.0.zip && \
     unzip 4.12.0.zip && \
     rm 4.12.0.zip && \
-    mv opencv-3.1.0 OpenCV && \
+    mv opencv-4.12.0 OpenCV && \
     mkdir -p OpenCV/build && \
     cd OpenCV/build && \
     cmake -DWITH_QT=ON \
