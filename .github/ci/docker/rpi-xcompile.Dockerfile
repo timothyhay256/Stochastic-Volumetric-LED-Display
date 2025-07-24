@@ -95,7 +95,7 @@ RUN set -eux; \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/usr/local \
             -DOPENCV_GENERATE_PKGCONFIG=ON \
-            -DOPENCV_EXTRA_MODULES_PATH=~/OpenCV/opencv_contrib-4.12.0/modules \
+            # -DOPENCV_EXTRA_MODULES_PATH=~/OpenCV/opencv_contrib-4.12.0/modules \
             -DOPENCV_VCSVERSION=4.12.0 \
             -DEXTRA_MODULES_VCSVERSION=4.12.0 \
             -DBUILD_opencv_python3=ON \
