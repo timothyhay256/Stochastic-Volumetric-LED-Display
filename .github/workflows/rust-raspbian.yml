@@ -1,4 +1,4 @@
-name: Build Rust Project for Linux and Raspberry Pi
+name: Build for RPI armv7
 
 on:
   push:
@@ -7,30 +7,9 @@ on:
     branches: [main]
 
 jobs:
-  build-x86_64:
-    name: Build for x86_64 Linux
-    runs-on: selfhosted
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Rust
-        uses: actions/setup-rust@v1
-        with:
-          rust-version: stable
-
-      - name: Build release (x86_64)
-        run: cargo build --release
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-x86_64
-          path: target/release/
-
   build-rpi:
     name: Cross-compile for Raspberry Pi (armv7)
-    runs-on: selfhosted
+    runs-on: [self-hosted, Linux]
 
     steps:
       - uses: actions/checkout@v4
@@ -57,4 +36,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-rpi
-          path: target/arm-unknown-linux-gnueabihf/release/
+          path: target/arm-unknown-linux-gnueabihf/release/svled
