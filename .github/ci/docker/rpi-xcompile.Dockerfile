@@ -71,7 +71,7 @@ RUN sudo apt-get install -y \
 	libgtk-3-dev libcanberra-gtk* \
 	libatlas-base-dev gfortran \
 	libeigen3-dev libtbb-dev \
-	python3-dev python3-numpy python-dev python-numpy
+	python3-dev python3-numpy python-dev 
 
 
 # Build and install OpenCV from source
