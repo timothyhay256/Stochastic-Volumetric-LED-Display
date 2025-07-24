@@ -148,13 +148,13 @@ RUN echo '#!/bin/bash\n\
 RPI_ROOT="/rpi-root"\n\
 clang --target=arm-unknown-linux-gnueabihf -fuse-ld=lld --sysroot="$RPI_ROOT" --gcc-toolchain="$RPI_ROOT" "$@"' > /usr/local/bin/clang-rpi && chmod +x /usr/local/bin/clang-rpi
 
-RUN echo '#!/bin/bash
-RPI_ROOT="/rpi-root"
-export PKG_CONFIG_SYSROOT_DIR="$RPI_ROOT"
-export PKG_CONFIG_LIBDIR="$RPI_ROOT/usr/lib/arm-linux-gnueabihf/pkgconfig"
-export PKG_CONFIG_PATH="/usr/local/lib/arm-linux-gnueabihf/pkgconfig:$PKG_CONFIG_PATH"
-export LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"
-export OPENCV_DIR="/usr/local"
-export CC="clang-rpi"
-export CXX="clang-rpi"
+RUN echo '#!/bin/bash\n\
+RPI_ROOT="/rpi-root"\n\
+export PKG_CONFIG_SYSROOT_DIR="$RPI_ROOT"\n\
+export PKG_CONFIG_LIBDIR="$RPI_ROOT/usr/lib/arm-linux-gnueabihf/pkgconfig"\n\
+export PKG_CONFIG_PATH="/usr/local/lib/arm-linux-gnueabihf/pkgconfig:$PKG_CONFIG_PATH"\n\
+export LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"\n\
+export OPENCV_DIR="/usr/local"\n\
+export CC="clang-rpi"\n\
+export CXX="clang-rpi"\n\
 cargo build -vv --target arm-unknown-linux-gnueabihf' > /usr/local/bin/cargo-xbuild && chmod +x /usr/local/bin/cargo-xbuild
