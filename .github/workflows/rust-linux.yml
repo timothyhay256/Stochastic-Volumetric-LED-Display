@@ -1,4 +1,4 @@
-name: Build for RPI and Linux x86_64
+name: Build for Linux x86_64
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 jobs:
   build-x86_64:
     name: Build for x86_64 Linux
-    runs-on: self-hosted
+    runs-on: [self-hosted, Linux]
 
     steps:
       - uses: actions/checkout@v4
@@ -22,34 +22,3 @@ jobs:
         with:
           name: release-x86_64
           path: target/release/svled
-
-  build-rpi:
-    name: Cross-compile for Raspberry Pi (armv7)
-    runs-on: self-hosted
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx (for qemu)
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker BuildKit
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Raspberry Pi Docker image
-        run: |
-          docker build -f .github/ci/docker/rpi-xcompile.Dockerfile -t rust-rpi-builder .
-
-      - name: Cross-compile using Docker
-        run: |
-          docker run --rm \
-            -v "$PWD":/usr/src/app \
-            -w /usr/src/app \
-            rust-rpi-builder \
-            cargo-xbuild
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-rpi
-          path: target/arm-unknown-linux-gnueabihf/release/
