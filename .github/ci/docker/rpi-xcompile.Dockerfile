@@ -156,6 +156,8 @@ RUN ln -s /rpi-root/usr/local/include/opencv4 /usr/local/include/opencv4 && \
     ln -s /rpi-root/usr/include /usr/include && \
     ln -s /rpi-root/usr/local/lib/arm-linux-gnueabihf /usr/local/lib/arm-linux-gnueabihf
 
+RUN ls -R /rpi-root/usr/local/include/opencv4 || echo "opencv4 headers not found"
+
 RUN echo '#!/bin/bash\n\
 RPI_ROOT="/rpi-root"\n\
 export PKG_CONFIG_SYSROOT_DIR="$RPI_ROOT"\n\
