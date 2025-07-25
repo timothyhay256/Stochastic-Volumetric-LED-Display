@@ -168,4 +168,4 @@ export OPENCV_LINK_PATHS="$RPI_ROOT/usr/local/lib/arm-linux-gnueabihf"\n\
 export OPENCV_LINK_LIBS="opencv_world"\n\
 export CC="clang-rpi"\n\
 export CXX="clang-rpi"\n\
-cargo build -vv --target arm-unknown-linux-gnueabihf' > /usr/local/bin/cargo-xbuild && chmod +x /usr/local/bin/cargo-xbuild
+cargo build -vv --release --target arm-unknown-linux-gnueabihf' > /usr/local/bin/cargo-xbuild && chmod +x /usr/local/bin/cargo-xbuild
