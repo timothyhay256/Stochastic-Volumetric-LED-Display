@@ -30,9 +30,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Whoami
-        run: whoami
-
       - name: Set up Docker Buildx (for qemu)
         uses: docker/setup-qemu-action@v3
 
