@@ -26,7 +26,7 @@ jobs:
           mkdir -p build && cd build
           cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=NO -DCMAKE_INSTALL_PREFIX=/opt/opencv -DBUILD_DOCS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_opencv_python=OFF -DOPENCV_EXTRA_MODULES_PATH=../opencv_contrib-4.8.1/modules ../opencv-4.8.1
           cmake --build . --target install --config Release --parallel 28
-          cmake --install . --prefix /opt/opencv
+          sudo cmake --install . --prefix /opt/opencv
           cd ..
 
       # Note: OPENCV_LINK_LIBS ordering matters for linux.  Put lower level deps after higher level.  See https://answers.opencv.org/question/186124/undefined-reference-to-cvsoftdoubleoperator/
