@@ -115,9 +115,9 @@ RUN set -eux; \
             -DWITH_EIGEN=ON && \
     make -j"$(nproc)" && \
     make install && \
-    cpack -G DEB && \
-    make uninstall && \
-    dpkg -i OpenCV-*.deb && \
+    # cpack -G DEB && \
+    # make uninstall && \
+    # dpkg -i OpenCV-*.deb && \
     ldconfig
 
 # RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/opencv.conf && ldconfig
@@ -152,9 +152,9 @@ RUN echo '#!/bin/bash\n\
 RPI_ROOT="/rpi-root"\n\
 clang --target=arm-unknown-linux-gnueabihf -fuse-ld=lld --sysroot="$RPI_ROOT" --gcc-toolchain="$RPI_ROOT" "$@"' > /usr/local/bin/clang-rpi && chmod +x /usr/local/bin/clang-rpi
 
-RUN ln -s /rpi-root/usr/local/include/opencv4 /usr/local/include/opencv4 && \
-    ln -s /rpi-root/usr/include /usr/include && \
-    ln -s /rpi-root/usr/local/lib/arm-linux-gnueabihf /usr/local/lib/arm-linux-gnueabihf
+# RUN ln -s /rpi-root/usr/local/include/opencv4 /usr/local/include/opencv4 && \
+#     ln -s /rpi-root/usr/include /usr/include && \
+#     ln -s /rpi-root/usr/local/lib/arm-linux-gnueabihf /usr/local/lib/arm-linux-gnueabihf
 
 RUN ls -R /rpi-root/usr/local/include/opencv4 || echo "opencv4 headers not found"
 
