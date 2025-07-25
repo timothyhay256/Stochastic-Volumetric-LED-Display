@@ -162,6 +162,10 @@ RUN echo '#!/bin/bash\n\
 RPI_ROOT="/rpi-root"\n\
 export PKG_CONFIG_SYSROOT_DIR="$RPI_ROOT"\n\
 export PKG_CONFIG_LIBDIR="$RPI_ROOT/usr/lib/arm-linux-gnueabihf/pkgconfig"\n\
+export OPENCV_HEADER_DIR="$RPI_ROOT/usr/local/include/opencv4"\n\
+export OPENCV_INCLUDE_PATHS="$RPI_ROOT/usr/local/include/opencv4"\n\
+export OPENCV_LINK_PATHS="$RPI_ROOT/usr/local/lib/arm-linux-gnueabihf"\n\
+export OPENCV_LINK_LIBS="opencv_world"\n\
 export CC="clang-rpi"\n\
 export CXX="clang-rpi"\n\
 cargo build -vv --target arm-unknown-linux-gnueabihf' > /usr/local/bin/cargo-xbuild && chmod +x /usr/local/bin/cargo-xbuild
