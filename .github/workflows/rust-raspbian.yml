@@ -1,4 +1,4 @@
-name: Build for RPI
+name: Build for RPI armv7
 
 on:
   push:
@@ -35,7 +35,8 @@ jobs:
       - name: list artifacts (debug)
         run: |
           ls target && \
-          ls target/release
+          ls target/arm-unknown-linux-gnueabihf && \
+          ls target/arm-unknown-linux-gnueabihf/release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
