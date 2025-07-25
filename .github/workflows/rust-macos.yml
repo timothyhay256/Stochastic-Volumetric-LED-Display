@@ -16,8 +16,8 @@ jobs:
         run: |
           echo "PKG_CONFIG_PATH=$(brew --prefix)/lib/pkgconfig" >> $GITHUB_ENV
           echo "PATH=$(brew --prefix llvm)/bin:$PATH" >> $GITHUB_ENV
-          echo 'DYLD_FALLBACK_LIBRARY_PATH="$(xcode-select --print-path)/usr/lib/"' >> $GITHUB_ENV
-          
+          echo "DYLD_FALLBACK_LIBRARY_PATH=$(xcode-select --print-path)/usr/lib/" >> $GITHUB_ENV
+
       - name: Build release (x86_64)
         run: /Users/docker/.cargo/bin/cargo build --release # Don't use absolute path
 
