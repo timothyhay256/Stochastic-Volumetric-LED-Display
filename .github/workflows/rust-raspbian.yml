@@ -32,14 +32,8 @@ jobs:
             rust-rpi-builder \
             cargo-xbuild
 
-      - name: list artifacts (debug)
-        run: |
-          ls target && \
-          ls target/arm-unknown-linux-gnueabihf && \
-          ls target/arm-unknown-linux-gnueabihf/release
-
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: release-rpi
-          path: target/arm-unknown-linux-gnueabihf/release/
+          path: target/arm-unknown-linux-gnueabihf/release/svled
