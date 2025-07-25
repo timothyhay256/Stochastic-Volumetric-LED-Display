@@ -40,8 +40,8 @@ jobs:
           export OPENCV_LINK_PATHS=$PWD/opencv-install/lib,$PWD/opencv-install/lib/opencv4/3rdparty,/usr/lib/x86_64-linux-gnu
           export OPENCV_INCLUDE_PATHS=$PWD/opencv-install/include,$PWD/opencv-install/include/opencv4
           # sudo ln -s /usr/lib/llvm-15/lib/libclang.so.1 /usr/lib/x86_64-linux-gnu/libclang.so
-          ls -R $PWD/opencv-install
-          ls -R /usr/lib
+          # ls -R $PWD/opencv-install/
+          # ls -R /usr/lib
           cargo build --release
 
       - name: Upload artifact
