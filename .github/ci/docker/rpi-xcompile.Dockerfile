@@ -152,9 +152,9 @@ RUN echo '#!/bin/bash\n\
 RPI_ROOT="/rpi-root"\n\
 clang --target=arm-unknown-linux-gnueabihf -fuse-ld=lld --sysroot="$RPI_ROOT" --gcc-toolchain="$RPI_ROOT" "$@"' > /usr/local/bin/clang-rpi && chmod +x /usr/local/bin/clang-rpi
 
-RUN ln -s /rpi-root/usr/local/include /usr/local/include && \
-    ln -s /rpi-root/usr/local/lib /usr/local/lib && \
-    ln -s /rpi-root/usr/include /usr/include
+RUN ln -s /rpi-root/usr/local/include/opencv4 /usr/local/include/opencv4 && \
+    ln -s /rpi-root/usr/include /usr/include && \
+    ln -s /rpi-root/usr/local/lib/arm-linux-gnueabihf /usr/local/lib/arm-linux-gnueabihf
 
 RUN echo '#!/bin/bash\n\
 RPI_ROOT="/rpi-root"\n\
