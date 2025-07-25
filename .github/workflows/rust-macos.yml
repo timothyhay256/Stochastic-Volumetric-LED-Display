@@ -12,12 +12,8 @@ jobs:
     runs-on: [self-hosted, MacOS]
 
     steps:
-      - name: Add cargo to path
-        run: export PATH="$PATH:/Users/docker/.cargo/bin/"
-      - uses: actions/checkout@v4
-
       - name: Build release (x86_64)
-        run: cargo build --release
+        run: /Users/docker/.cargo/bin/cargo build --release # Don't use absolute path
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

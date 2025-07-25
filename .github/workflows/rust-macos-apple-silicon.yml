@@ -23,10 +23,10 @@ jobs:
           eval "$(/opt/homebrew/bin/brew shellenv)"
           brew install opencv llvm
 
-      # - name: Set environment variables for OpenCV and LLVM
-      #   run: |
-      #     echo "PKG_CONFIG_PATH=$(brew --prefix)/lib/pkgconfig" >> $GITHUB_ENV
-      #     echo "PATH=$(brew --prefix llvm)/bin:$PATH" >> $GITHUB_ENV
+      - name: Set environment variables for OpenCV and LLVM
+        run: |
+          echo "PKG_CONFIG_PATH=$(brew --prefix)/lib/pkgconfig" >> $GITHUB_ENV
+          echo "PATH=$(brew --prefix llvm)/bin:$PATH" >> $GITHUB_ENV
 
       - name: Install Rust (via rustup)
         uses: actions-rs/toolchain@v1
