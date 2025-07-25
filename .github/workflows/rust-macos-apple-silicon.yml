@@ -1,0 +1,44 @@
+name: macOS Apple Silicon Build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-macos-arm64:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Homebrew
+        run: |
+          NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> "$HOME/.zprofile"
+          eval "$(/opt/homebrew/bin/brew shellenv)"
+
+      - name: Install dependencies (OpenCV + LLVM)
+        run: |
+          eval "$(/opt/homebrew/bin/brew shellenv)"
+          brew install opencv llvm
+
+      # - name: Set environment variables for OpenCV and LLVM
+      #   run: |
+      #     echo "PKG_CONFIG_PATH=$(brew --prefix)/lib/pkgconfig" >> $GITHUB_ENV
+      #     echo "PATH=$(brew --prefix llvm)/bin:$PATH" >> $GITHUB_ENV
+
+      - name: Install Rust (via rustup)
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Build in release mode
+        run: cargo build --release
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: svled
+          path: target/release/svled
