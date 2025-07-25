@@ -32,6 +32,11 @@ jobs:
             rust-rpi-builder \
             cargo-xbuild
 
+      - name: list artifacts (debug)
+        run: |
+          ls target && \
+          ls target/release
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
