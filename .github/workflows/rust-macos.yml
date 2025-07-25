@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Add cargo to path
-        run: export PATH="$PATH:/Users/docker/.cargo/bin/cargo"
+        run: export PATH="$PATH:/Users/docker/.cargo/bin/"
       - uses: actions/checkout@v4
 
       - name: Build release (x86_64)
