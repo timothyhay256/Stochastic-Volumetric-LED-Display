@@ -24,7 +24,7 @@ jobs:
           unzip opencv.zip && rm opencv.zip
           unzip opencv_contrib.zip && rm opencv_contrib.zip
           mkdir -p build && cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=NO -DCMAKE_INSTALL_PREFIX=$PWD/../opencv-install -DBUILD_DOCS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_opencv_python=OFF -D WITH_OPENMP=ON -DOPENCV_EXTRA_MODULES_PATH=../opencv_contrib-4.12.0/modules ../opencv-4.12.0
+          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=NO -DCMAKE_INSTALL_PREFIX=$PWD/../opencv-install -DBUILD_DOCS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_opencv_python=OFF -D WITH_OPENMP=ON -DWITH_LAPACK=OFF -DOPENCV_EXTRA_MODULES_PATH=../opencv_contrib-4.12.0/modules ../opencv-4.12.0
           cmake --build . --target install --config Release --parallel 28
           cmake --install . --prefix $PWD/../opencv-install
           cd ..
