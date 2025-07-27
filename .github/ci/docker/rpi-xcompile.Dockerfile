@@ -64,8 +64,8 @@ RUN sudo apt-get install -y \
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     build-essential cmake \
     libvtk6-dev \
-    zlib1g-dev libjpeg-dev libwebp-dev libpng-dev libtiff5-dev libjasper-dev libopenjp2-7-dev libjpeg-turbo8-dev libopenexr-dev libgdal-dev \
-    libdc1394-22-dev libavcodec-dev libavformat-dev libswscale-dev libtheora-dev libprotobuf-dev libquirc-dev libvorbis-dev \
+    zlib1g-dev libjpeg-dev libwebp-dev libpng-dev libtiff5-dev libjasper-dev libopenjp2-7-dev libopenexr-dev libgdal-dev \
+    libdc1394-22-dev libavcodec-dev libavformat-dev libswscale-dev libtheora-dev libprotobuf-dev libvorbis-dev \
     libxvidcore-dev libx264-dev yasm libopencore-amrnb-dev libopencore-amrwb-dev libv4l-dev libxine2-dev \
     libtbb-dev libeigen3-dev \
     python-dev python-tk python3-dev python3-tk python3-numpy \

@@ -159,17 +159,14 @@ jobs:
           export OPENCV_LINK_LIBS=opencv_highgui,opencv_core,opencv_videoio,opencv_imgcodecs,opencv_imgproc,libippiw,libittnotify,libippicv,zlib,OpenCL.framework,Cocoa.framework,Accelerate.framework,AVFoundation.framework,CoreGraphics.framework,CoreMedia.framework,CoreVideo.framework,QuartzCore.framework,clang_rt.osx
           export OPENCV_LINK_PATHS=/usr/local/lib,/usr/local/lib/opencv4/3rdparty,$clang_dir/lib/darwin
           export OPENCV_INCLUDE_PATHS=/usr/local/include,/usr/local/include/opencv4
-          cargo build --release
+          /Users/docker/.cargo/bin/cargo build --release
           
       - name: Set environment variables for OpenCV and LLVM
         run: |
           echo "PKG_CONFIG_PATH=$(brew --prefix)/lib/pkgconfig" >> $GITHUB_ENV
           echo "PATH=$(brew --prefix llvm)/bin:$PATH" >> $GITHUB_ENV
           echo "DYLD_FALLBACK_LIBRARY_PATH=$(xcode-select --print-path)/usr/lib/" >> $GITHUB_ENV
-
-      - name: Build release (x86_64)
-        run: /Users/docker/.cargo/bin/cargo build --release # Don't use absolute path
-
+          
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
