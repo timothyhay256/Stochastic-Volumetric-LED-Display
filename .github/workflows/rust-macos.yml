@@ -12,6 +12,154 @@ jobs:
     runs-on: [self-hosted, MacOS]
 
     steps:
+      - uses: actions/checkout@v3
+
+      # Install rust
+      - name: Install rust
+        run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+      # See https://github.com/orgs/community/discussions/26635
+      - name: brew bash
+        run: brew install bash
+
+      # dynamic link libclang correctly, according to https://github.com/twistedfall/opencv-rust
+      - name: Dynamic Link libclang
+        shell: /usr/local/bin/bash {0}
+        run: echo "DYLD_FALLBACK_LIBRARY_PATH=$(xcode-select --print-path)/Toolchains/XcodeDefault.xctoolchain/usr/lib/" >> $GITHUB_ENV
+
+      # Install opencv
+      #- name: Install opencv
+      #  shell: /usr/local/bin/bash {0}
+      #  run: |
+      #    echo ${DYLD_FALLBACK_LIBRARY_PATH:-is_empty}
+      #    brew install opencv
+
+      # We install to /usr/local to simplify things, as cmake doesn't have permissions by default for other dirs like /opt or /usr/local/opencv
+      # Pull opencv source, unzip, configure cmake, build, and install
+      # Disable image formats like jpeg, png, tiff, as we use rust image crate instead.  See https://docs.opencv.org/4.x/db/d05/tutorial_config_reference.html
+      # Inspired from https://github.com/twistedfall/opencv-rust/issues/364
+      - name: Install OpenCV static lib
+        run: |
+          wget -O opencv.zip https://github.com/opencv/opencv/archive/refs/tags/4.11.0.zip
+          wget -O opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/refs/tags/4.11.0.zip
+          unzip opencv.zip && rm opencv.zip
+          unzip opencv_contrib.zip && rm opencv_contrib.zip
+          mkdir -p build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=NO -DCMAKE_INSTALL_PREFIX=/usr/local BUILD_CUDA_STUBS=OFF \
+            -D BUILD_DOCS=OFF \
+            -D BUILD_EXAMPLES=OFF \
+            -D BUILD_IPP_IW=ON \
+            -D BUILD_ITT=ON \
+            -D BUILD_JASPER=OFF \
+            -D BUILD_JAVA=OFF \
+            -D BUILD_JPEG=ON \
+            -D BUILD_OPENEXR=OFF \
+            -D BUILD_OPENJPEG=ON \
+            -D BUILD_PERF_TESTS=OFF \
+            -D BUILD_PNG=ON \
+            -D BUILD_PROTOBUF=ON \
+            -D BUILD_SHARED_LIBS=OFF \
+            -D BUILD_TBB=OFF \
+            -D BUILD_TESTS=OFF \
+            -D BUILD_TIFF=ON \
+            -D BUILD_WEBP=ON \
+            -D BUILD_WITH_DEBUG_INFO=OFF \
+            -D BUILD_WITH_DYNAMIC_IPP=OFF \
+            -D BUILD_ZLIB=ON \
+            -D BUILD_opencv_apps=OFF \
+            -D BUILD_opencv_python2=OFF \
+            -D BUILD_opencv_python3=OFF \
+            -D CMAKE_BUILD_TYPE=Release \
+            -D CV_DISABLE_OPTIMIZATION=OFF \
+            -D CV_ENABLE_INTRINSICS=ON \
+            -D ENABLE_CONFIG_VERIFICATION=OFF \
+            -D ENABLE_FAST_MATH=OFF \
+            -D ENABLE_LTO=OFF \
+            -D ENABLE_PIC=ON \
+            -D ENABLE_PRECOMPILED_HEADERS=OFF \
+            -D INSTALL_CREATE_DISTRIB=OFF \
+            -D INSTALL_C_EXAMPLES=OFF \
+            -D INSTALL_PYTHON_EXAMPLES=OFF \
+            -D INSTALL_TESTS=OFF \
+            -D OPENCV_ENABLE_MEMALIGN=OFF \
+            -D OPENCV_ENABLE_NONFREE=ON \
+            -D OPENCV_FORCE_3RDPARTY_BUILD=ON \
+            -D OPENCV_GENERATE_PKGCONFIG=OFF \
+            -D PROTOBUF_UPDATE_FILES=OFF \
+            -D WITH_1394=OFF \
+            -D WITH_ADE=ON \
+            -D WITH_ARAVIS=OFF \
+            -D WITH_CLP=OFF \
+            -D WITH_CUBLAS=OFF \
+            -D WITH_CUDA=OFF \
+            -D WITH_CUFFT=OFF \
+            -D WITH_EIGEN=ON \
+            -D WITH_FFMPEG=OFF \
+            -D WITH_GDAL=OFF \
+            -D WITH_GDCM=OFF \
+            -D WITH_GIGEAPI=OFF \
+            -D WITH_GPHOTO2=OFF \
+            -D WITH_GSTREAMER=OFF \
+            -D WITH_GTK=OFF \
+            -D WITH_HALIDE=OFF \
+            -D WITH_IMGCODEC_HDcR=ON \
+            -D WITH_IMGCODEC_PXM=ON \
+            -D WITH_IMGCODEC_SUNRASTER=ON \
+            -D WITH_INF_ENGINE=OFF \
+            -D WITH_IPP=ON \
+            -D WITH_ITT=ON \
+            -D WITH_JASPER=OFF \
+            -D WITH_JPEG=ON \
+            -D WITH_LAPACK=OFF \
+            -D WITH_LIBV4L=OFF \
+            -D WITH_MATLAB=OFF \
+            -D WITH_MFX=OFF \
+            -D WITH_OPENCL=OFF \
+            -D WITH_OPENCLAMDBLAS=OFF \
+            -D WITH_OPENCLAMDFFT=OFF \
+            -D WITH_OPENCL_SVM=OFF \
+            -D WITH_OPENEXR=OFF \
+            -D WITH_OPENGL=OFF \
+            -D WITH_OPENMP=OFF \
+            -D WITH_OPENNI2=OFF \
+            -D WITH_OPENNI=OFF \
+            -D WITH_OPENVX=OFF \
+            -D WITH_PNG=ON \
+            -D WITH_PROTOBUF=ON \
+            -D WITH_PTHREADS_PF=ON \
+            -D WITH_PVAPI=OFF \
+            -D WITH_QT=OFF \
+            -D WITH_QUIRC=ON \
+            -D WITH_TBB=OFF \
+            -D WITH_TIFF=ON \
+            -D WITH_UNICAP=OFF \
+            -D WITH_V4L=ON \
+            -D WITH_VA=ON \
+            -D WITH_VA_INTEL=ON \
+            -D WITH_VTK=ON \
+            -D WITH_WEBP=ON \
+            -D WITH_XIMEA=OFF \
+            -D WITH_XINE=OFF \
+            -D WITH_AVIF=OFF \
+            -D WITH_IMGCODEC_AVIF=OFF \
+            -DOPENCV_EXTRA_MODULES_PATH=../opencv_contrib-4.11.0/modules ../opencv-4.11.0
+          cmake --build . --target install --config Release --parallel 16
+          cmake --install . --prefix /usr/local
+          cd ..
+
+      # OpenCV-rust looks for "opencv2/core/version.hpp" for the OpenCV version: https://github.com/twistedfall/opencv-rust/issues/368
+      #  which is under /<install-prefix>/include/opencv4 for macOS
+      # We also need to link a bunch of OSX frameworks.  See https://github.com/twistedfall/opencv-rust/issues/270#issuecomment-930208141
+      # Build
+      - name: Build
+        shell: /usr/local/bin/bash {0}
+        run: |
+          clang_dir="$(clang --print-search-dirs | awk -F= '/^libraries: =/ { print $2 }')"
+          export OPENCV_LINK_LIBS=opencv_highgui,opencv_core,opencv_videoio,opencv_imgcodecs,opencv_imgproc,libippiw,libittnotify,libippicv,zlib,OpenCL.framework,Cocoa.framework,Accelerate.framework,AVFoundation.framework,CoreGraphics.framework,CoreMedia.framework,CoreVideo.framework,QuartzCore.framework,clang_rt.osx
+          export OPENCV_LINK_PATHS=/usr/local/lib,/usr/local/lib/opencv4/3rdparty,$clang_dir/lib/darwin
+          export OPENCV_INCLUDE_PATHS=/usr/local/include,/usr/local/include/opencv4
+          cargo build --release
+          
       - name: Set environment variables for OpenCV and LLVM
         run: |
           echo "PKG_CONFIG_PATH=$(brew --prefix)/lib/pkgconfig" >> $GITHUB_ENV
