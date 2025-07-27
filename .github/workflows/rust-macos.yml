@@ -19,8 +19,8 @@ jobs:
         run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
       # See https://github.com/orgs/community/discussions/26635
-      - name: brew bash
-        run: brew install bash
+      - name: brew bash and wget
+        run: brew install bash wget
 
       # dynamic link libclang correctly, according to https://github.com/twistedfall/opencv-rust
       - name: Dynamic Link libclang
