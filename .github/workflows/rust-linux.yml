@@ -92,7 +92,7 @@ jobs:
             -D WITH_GIGEAPI=OFF \
             -D WITH_GPHOTO2=OFF \
             -D WITH_GSTREAMER=OFF \
-            -D WITH_GTK=OFF \
+            -D WITH_GTK=ON \
             -D WITH_HALIDE=OFF \
             -D WITH_IMGCODEC_HDcR=ON \
             -D WITH_IMGCODEC_PXM=ON \
