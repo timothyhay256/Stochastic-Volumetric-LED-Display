@@ -216,7 +216,7 @@ RUN set -eux; \
             -D BUILD_TBB=OFF \
             -D WITH_AVIF=OFF \
             -D WITH_IMGCODEC_AVIF=OFF \
-            -DOPENCV_EXTRA_MODULES_PATH=../../OpenCV_contrib/modules \
+            -DOPENCV_EXTRA_MODULES_PATH=../../OpenCV_contrib/modules && \
     make -j"$(nproc)" && \
     make install && \
     # cpack -G DEB && \
