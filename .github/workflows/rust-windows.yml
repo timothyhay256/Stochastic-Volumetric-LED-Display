@@ -19,7 +19,7 @@ jobs:
         with:
           # Arguments to pass to Chocolatey
           # don't install opencv here as we build the staticlib below
-          args: install -y llvm wget strawberryperl unzip
+          args: install -y llvm wget strawberryperl unzip cmake
           # Docker image to use
           #image: # optional, default is ghcr.io/crazy-max/ghaction-chocolatey
 
