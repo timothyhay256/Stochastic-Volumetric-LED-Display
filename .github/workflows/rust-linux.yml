@@ -1,10 +1,13 @@
-name: Build for Linux x86_64
+name: Static build for Linux x86_64
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
+env:
+  OPENCV_VERSION: 4.11.0
 
 jobs:
   build-x86_64:
@@ -14,25 +17,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # - name: Cache OpenCV build
-      #   id: cache-opencv
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: |
-      #       opencv-install
-      #       opencv-4.11.0
-      #       opencv_contrib-4.11.0
-      #       build
-      #     key: opencv-4.11.0-linux-x64
+      - name: Cache OpenCV build
+        id: cache-opencv
+        uses: actions/cache@v4
+        with:
+          path: |
+            opencv-install
+            opencv-${{ env.OPENCV_VERSION }}
+            opencv_contrib-${{ env.OPENCV_VERSION }}
+            build
+          key: opencv-${{ env.OPENCV_VERSION }}-linux-x64
 
-      # Pull opencv source, unzip, configure cmake, build, and install
-      # Disable image formats like jpeg, png, tiff, as this breaks the build step.
-      # Inspired from https://github.com/twistedfall/opencv-rust/issues/364
       - name: Install OpenCV static lib
-      #   if: steps.cache-opencv.outputs.cache-hit != 'true'
+        if: steps.cache-opencv.outputs.cache-hit != 'true'
         run: |
-          wget -O opencv.zip https://github.com/opencv/opencv/archive/refs/tags/4.11.0.zip
-          wget -O opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/refs/tags/4.11.0.zip
+          wget -O opencv.zip https://github.com/opencv/opencv/archive/refs/tags/${OPENCV_VERSION}.zip
+          wget -O opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/refs/tags/${OPENCV_VERSION}.zip
           unzip opencv.zip && rm opencv.zip
           unzip opencv_contrib.zip && rm opencv_contrib.zip
           mkdir -p build && cd build
@@ -43,20 +43,20 @@ jobs:
             -D BUILD_ITT=ON \
             -D BUILD_JASPER=OFF \
             -D BUILD_JAVA=OFF \
-            -D BUILD_JPEG=OFF \
+            -D BUILD_JPEG=ON \
             -D BUILD_OPENEXR=OFF \
-            -D BUILD_OPENJPEG=OFF \
+            -D BUILD_OPENJPEG=ON \
             -D BUILD_PERF_TESTS=OFF \
-            -D BUILD_PNG=OFF \
+            -D BUILD_PNG=ON \
             -D BUILD_PROTOBUF=ON \
-            -D BUILD_SHARED_LIBS=ON \
+            -D BUILD_SHARED_LIBS=OFF \
             -D BUILD_TBB=OFF \
             -D BUILD_TESTS=OFF \
-            -D BUILD_TIFF=OFF \
-            -D BUILD_WEBP=OFF \
+            -D BUILD_TIFF=ON \
+            -D BUILD_WEBP=ON \
             -D BUILD_WITH_DEBUG_INFO=OFF \
             -D BUILD_WITH_DYNAMIC_IPP=OFF \
-            -D BUILD_ZLIB=OFF \
+            -D BUILD_ZLIB=ON \
             -D BUILD_opencv_apps=OFF \
             -D BUILD_opencv_python2=OFF \
             -D BUILD_opencv_python3=OFF \
@@ -75,10 +75,10 @@ jobs:
             -D INSTALL_TESTS=OFF \
             -D OPENCV_ENABLE_MEMALIGN=OFF \
             -D OPENCV_ENABLE_NONFREE=ON \
-            -D OPENCV_FORCE_3RDPARTY_BUILD=OFF \
+            -D OPENCV_FORCE_3RDPARTY_BUILD=ON \
             -D OPENCV_GENERATE_PKGCONFIG=OFF \
             -D PROTOBUF_UPDATE_FILES=OFF \
-            -D WITH_1394=ON \
+            -D WITH_1394=OFF \
             -D WITH_ADE=ON \
             -D WITH_ARAVIS=OFF \
             -D WITH_CLP=OFF \
@@ -86,15 +86,13 @@ jobs:
             -D WITH_CUDA=OFF \
             -D WITH_CUFFT=OFF \
             -D WITH_EIGEN=ON \
-            -D WITH_FFMPEG=ON \
-            -D WITH_GDAL=ON \
+            -D WITH_FFMPEG=OFF \
+            -D WITH_GDAL=OFF \
             -D WITH_GDCM=OFF \
             -D WITH_GIGEAPI=OFF \
-            -D WITH_GPHOTO2=ON \
-            -D WITH_GSTREAMER=ON \
-            -D WITH_GSTREAMER_0_10=OFF \
+            -D WITH_GPHOTO2=OFF \
+            -D WITH_GSTREAMER=OFF \
             -D WITH_GTK=OFF \
-            -D WITH_GTK_2_X=OFF \
             -D WITH_HALIDE=OFF \
             -D WITH_IMGCODEC_HDcR=ON \
             -D WITH_IMGCODEC_PXM=ON \
@@ -104,7 +102,7 @@ jobs:
             -D WITH_ITT=ON \
             -D WITH_JASPER=OFF \
             -D WITH_JPEG=ON \
-            -D WITH_LAPACK=ON \
+            -D WITH_LAPACK=OFF \
             -D WITH_LIBV4L=OFF \
             -D WITH_MATLAB=OFF \
             -D WITH_MFX=OFF \
@@ -113,7 +111,7 @@ jobs:
             -D WITH_OPENCLAMDFFT=OFF \
             -D WITH_OPENCL_SVM=OFF \
             -D WITH_OPENEXR=OFF \
-            -D WITH_OPENGL=ON \
+            -D WITH_OPENGL=OFF \
             -D WITH_OPENMP=OFF \
             -D WITH_OPENNI2=OFF \
             -D WITH_OPENNI=OFF \
@@ -122,9 +120,9 @@ jobs:
             -D WITH_PROTOBUF=ON \
             -D WITH_PTHREADS_PF=ON \
             -D WITH_PVAPI=OFF \
-            -D WITH_QT=ON \
+            -D WITH_QT=OFF \
             -D WITH_QUIRC=ON \
-            -D WITH_TBB=ON \
+            -D WITH_TBB=OFF \
             -D WITH_TIFF=ON \
             -D WITH_UNICAP=OFF \
             -D WITH_V4L=ON \
@@ -134,49 +132,19 @@ jobs:
             -D WITH_WEBP=ON \
             -D WITH_XIMEA=OFF \
             -D WITH_XINE=OFF \
-            -D BUILD_JPEG=ON \
-            -D BUILD_OPENJPEG=ON \
-            -D BUILD_PNG=ON \
-            -D BUILD_SHARED_LIBS=OFF \
-            -D BUILD_TIFF=ON \
-            -D BUILD_WEBP=ON \
-            -D BUILD_ZLIB=ON \
-            -D BUILD_opencv_freetype=OFF \
-            -D OPENCV_FORCE_3RDPARTY_BUILD=ON \
-            -D WITH_1394=OFF \
-            -D WITH_FFMPEG=OFF \
-            -D WITH_FREETYPE=OFF \
-            -D WITH_GDAL=OFF \
-            -D WITH_GPHOTO2=OFF \
-            -D WITH_GSTREAMER=OFF \
-            -D WITH_GTK=OFF \
-            -D WITH_LAPACK=OFF \
-            -D WITH_OPENGL=OFF \
-            -D WITH_QT=OFF \
-            -D WITH_TBB=OFF \
-            -D BUILD_TBB=OFF \
             -D WITH_AVIF=OFF \
             -D WITH_IMGCODEC_AVIF=OFF \
-            -DOPENCV_EXTRA_MODULES_PATH=../opencv_contrib-4.11.0/modules \
-            ../opencv-4.11.0
+            -DOPENCV_EXTRA_MODULES_PATH=../opencv_contrib-${OPENCV_VERSION}/modules \
+            ../opencv-${OPENCV_VERSION}
           cmake --build . --target install --config Release --parallel 28
           cmake --install . --prefix $PWD/../opencv-install
           cd ..
 
-      # Note: OPENCV_LINK_LIBS ordering matters for linux.  Put lower level deps after higher level.  See https://answers.opencv.org/question/186124/undefined-reference-to-cvsoftdoubleoperator/
-      # libclang files are in /usr/lib/llvm-##/lib.  We symlink it to one of the opencv_link_paths
-      # OpenCV-rust looks for "opencv2/core/version.hpp" for the OpenCV version: https://github.com/twistedfall/opencv-rust/issues/368
-      #  which is under /<install-prefix>/include/opencv4 for linux
-      # Build
-      - name: Build
+      - name: Build Rust project
         run: |
-          # export OPENCV_LINK_LIBS="opencv_highgui,opencv_videoio,opencv_imgcodecs,opencv_imgproc,opencv_core,libippiw,libittnotify,libippicv,z"
           export OPENCV_LINK_LIBS=opencv_gapi,opencv_highgui,opencv_objdetect,opencv_dnn,opencv_videostab,opencv_calib3d,opencv_features2d,opencv_stitching,opencv_flann,opencv_videoio,opencv_rgbd,opencv_aruco,opencv_video,opencv_ml,opencv_imgcodecs,opencv_imgproc,opencv_core,ade,ittnotify,liblibwebp,liblibtiff,liblibjpeg-turbo,liblibpng,liblibopenjp2,ippiw,ippicv,liblibprotobuf,quirc,zlib
           export OPENCV_LINK_PATHS=$PWD/opencv-install/lib,$PWD/opencv-install/lib/opencv4/3rdparty,/usr/lib/x86_64-linux-gnu
           export OPENCV_INCLUDE_PATHS=$PWD/opencv-install/include,$PWD/opencv-install/include/opencv4
-          # sudo ln -s /usr/lib/llvm-15/lib/libclang.so.1 /usr/lib/x86_64-linux-gnu/libclang.so
-          # ls -R $PWD/opencv-install/
-          # ls -R /usr/lib
           cargo build --release
 
       - name: Upload artifact

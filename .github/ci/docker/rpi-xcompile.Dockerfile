@@ -50,19 +50,6 @@ RUN set -xeu && \
 
 # # Install dependencies for building OpenCV
 
-# RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-#     build-essential cmake \
-#     qt5-default libvtk6-dev \
-#     zlib1g-dev libjpeg-dev libwebp-dev libpng-dev libtiff5-dev libjasper-dev libopenexr-dev libgdal-dev \
-#     libdc1394-22-dev libavcodec-dev libavformat-dev libswscale-dev libtheora-dev libvorbis-dev \
-#     libxvidcore-dev libx264-dev yasm libopencore-amrnb-dev libopencore-amrwb-dev libv4l-dev libxine2-dev \
-#     libtbb-dev libeigen3-dev \
-#     python-dev python-tk python-numpy python3-dev python3-tk python3-numpy \
-#     ant default-jdk \
-#     doxygen \
-#     unzip wget && \
-#     apt-get clean && rm -rf /var/lib/apt/lists/*
-
 RUN sudo apt-get install -y \
 	build-essential ccache cmake unzip pkg-config curl \
 	libjpeg-dev libpng-dev libtiff-dev \
@@ -74,6 +61,18 @@ RUN sudo apt-get install -y \
     libglfw3-dev libgl1-mesa-dev libglu1-mesa-dev \
 	python3-dev python3-numpy python-dev 
 
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    build-essential cmake \
+    qt5-default libvtk6-dev \
+    zlib1g-dev libjpeg-dev libwebp-dev libpng-dev libtiff5-dev libjasper-dev libopenexr-dev libgdal-dev \
+    libdc1394-22-dev libavcodec-dev libavformat-dev libswscale-dev libtheora-dev libvorbis-dev \
+    libxvidcore-dev libx264-dev yasm libopencore-amrnb-dev libopencore-amrwb-dev libv4l-dev libxine2-dev \
+    libtbb-dev libeigen3-dev \
+    python-dev python-tk python-numpy python3-dev python3-tk python3-numpy \
+    ant default-jdk \
+    doxygen \
+    unzip wget && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Build and install OpenCV from source
 RUN set -eux; \
