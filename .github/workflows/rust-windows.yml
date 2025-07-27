@@ -27,9 +27,12 @@ jobs:
         run: |
           wget -O opencv.zip https://github.com/opencv/opencv/archive/refs/tags/4.11.0.zip
           wget -O opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/refs/tags/4.11.0.zip
-          unzip opencv.zip && rm opencv.zip
-          unzip opencv_contrib.zip && rm opencv_contrib.zip
-          mkdir -p build && cd build
+          unzip opencv.zip
+          rm opencv.zip
+          unzip opencv_contrib.zip
+          rm opencv_contrib.zip
+          mkdir -p build
+          cd build
           cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=NO -DCMAKE_INSTALL_PREFIX="C:/opt/opencv" BUILD_CUDA_STUBS=OFF \
             -D BUILD_DOCS=OFF \
             -D BUILD_EXAMPLES=OFF \
@@ -127,7 +130,7 @@ jobs:
             -D WITH_XINE=OFF \
             -D WITH_AVIF=OFF \
             -D WITH_IMGCODEC_AVIF=OFF \
-            -D OPENCV_EXTRA_MODULES_PATH="../opencv_contrib-4.11.0/modules" ../opencv-4.11.0 && \
+            -D OPENCV_EXTRA_MODULES_PATH="../opencv_contrib-4.11.0/modules" ../opencv-4.11.0
           cmake --build . --target install --config Release --parallel 28
           cmake --install . --prefix C:/opt/opencv
           cd ..
