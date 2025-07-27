@@ -20,7 +20,7 @@ jobs:
 
       # See https://github.com/orgs/community/discussions/26635
       - name: brew bash, wget, cmake
-        run: brew install bash wget
+        run: brew install bash wget cmake
 
       # dynamic link libclang correctly, according to https://github.com/twistedfall/opencv-rust
       - name: Dynamic Link libclang
