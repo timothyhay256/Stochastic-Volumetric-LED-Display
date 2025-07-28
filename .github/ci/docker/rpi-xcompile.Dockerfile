@@ -64,7 +64,7 @@ RUN sudo apt-get install -y \
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     build-essential cmake \
     libvtk6-dev \
-    zlib1g-dev libjpeg-dev libopenjp2-7-dev libwebp-dev libpng-dev libtiff5-dev libjasper-dev libopenjp2-7-dev libopenexr-dev libgdal-dev \
+    zlib1g-dev libjpeg-dev libopenjp2-7-dev libopenjp2-tools libwebp-dev libpng-dev libtiff5-dev libjasper-dev libopenjp2-7-dev libopenexr-dev libgdal-dev \
     libdc1394-22-dev libavcodec-dev libavformat-dev libswscale-dev libtheora-dev libprotobuf-dev libvorbis-dev \
     libxvidcore-dev libx264-dev yasm libopencore-amrnb-dev libopencore-amrwb-dev libv4l-dev libxine2-dev \
     libtbb-dev libeigen3-dev \
@@ -103,7 +103,6 @@ RUN set -eux; \
             -D BUILD_JAVA=OFF \
             -D BUILD_JPEG=ON \
             -D BUILD_OPENEXR=OFF \
-            -D BUILD_OPENJPEG=ON \
             -D BUILD_PERF_TESTS=OFF \
             -D BUILD_PNG=OFF \
             -D BUILD_PROTOBUF=ON \
