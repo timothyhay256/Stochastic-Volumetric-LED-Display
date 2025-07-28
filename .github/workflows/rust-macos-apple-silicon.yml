@@ -59,7 +59,7 @@ jobs:
           cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=NO -DCMAKE_INSTALL_PREFIX=/usr/local BUILD_CUDA_STUBS=OFF \
             -D BUILD_DOCS=OFF \
             -D BUILD_EXAMPLES=OFF \
-            -D BUILD_IPP_IW=ON \
+            -D BUILD_IPP_IW=OFF \
             -D BUILD_ITT=ON \
             -D BUILD_JASPER=OFF \
             -D BUILD_JAVA=OFF \
@@ -117,7 +117,7 @@ jobs:
             -D WITH_IMGCODEC_PXM=ON \
             -D WITH_IMGCODEC_SUNRASTER=ON \
             -D WITH_INF_ENGINE=OFF \
-            -D WITH_IPP=ON \
+            -D WITH_IPP=OFF \
             -D WITH_ITT=ON \
             -D WITH_JASPER=OFF \
             -D WITH_JPEG=ON \
