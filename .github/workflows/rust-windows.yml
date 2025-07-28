@@ -40,8 +40,8 @@ jobs:
 
       - name: Build
         run: |
-          # $env:OPENCV_LINK_LIBS="opencv_highgui4110,opencv_core4110,opencv_videoio4110,opencv_imgcodecs4110,opencv_imgproc4110,ippiw,ittnotify,ippicvmt,zlib"
-          $env:OPENCV_LINK_LIBS=$(Get-ChildItem -Path C:\tools -Recurse -Filter 'opencv_world*.lib' | Select-Object -first 1 | Select-Object -ExpandProperty Name)
+          $env:OPENCV_LINK_LIBS="opencv_highgui4110,opencv_core4110,opencv_videoio4110,opencv_imgcodecs4110,opencv_imgproc4110,ippiw,ittnotify,ippicvmt,zlib,jpeg,openjpeg"
+          # $env:OPENCV_LINK_LIBS=$(Get-ChildItem -Path C:\tools -Recurse -Filter 'opencv_world*.lib' | Select-Object -first 1 | Select-Object -ExpandProperty Name)
           $env:OPENCV_LINK_PATHS="C:/opt/opencv/x64/vc17/staticlib"
           $env:OPENCV_INCLUDE_PATHS="C:/opt/opencv/include"
           $env:OPENCV_MSVC_CRT="static"

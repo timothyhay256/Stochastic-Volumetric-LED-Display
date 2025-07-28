@@ -268,7 +268,7 @@ export PKG_CONFIG_LIBDIR="$RPI_ROOT/usr/lib/arm-linux-gnueabihf/pkgconfig"\n\
 export OPENCV_HEADER_DIR="$RPI_ROOT/usr/local/include/opencv4,$RPI_ROOT/usr/local/include/opencv4"\n\
 export OPENCV_INCLUDE_PATHS="$RPI_ROOT/usr/local/include/opencv4"\n\
 export OPENCV_LINK_PATHS="$RPI_ROOT/usr/local/lib,$RPI_ROOT/usr/local/lib/opencv4/3rdparty,$RPI_ROOT/usr/local/lib/arm-linux-gnueabihf"\n\
-export OPENCV_LINK_LIBS=opencv_gapi,opencv_highgui,opencv_objdetect,opencv_dnn,opencv_videostab,opencv_calib3d,opencv_features2d,opencv_stitching,opencv_flann,opencv_videoio,opencv_rgbd,opencv_aruco,opencv_video,opencv_ml,opencv_imgcodecs,opencv_imgproc,opencv_core,jpeg\n\
+export OPENCV_LINK_LIBS=opencv_gapi,opencv_highgui,opencv_objdetect,opencv_dnn,opencv_videostab,opencv_calib3d,opencv_features2d,opencv_stitching,opencv_flann,opencv_videoio,opencv_rgbd,opencv_aruco,opencv_video,opencv_ml,opencv_imgcodecs,opencv_imgproc,opencv_core,jpeg,openjpeg\n\
 export CC="clang-rpi"\n\
 export CXX="clang-rpi"\n\
 cargo build -vv --release --target arm-unknown-linux-gnueabihf' > /usr/local/bin/cargo-xbuild && chmod +x /usr/local/bin/cargo-xbuild
