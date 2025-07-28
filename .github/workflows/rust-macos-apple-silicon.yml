@@ -163,7 +163,6 @@ jobs:
       # We also need to link a bunch of OSX frameworks.  See https://github.com/twistedfall/opencv-rust/issues/270#issuecomment-930208141
       # Build
       - name: Build
-        shell: /usr/local/bin/bash {0}
         run: |
           export DYLD_FALLBACK_LIBRARY_PATH="$(xcode-select --print-path)/usr/lib/"
           clang_dir="$(clang --print-search-dirs | awk -F= '/^libraries: =/ { print $2 }')"
