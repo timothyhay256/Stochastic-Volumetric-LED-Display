@@ -18,8 +18,8 @@ jobs:
         run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
       # See https://github.com/orgs/community/discussions/26635
-      - name: brew bash, wget, cmake, openjpeg, webp
-        run: brew install bash wget cmake openjpeg webp
+      - name: brew bash, wget, cmake, openjpeg, jpeg, webp
+        run: brew install bash wget cmake openjpeg jpeg webp
 
       # dynamic link libclang correctly, according to https://github.com/twistedfall/opencv-rust
       - name: Dynamic Link libclang
