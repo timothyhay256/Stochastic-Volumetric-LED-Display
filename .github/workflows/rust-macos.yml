@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  OPENCV_VERSION: 4.11.0
+
 jobs:
   build-x86_64:
     name: Build for x86_64 MacOS
@@ -27,6 +30,17 @@ jobs:
         shell: /usr/local/bin/bash {0}
         run: echo "DYLD_FALLBACK_LIBRARY_PATH=$(xcode-select --print-path)/Toolchains/XcodeDefault.xctoolchain/usr/lib/" >> $GITHUB_ENV
 
+      - name: Cache OpenCV build
+        id: cache-opencv
+        uses: actions/cache@v4
+        with:
+          path: |
+            opencv-install
+            opencv-${{ env.OPENCV_VERSION }}
+            opencv_contrib-${{ env.OPENCV_VERSION }}
+            build
+          key: opencv-${{ env.OPENCV_VERSION }}-macos-x64
+
       # Install opencv
       #- name: Install opencv
       #  shell: /usr/local/bin/bash {0}
@@ -39,10 +53,11 @@ jobs:
       # Disable image formats like jpeg, png, tiff, as we use rust image crate instead.  See https://docs.opencv.org/4.x/db/d05/tutorial_config_reference.html
       # Inspired from https://github.com/twistedfall/opencv-rust/issues/364
       - name: Install OpenCV static lib
+        if: steps.cache-opencv.outputs.cache-hit != 'true'
         run: |
           DYLD_FALLBACK_LIBRARY_PATH=$(xcode-select --print-path)/Toolchains/XcodeDefault.xctoolchain/usr/lib/
-          wget -O opencv.zip https://github.com/opencv/opencv/archive/refs/tags/4.11.0.zip
-          wget -O opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/refs/tags/4.11.0.zip
+          wget -O opencv.zip https://github.com/opencv/opencv/archive/refs/tags/${{ env.OPENCV_VERSION }}.zip
+          wget -O opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/refs/tags/${{ env.OPENCV_VERSION }}.zip
           unzip opencv.zip && rm opencv.zip
           unzip opencv_contrib.zip && rm opencv_contrib.zip
           mkdir -p build && cd build
@@ -143,7 +158,7 @@ jobs:
             -D WITH_XINE=OFF \
             -D WITH_AVIF=OFF \
             -D WITH_IMGCODEC_AVIF=OFF \
-            -DOPENCV_EXTRA_MODULES_PATH=../opencv_contrib-4.11.0/modules ../opencv-4.11.0
+            -DOPENCV_EXTRA_MODULES_PATH=../opencv_contrib-${{ env.OPENCV_VERSION }}/modules ../opencv-${{ env.OPENCV_VERSION }}
           cmake --build . --target install --config Release --parallel 16
           cmake --install . --prefix /usr/local
           cd ..
