@@ -53,9 +53,9 @@ jobs:
             -D BUILD_ITT=ON \
             -D BUILD_JASPER=OFF \
             -D BUILD_JAVA=OFF \
-            -D BUILD_JPEG=OFF \
+            -D BUILD_JPEG=ON \
             -D BUILD_OPENEXR=OFF \
-            -D BUILD_OPENJPEG=OFF \
+            -D BUILD_OPENJPEG=ON \
             -D BUILD_PERF_TESTS=OFF \
             -D BUILD_PNG=OFF \
             -D BUILD_PROTOBUF=ON \
@@ -110,7 +110,7 @@ jobs:
             -D WITH_IPP=ON \
             -D WITH_ITT=ON \
             -D WITH_JASPER=OFF \
-            -D WITH_JPEG=OFF \
+            -D WITH_JPEG=ON \
             -D WITH_LAPACK=OFF \
             -D WITH_LIBV4L=OFF \
             -D WITH_MATLAB=OFF \
