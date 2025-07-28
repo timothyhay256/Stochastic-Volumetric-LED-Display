@@ -101,9 +101,9 @@ RUN set -eux; \
             -D BUILD_ITT=ON \
             -D BUILD_JASPER=OFF \
             -D BUILD_JAVA=OFF \
-            -D BUILD_JPEG=OFF \
+            -D BUILD_JPEG=ON \
             -D BUILD_OPENEXR=OFF \
-            -D BUILD_OPENJPEG=OFF \
+            -D BUILD_OPENJPEG=ON \
             -D BUILD_PERF_TESTS=OFF \
             -D BUILD_PNG=OFF \
             -D BUILD_PROTOBUF=ON \
@@ -161,7 +161,7 @@ RUN set -eux; \
             -D WITH_IPP=ON \
             -D WITH_ITT=ON \
             -D WITH_JASPER=OFF \
-            -D WITH_JPEG=OFF \
+            -D WITH_JPEG=ON \
             -D WITH_LAPACK=ON \
             -D WITH_LIBV4L=OFF \
             -D WITH_MATLAB=OFF \
@@ -192,8 +192,8 @@ RUN set -eux; \
             -D WITH_WEBP=ON \
             -D WITH_XIMEA=OFF \
             -D WITH_XINE=OFF \
-            -D BUILD_JPEG=OFF \
-            -D BUILD_OPENJPEG=OFF \
+            -D BUILD_JPEG=ON \
+            -D BUILD_OPENJPEG=ON \
             -D BUILD_PNG=ON \
             -D BUILD_SHARED_LIBS=OFF \
             -D BUILD_TIFF=ON \
