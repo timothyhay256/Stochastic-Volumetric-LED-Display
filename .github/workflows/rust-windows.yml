@@ -19,7 +19,7 @@ jobs:
         with:
           # Arguments to pass to Chocolatey
           # don't install opencv here as we build the staticlib below
-          args: install -y llvm wget strawberryperl unzip cmake
+          args: install -y llvm wget strawberryperl unzip cmake opencl-intel-cpu-runtime
           # Docker image to use
           #image: # optional, default is ghcr.io/crazy-max/ghaction-chocolatey
 
@@ -40,7 +40,7 @@ jobs:
 
       - name: Build
         run: |
-          $env:OPENCV_LINK_LIBS="opencv_highgui4110,opencv_core4110,opencv_videoio4110,opencv_imgcodecs4110,opencv_imgproc4110,ippiw,ittnotify,ippicvmt,zlib,libjpeg-turbo,libwebp,libpng,libtiff"
+          $env:OPENCV_LINK_LIBS="opencv_highgui4110,opencv_core4110,opencv_videoio4110,opencv_imgcodecs4110,opencv_imgproc4110,ippiw,ittnotify,ippicvmt,zlib,libjpeg-turbo,libwebp,libpng,libtiff,libopenjp2"
           # $env:OPENCV_LINK_LIBS=$(Get-ChildItem -Path C:\tools -Recurse -Filter 'opencv_world*.lib' | Select-Object -first 1 | Select-Object -ExpandProperty Name)
           $env:OPENCV_LINK_PATHS="C:/opt/opencv/x64/vc17/staticlib"
           $env:OPENCV_INCLUDE_PATHS="C:/opt/opencv/include"

@@ -19,8 +19,8 @@ jobs:
         run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
       # See https://github.com/orgs/community/discussions/26635
-      - name: brew bash, wget, cmake, openjpeg
-        run: brew install bash wget cmake openjpeg
+      - name: brew bash, wget, cmake, openjpeg, webp
+        run: brew install bash wget cmake openjpeg, webp
 
       # dynamic link libclang correctly, according to https://github.com/twistedfall/opencv-rust
       - name: Dynamic Link libclang
@@ -157,7 +157,7 @@ jobs:
         run: |
           export DYLD_FALLBACK_LIBRARY_PATH="$(xcode-select --print-path)/usr/lib/"
           clang_dir="$(clang --print-search-dirs | awk -F= '/^libraries: =/ { print $2 }')"
-          export OPENCV_LINK_LIBS=opencv_highgui,opencv_core,opencv_videoio,opencv_imgcodecs,opencv_imgproc,libippiw,libittnotify,libippicv,zlib,jpeg,openjp2,OpenCL.framework,Cocoa.framework,Accelerate.framework,AVFoundation.framework,CoreGraphics.framework,CoreMedia.framework,CoreVideo.framework,QuartzCore.framework,clang_rt.osx
+          export OPENCV_LINK_LIBS=opencv_highgui,opencv_core,opencv_videoio,opencv_imgcodecs,opencv_imgproc,libippiw,libittnotify,libippicv,zlib,jpeg,openjp2,webp,OpenCL.framework,Cocoa.framework,Accelerate.framework,AVFoundation.framework,CoreGraphics.framework,CoreMedia.framework,CoreVideo.framework,QuartzCore.framework,clang_rt.osx
           export OPENCV_LINK_PATHS=/usr/local/lib,/usr/local/lib/opencv4/3rdparty,$clang_dir/lib/darwin
           export OPENCV_INCLUDE_PATHS=/usr/local/include,/usr/local/include/opencv4
           /Users/docker/.cargo/bin/cargo build --release
