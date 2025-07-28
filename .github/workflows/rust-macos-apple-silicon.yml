@@ -154,8 +154,8 @@ jobs:
             -D WITH_AVIF=OFF \
             -D WITH_IMGCODEC_AVIF=OFF \
             -DOPENCV_EXTRA_MODULES_PATH=../opencv_contrib-${{ env.OPENCV_VERSION }}/modules ../opencv-${{ env.OPENCV_VERSION }}
-          cmake --build . --target install --config Release --parallel 16
-          cmake --install . --prefix /usr/local
+          sudo cmake --build . --target install --config Release --parallel 16
+          sudo cmake --install . --prefix /usr/local
           cd ..
 
       # OpenCV-rust looks for "opencv2/core/version.hpp" for the OpenCV version: https://github.com/twistedfall/opencv-rust/issues/368
