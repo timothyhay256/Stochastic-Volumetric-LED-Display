@@ -1,7 +1,6 @@
 name: Build for MacOS arm64
 
-on:
-  workflow_dispatch:
+on: workflow_dispatch
 
 env:
   OPENCV_VERSION: 4.11.0
