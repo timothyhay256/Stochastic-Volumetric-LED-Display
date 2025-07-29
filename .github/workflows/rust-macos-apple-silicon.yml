@@ -19,8 +19,8 @@ jobs:
 
       - name: Uninstall default jpeg-turbo to use jpeg instead
         run: brew uninstall jpeg-turbo
-      # See
- https://github.com/orgs/community/discussions/26635
+        
+      # See https://github.com/orgs/community/discussions/26635
       - name: brew bash, wget, cmake, openjpeg, jpeg, webp
         run: brew install bash wget cmake openjpeg jpeg webp
 
