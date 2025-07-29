@@ -16,9 +16,6 @@ jobs:
       # Install rust
       - name: Install rust
         run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-
-      - name: Uninstall default jpeg-turbo to use jpeg instead
-        run: brew uninstall jpeg-turbo
         
       # See https://github.com/orgs/community/discussions/26635
       - name: brew bash, wget, cmake, openjpeg, jpeg, webp
