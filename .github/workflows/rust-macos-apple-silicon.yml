@@ -100,6 +100,7 @@ jobs:
             -D WITH_1394=OFF \
             -D WITH_ADE=ON \
             -D WITH_ARAVIS=OFF \
+            -D WITH_CAROTENE=OFF \
             -D WITH_CLP=OFF \
             -D WITH_CUBLAS=OFF \
             -D WITH_CUDA=OFF \
