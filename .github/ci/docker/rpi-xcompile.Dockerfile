@@ -74,6 +74,9 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     unzip wget && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
+RUN pkg-config --libs gtk+-3.0
+RUN pkg-config --libs libopenjpeg
+
 # Build and install OpenCV from source
 RUN set -eux; \
     wget https://github.com/opencv/opencv/archive/refs/tags/4.11.0.zip && \
@@ -259,9 +262,6 @@ clang --target=arm-unknown-linux-gnueabihf -fuse-ld=lld --sysroot="$RPI_ROOT" --
 #     ln -s /rpi-root/usr/local/lib/arm-linux-gnueabihf /usr/local/lib/arm-linux-gnueabihf
 
 RUN ls -R /rpi-root/usr/local/include/opencv4 || echo "opencv4 headers not found"
-
-RUN pkg-config --libs gtk+-3.0
-RUN pkg-config --libs libopenjpeg
 
 RUN echo '#!/bin/bash\n\
 RPI_ROOT="/rpi-root"\n\
