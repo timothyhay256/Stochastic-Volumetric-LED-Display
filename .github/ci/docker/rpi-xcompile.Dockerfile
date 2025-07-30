@@ -74,9 +74,6 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     unzip wget && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN pkg-config --libs gtk+-3.0
-RUN pkg-config --libs libopenjp2
-
 # Build and install OpenCV from source
 RUN set -eux; \
     wget https://github.com/opencv/opencv/archive/refs/tags/4.11.0.zip && \
@@ -104,7 +101,7 @@ RUN set -eux; \
             -D BUILD_ITT=ON \
             -D BUILD_JASPER=OFF \
             -D BUILD_JAVA=OFF \
-            -D BUILD_JPEG=ON \
+            -D BUILD_JPEG=OFF \
             -D BUILD_OPENEXR=OFF \
             -D BUILD_PERF_TESTS=OFF \
             -D BUILD_PNG=OFF \
@@ -163,7 +160,7 @@ RUN set -eux; \
             -D WITH_IPP=ON \
             -D WITH_ITT=ON \
             -D WITH_JASPER=OFF \
-            -D WITH_JPEG=ON \
+            -D WITH_JPEG=OFF \
             -D WITH_LAPACK=ON \
             -D WITH_LIBV4L=OFF \
             -D WITH_MATLAB=OFF \
@@ -194,8 +191,8 @@ RUN set -eux; \
             -D WITH_WEBP=ON \
             -D WITH_XIMEA=OFF \
             -D WITH_XINE=OFF \
-            -D BUILD_JPEG=ON \
-            -D BUILD_OPENJPEG=ON \
+            -D BUILD_JPEG=OFF \
+            -D BUILD_OPENJPEG=OFF \
             -D BUILD_PNG=ON \
             -D BUILD_SHARED_LIBS=OFF \
             -D BUILD_TIFF=ON \
@@ -270,7 +267,7 @@ export PKG_CONFIG_LIBDIR="$RPI_ROOT/usr/lib/arm-linux-gnueabihf/pkgconfig"\n\
 export OPENCV_HEADER_DIR="$RPI_ROOT/usr/local/include/opencv4,$RPI_ROOT/usr/local/include/opencv4"\n\
 export OPENCV_INCLUDE_PATHS="$RPI_ROOT/usr/local/include/opencv4"\n\
 export OPENCV_LINK_PATHS="$RPI_ROOT/usr/local/lib,$RPI_ROOT/usr/local/lib/opencv4/3rdparty,$RPI_ROOT/usr/local/lib/arm-linux-gnueabihf"\n\
-export OPENCV_LINK_LIBS=opencv_gapi,opencv_highgui,opencv_objdetect,opencv_dnn,opencv_videostab,opencv_calib3d,opencv_features2d,opencv_stitching,opencv_flann,opencv_videoio,opencv_rgbd,opencv_aruco,opencv_video,opencv_ml,opencv_imgcodecs,opencv_imgproc,opencv_core,jpeg,openjp2,gtk-3,gdk-3,pangocairo-1.0,pango-1.0,harfbuzz,atk-1.0,cairo-gobject,cairo,gdk_pixbuf-2.0,gio-2.0,gobject-2.0,glib-2.0\n\
+export OPENCV_LINK_LIBS=opencv_gapi,opencv_highgui,opencv_objdetect,opencv_dnn,opencv_videostab,opencv_calib3d,opencv_features2d,opencv_stitching,opencv_flann,opencv_videoio,opencv_rgbd,opencv_aruco,opencv_video,opencv_ml,opencv_imgcodecs,opencv_imgproc,opencv_core,gtk-3,gdk-3,pangocairo-1.0,pango-1.0,harfbuzz,atk-1.0,cairo-gobject,cairo,gdk_pixbuf-2.0,gio-2.0,gobject-2.0,glib-2.0\n\
 export CC="clang-rpi"\n\
 export CXX="clang-rpi"\n\
 cargo build -vv --release --target arm-unknown-linux-gnueabihf' > /usr/local/bin/cargo-xbuild && chmod +x /usr/local/bin/cargo-xbuild
