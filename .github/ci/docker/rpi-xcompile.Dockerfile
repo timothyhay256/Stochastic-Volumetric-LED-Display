@@ -206,7 +206,7 @@ RUN set -eux; \
             -D WITH_GDAL=OFF \
             -D WITH_GPHOTO2=OFF \
             -D WITH_GSTREAMER=OFF \
-            -D WITH_GTK=OFF \
+            -D WITH_GTK=ON \
             -D WITH_LAPACK=OFF \
             -D WITH_OPENGL=OFF \
             -D WITH_QT=OFF \
@@ -259,6 +259,9 @@ clang --target=arm-unknown-linux-gnueabihf -fuse-ld=lld --sysroot="$RPI_ROOT" --
 #     ln -s /rpi-root/usr/local/lib/arm-linux-gnueabihf /usr/local/lib/arm-linux-gnueabihf
 
 RUN ls -R /rpi-root/usr/local/include/opencv4 || echo "opencv4 headers not found"
+
+RUN pkg-config --libs gtk+-3.0
+RUN pkg-config --libs libopenjpeg
 
 RUN echo '#!/bin/bash\n\
 RPI_ROOT="/rpi-root"\n\
