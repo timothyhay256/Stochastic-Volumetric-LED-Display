@@ -8,7 +8,7 @@ env:
 jobs:
   build-x86_64:
     name: Build for arm64 MacOS
-    runs-on: macos-15
+    runs-on: [macOS, home-machine, self-hosted]
 
     steps:
       - uses: actions/checkout@v3
