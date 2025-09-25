@@ -1,10 +1,10 @@
 use std::{
     error::Error,
-    fs::{remove_file, File},
+    fs::{File, remove_file},
     io::{BufWriter, Read, Write},
     net::{Ipv4Addr, UdpSocket},
     path::{Path, PathBuf},
-    sync::{atomic::AtomicBool, Arc, Mutex},
+    sync::{Arc, Mutex, atomic::AtomicBool},
     thread::JoinHandle,
     time::SystemTime,
 };
@@ -284,7 +284,9 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
     // TODO: Make this an implmentation
     // Load and validate config
     if !config_path.exists() {
-        panic!("Could not find svled.toml! Please create one according to the documentation in the current directory.");
+        panic!(
+            "Could not find svled.toml! Please create one according to the documentation in the current directory."
+        );
     }
     let mut config_file =
         File::open(config_path).expect("Could not open config file. Do I have permission?");
@@ -299,22 +301,22 @@ pub fn load_validate_conf(config_path: &Path) -> (ManagerData, UnityOptions, Con
 
     // Validate config and inform user of settings
 
-    if let Some(no_controller) = config_holder.advanced.misc.no_controller {
-        if !no_controller {
-            if config_holder.communication.communication_mode == 2 {
-                for path in config_holder.communication.serial_port_paths.iter() {
-                    if Path::new(&path).exists() {
-                        info!("Using serial for communication on {path}!");
-                    } else {
-                        panic!("Serial port {path} does not exist!");
-                    }
+    if let Some(no_controller) = config_holder.advanced.misc.no_controller
+        && !no_controller
+    {
+        if config_holder.communication.communication_mode == 2 {
+            for path in config_holder.communication.serial_port_paths.iter() {
+                if Path::new(&path).exists() {
+                    info!("Using serial for communication on {path}!");
+                } else {
+                    panic!("Serial port {path} does not exist!");
                 }
-            } else if config_holder.communication.communication_mode == 1 {
-                info!(
-                    "Using udp for communication at {} on port {}",
-                    config_holder.communication.host, config_holder.communication.port
-                );
             }
+        } else if config_holder.communication.communication_mode == 1 {
+            info!(
+                "Using udp for communication at {} on port {}",
+                config_holder.communication.host, config_holder.communication.port
+            );
         }
     }
 
@@ -458,33 +460,29 @@ pub fn check_and_create_file(file: &PathBuf) -> Result<File, Box<dyn Error>> {
 pub fn flush_data(manager_guard: Arc<Mutex<ManagerData>>) {
     let mut manager = manager_guard.lock().unwrap();
     // Flush our BufWriters
-    if manager.io.data_file_buf.is_some() {
-        if let Some(data_file_buf) = manager.io.data_file_buf.as_mut() {
-            match data_file_buf.flush() {
-                Ok(_) => {}
-                Err(e) => {
-                    error!(
-                        "Could not flush {}! It may be incomplete or corrupted. Error: {}",
-                        manager.config.record_data_file.display(),
-                        e
-                    )
-                }
-            }
-        };
-    }
+    if manager.io.data_file_buf.is_some()
+        && let Some(data_file_buf) = manager.io.data_file_buf.as_mut()
+        && let Err(e) = data_file_buf.flush()
+    {
+        error!(
+            "Could not flush {}! It may be incomplete or corrupted. Error: {}",
+            manager.config.record_data_file.display(),
+            e
+        )
+    };
 
-    if manager.io.esp_data_file_buf.is_some() {
-        if let Some(esp_data_file_buf) = manager.io.esp_data_file_buf.as_mut() {
-            match esp_data_file_buf.flush() {
-                Ok(_) => {}
-                Err(e) => {
-                    error!(
-                        "Could not flush {}! It may be incomplete or corrupted. Error: {}",
-                        manager.config.record_esp_data_file.display(),
-                        e
-                    )
-                }
+    if manager.io.esp_data_file_buf.is_some()
+        && let Some(esp_data_file_buf) = manager.io.esp_data_file_buf.as_mut()
+    {
+        match esp_data_file_buf.flush() {
+            Ok(_) => {}
+            Err(e) => {
+                error!(
+                    "Could not flush {}! It may be incomplete or corrupted. Error: {}",
+                    manager.config.record_esp_data_file.display(),
+                    e
+                )
             }
-        };
-    }
+        }
+    };
 }

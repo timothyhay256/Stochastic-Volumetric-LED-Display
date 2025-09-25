@@ -7,8 +7,9 @@ use std::{
 use image::{GenericImageView, Pixel};
 use log::error;
 
-use crate::{led_manager, set_color, ManagerData, PosEntry};
+use crate::{ManagerData, PosEntry, led_manager, set_color};
 type LedPos = [(String, (i32, i32), (i32, i32))];
+type FilteredLeds<'a> = Vec<(usize, &'a (String, (i32, i32), (i32, i32)))>;
 
 #[derive(Clone, Copy)]
 pub enum Axis {
@@ -29,9 +30,9 @@ pub fn rainbow(
     // Axis value accessor closure
     let get_axis_value = |entry: &(String, (i32, i32), (i32, i32))| -> i32 {
         match axis {
-            Axis::X => entry.1 .0,
-            Axis::Y => entry.1 .1,
-            Axis::Z => entry.2 .0,
+            Axis::X => entry.1.0,
+            Axis::Y => entry.1.1,
+            Axis::Z => entry.2.0,
         }
     };
 
@@ -99,9 +100,9 @@ pub fn rainbow(
 pub fn rainbow_fill(manager: &Arc<Mutex<ManagerData>>, led_pos: &LedPos, axis: Axis, offset: i32) {
     let get_axis_value = |entry: &(String, (i32, i32), (i32, i32))| -> i32 {
         match axis {
-            Axis::X => entry.1 .0,
-            Axis::Y => entry.1 .1,
-            Axis::Z => entry.2 .0,
+            Axis::X => entry.1.0,
+            Axis::Y => entry.1.1,
+            Axis::Z => entry.2.0,
         }
     };
 
@@ -178,7 +179,7 @@ pub fn render_jpg_onto_leds(
     let img_height = img.height() as f32;
 
     // Filter positions based on z_range
-    let filtered: Vec<(usize, &(_, (i32, i32), (i32, i32)))> = led_positions
+    let filtered: FilteredLeds = led_positions
         .iter()
         .enumerate()
         .filter(|(_, (_, _, (z, _)))| match &z_range {

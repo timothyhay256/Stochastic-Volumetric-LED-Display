@@ -4,16 +4,16 @@ use std::{
     net::UdpSocket,
     path::{Path, PathBuf},
     process,
-    sync::{atomic::Ordering, Arc, Mutex},
+    sync::{Arc, Mutex, atomic::Ordering},
     thread,
     time::{Duration, SystemTime},
 };
 
-use crossbeam_channel::{bounded, Receiver, RecvTimeoutError, Sender};
+use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, bounded};
 use log::{debug, error, info, warn};
 use serialport::SerialPort;
 
-use crate::{utils::ManagerData, LedConfig, LedState, Task};
+use crate::{LedConfig, LedState, Task, utils::ManagerData};
 
 enum ConnectionType<'a> {
     Udp(&'a mut Option<UdpSocket>),
@@ -183,39 +183,48 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
                 manager.state.call_time = SystemTime::now(); // Reset timer
                 if record_data {
                     match manager.io.data_file_buf.as_mut() {
-                            Some(data_file_buf) => {
-                                let millis = duration.as_millis();
-                                if millis >= 3 {
-                                    writeln!(data_file_buf, "T:{}", &millis.to_string()).expect("Could not write to data_file_buf!");
-                                }
-                                writeln!(data_file_buf, "{n}|{r}|{g}|{b}").expect("Could not write to data_file_buf!");
+                        Some(data_file_buf) => {
+                            let millis = duration.as_millis();
+                            if millis >= 3 {
+                                writeln!(data_file_buf, "T:{}", &millis.to_string())
+                                    .expect("Could not write to data_file_buf!");
                             }
-                            None => error!("record_data is true, but data_file_buf is None! Something has gone very wrong, please report this.")
+                            writeln!(data_file_buf, "{n}|{r}|{g}|{b}")
+                                .expect("Could not write to data_file_buf!");
                         }
+                        None => error!(
+                            "record_data is true, but data_file_buf is None! Something has gone very wrong, please report this."
+                        ),
+                    }
                 }
                 if record_esp_data {
                     match manager.io.esp_data_file_buf.as_mut() {
-                            Some(esp_data_file_buf) => {
-                                let mut millis = duration.as_millis();
+                        Some(esp_data_file_buf) => {
+                            let mut millis = duration.as_millis();
 
-                                while millis > 255 {
-                                    // Delay marker + max duration
-                                    write!(esp_data_file_buf, "0xFE, 0xFF, ").expect("Failed to write delay");
-                                    millis -= 255;
-                                }
-                                if millis > 0 {
-                                    write!(esp_data_file_buf, "0xFE, {millis:#04X}, ").expect("Failed to write delay");
-                                }
-
-                                let n_bytes = n.to_le_bytes();
-                                write!(
-                                    esp_data_file_buf,
-                                    "0x{0:02X}, 0x{1:02X}, 0x{2:02X}, 0x{3:02X}, 0x{4:02X}, ",
-                                    n_bytes[0], n_bytes[1], r, g, b
-                                ).expect("Failed to write LED data");                            
+                            while millis > 255 {
+                                // Delay marker + max duration
+                                write!(esp_data_file_buf, "0xFE, 0xFF, ")
+                                    .expect("Failed to write delay");
+                                millis -= 255;
                             }
-                            None => error!("record_esp_data is true, but esp_data_file_buf is None!, Something has gone very wrong, please report this.")
+                            if millis > 0 {
+                                write!(esp_data_file_buf, "0xFE, {millis:#04X}, ")
+                                    .expect("Failed to write delay");
+                            }
+
+                            let n_bytes = n.to_le_bytes();
+                            write!(
+                                esp_data_file_buf,
+                                "0x{0:02X}, 0x{1:02X}, 0x{2:02X}, 0x{3:02X}, 0x{4:02X}, ",
+                                n_bytes[0], n_bytes[1], r, g, b
+                            )
+                            .expect("Failed to write LED data");
                         }
+                        None => error!(
+                            "record_esp_data is true, but esp_data_file_buf is None!, Something has gone very wrong, please report this."
+                        ),
+                    }
                 }
             }
             Err(e) => println!("Error: {e}"),
@@ -242,10 +251,10 @@ pub fn set_color(manager_guard: &Arc<Mutex<ManagerData>>, n: u16, r: u8, g: u8, 
                 });
             }
 
-            if let Some(no_controller) = manager.config.no_controller {
-                if !no_controller {
-                    send_color_command(SendCommandArgs::Manager(&mut manager), n, r, g, b);
-                }
+            if let Some(no_controller) = manager.config.no_controller
+                && !no_controller
+            {
+                send_color_command(SendCommandArgs::Manager(&mut manager), n, r, g, b);
             }
         } else if manager.state.led_thread_channels.is_empty() {
             manager.state.led_thread_channels = dispatch_threads(&mut manager);
@@ -369,8 +378,8 @@ fn send_color_command(manager_or_config: SendCommandArgs, n: u16, r: u8, g: u8, 
                         Ok(_) => {}
                         Err(e) => {
                             error!(
-                            "Could not write bytes to UDP socket: {e}, trying to continue anyway"
-                        )
+                                "Could not write bytes to UDP socket: {e}, trying to continue anyway"
+                            )
                         }
                     }
                     let mut buf = [0; 3];
@@ -386,14 +395,16 @@ fn send_color_command(manager_or_config: SendCommandArgs, n: u16, r: u8, g: u8, 
                                 process::exit(1);
                             }
                             warn!(
-                            "UDP timeout reached! Will resend packet, but won't wait for response!"
-                        );
+                                "UDP timeout reached! Will resend packet, but won't wait for response!"
+                            );
                             match udp_socket
                                 .send_to(&bytes, format!("{}:{}", config.host, config.port))
                             {
                                 Ok(_) => {}
                                 Err(e) => {
-                                    error!("Could not write bytes to UDP socket: {e}, trying to continue anyway")
+                                    error!(
+                                        "Could not write bytes to UDP socket: {e}, trying to continue anyway"
+                                    )
                                 }
                             }
                             state.failures += 1

@@ -7,8 +7,8 @@ use std::{
     net::{Ipv4Addr, TcpStream, UdpSocket},
     str,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
     },
     thread::{self, JoinHandle},
     time::{Duration, SystemTime},
@@ -20,14 +20,14 @@ use opencv::{
     core::{Mat, Point, Scalar},
     imgproc::{self, LINE_8},
     videoio::{
-        self, VideoCaptureTrait, VideoCaptureTraitConst, CAP_PROP_FRAME_HEIGHT,
-        CAP_PROP_FRAME_WIDTH,
+        self, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH, VideoCaptureTrait,
+        VideoCaptureTraitConst,
     },
 };
 
 use crate::{
-    led_manager, scan::get_cam, Config, GetEventsFrameBuffer, IOHandles, LedState, ManagerData,
-    ManagerState, PosEntry, RuntimeConfig, UnityOptions, VisionData,
+    Config, GetEventsFrameBuffer, IOHandles, LedState, ManagerData, ManagerState, PosEntry,
+    RuntimeConfig, UnityOptions, VisionData, led_manager, scan::get_cam,
 };
 
 pub fn signal_restart(unity_ip: Ipv4Addr, unity_port: u32) {
@@ -112,9 +112,9 @@ pub fn send_pos(unity: UnityOptions) -> std::io::Result<()> {
                 .write_all(
                     format!(
                         "{},{},{}",
-                        led.1 .0 as f32 * unity.scale,
-                        led.1 .1 as f32 * unity.scale,
-                        led.2 .0 as f32 * unity.scale
+                        led.1.0 as f32 * unity.scale,
+                        led.1.1 as f32 * unity.scale,
+                        led.2.0 as f32 * unity.scale
                     )
                     .as_bytes(),
                 )
@@ -215,17 +215,17 @@ pub fn get_events(
 
         for item in json.iter().take(led_count) {
             // Get max and min values in led_pos
-            y_max = max(item.1 .1, y_max);
+            y_max = max(item.1.1, y_max);
         }
 
-        for i in 0..led_count {
+        for item in json.iter_mut().take(led_count) {
             let y_mid: f32 = (y_max / 2) as f32;
-            let current_y: f32 = json[i].1 .1 as f32;
+            let current_y: f32 = item.1.1 as f32;
 
-            json[i].1 .1 = match current_y {
+            item.1.1 = match current_y {
                 y if y > y_mid => (y_mid - (y - y_mid)).round() as i32,
                 y if y < y_mid => (y_mid + (y_mid - y)).round() as i32,
-                _ => json[i].1 .1,
+                _ => item.1.1,
             };
         }
 
@@ -325,10 +325,10 @@ pub fn get_events(
                 loop {
                     cam.lock().unwrap().read(&mut frame_cam_1).unwrap();
 
-                    if let Some(cam2) = &mut cam2 {
-                        if config.camera.multi_camera {
-                            cam2.lock().unwrap().read(&mut frame_cam_2).unwrap();
-                        }
+                    if let Some(cam2) = &mut cam2
+                        && config.camera.multi_camera
+                    {
+                        cam2.lock().unwrap().read(&mut frame_cam_2).unwrap();
                     }
 
                     if config
@@ -436,7 +436,9 @@ pub fn get_events(
                             xs[i] = match el.parse::<u16>() {
                                 Ok(el) => el,
                                 Err(e) => {
-                                    panic!("Unity packet was malformed: Attempted to convert {el} to u8: {e}")
+                                    panic!(
+                                        "Unity packet was malformed: Attempted to convert {el} to u8: {e}"
+                                    )
                                 }
                             };
                         }
@@ -453,7 +455,13 @@ pub fn get_events(
                                 value.3 = false;
                             }
                         }
-                        led_manager::set_color(&manager, xs[0], xs[1] as u8, xs[2] as u8, xs[3] as u8);
+                        led_manager::set_color(
+                            &manager,
+                            xs[0],
+                            xs[1] as u8,
+                            xs[2] as u8,
+                            xs[3] as u8,
+                        );
                     } else {
                         error!("Unity packet was malformed! Packet: {line}");
                     }

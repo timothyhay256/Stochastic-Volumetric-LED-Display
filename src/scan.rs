@@ -10,19 +10,19 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::Local; // TODO: Play with different camera backends
 use inquire;
 use log::{debug, error, info, warn}; // TODO: Properly get HSV for each camera
 use opencv::{
-    core::{self, flip, get_default_algorithm_hint, min_max_loc, no_array, Point, Scalar},
+    core::{self, Point, Scalar, flip, get_default_algorithm_hint, min_max_loc, no_array},
     highgui::{self, EVENT_LBUTTONDOWN, EVENT_LBUTTONUP, EVENT_MOUSEMOVE},
     imgproc::{self, COLOR_BGR2GRAY, COLOR_BGR2HSV, LINE_8},
     prelude::*,
-    videoio::{self, VideoCapture, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH},
+    videoio::{self, CAP_PROP_FRAME_HEIGHT, CAP_PROP_FRAME_WIDTH, VideoCapture},
 };
 
-use crate::{led_manager, Config, CropPos, ManagerData, PosEntry, ScanData};
+use crate::{Config, CropPos, ManagerData, PosEntry, ScanData, led_manager};
 
 type ScanResult = Result<(i32, i32, Option<i32>, Option<i32>), Box<dyn Error>>;
 type CropData = Option<((i32, i32, i32, i32), (i32, i32, i32, i32))>;
@@ -67,10 +67,10 @@ pub fn scan(
     }
 
     let window = "Please wait...";
-    if let Some(no_video) = config.advanced.camera.no_video {
-        if !no_video {
-            highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
-        }
+    if let Some(no_video) = config.advanced.camera.no_video
+        && !no_video
+    {
+        highgui::named_window(window, highgui::WINDOW_AUTOSIZE)?;
     }
 
     let mut pos = CropPos {
@@ -125,7 +125,7 @@ pub fn scan(
             return Err(anyhow!(
                 "Unable to open camera {}! Please select another.",
                 config.camera.camera_index_1
-            ))
+            ));
         }
     };
 
@@ -164,15 +164,15 @@ pub fn scan(
                 .get(opencv::videoio::CAP_PROP_FRAME_HEIGHT)
                 .unwrap() as i32;
         } else if let Some(crop_data) = crop_data {
-            pos.x1_start = crop_data.0 .0;
-            pos.x1_end = crop_data.0 .1;
-            pos.y1_start = crop_data.0 .2;
-            pos.y1_end = crop_data.0 .3;
+            pos.x1_start = crop_data.0.0;
+            pos.x1_end = crop_data.0.1;
+            pos.y1_start = crop_data.0.2;
+            pos.y1_end = crop_data.0.3;
 
-            pos.x2_start = Some(crop_data.1 .0);
-            pos.x2_end = Some(crop_data.1 .1);
-            pos.y2_start = Some(crop_data.1 .2);
-            pos.y2_end = Some(crop_data.1 .3);
+            pos.x2_start = Some(crop_data.1.0);
+            pos.x2_end = Some(crop_data.1.1);
+            pos.y2_start = Some(crop_data.1.2);
+            pos.y2_end = Some(crop_data.1.3);
         }
 
         if config.camera.multi_camera {
@@ -274,7 +274,7 @@ pub fn scan(
                 return Err(anyhow!(
                     "Unable to open camera {}! Please select another.",
                     config.camera.camera_index_2.unwrap()
-                ))
+                ));
             }
         };
 
@@ -296,7 +296,9 @@ pub fn scan(
                 }) {
                 Ok(_) => {}
                 Err(e) => {
-                    error!("Failed to spawn frame_consumer! Scan results may be inaccurate! Error: {e}")
+                    error!(
+                        "Failed to spawn frame_consumer! Scan results may be inaccurate! Error: {e}"
+                    )
                 }
             };
         }
@@ -389,14 +391,22 @@ pub fn scan(
             (success, failures, success_cam_2, failures_cam_2)
         }
         Err(e) => {
-            panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
+            panic!(
+                "There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}",
+                failed_calibration(led_pos),
+                e
+            );
         }
     };
 
     if !config.camera.multi_camera {
         info!("{success} succesful calibrations, {failures} failed calibrations");
     } else {
-        info!("First camera: {success} succesful calibrations, {failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.", success_cam_2.unwrap(), failures_cam_2.unwrap());
+        info!(
+            "First camera: {success} succesful calibrations, {failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.",
+            success_cam_2.unwrap(),
+            failures_cam_2.unwrap()
+        );
     }
 
     if failures > 0 && !streamlined && !config.camera.multi_camera {
@@ -404,12 +414,21 @@ pub fn scan(
         {
             data.lock().unwrap().invert = true;
         }
-        info!("Please rotate the container 180 degrees to recalibrate failures. Press space to continue.");
-        highgui::set_window_title(window, "Please rotate the container 180 degrees to recalibrate failures. Press space to continue.")?;
+        info!(
+            "Please rotate the container 180 degrees to recalibrate failures. Press space to continue."
+        );
+        highgui::set_window_title(
+            window,
+            "Please rotate the container 180 degrees to recalibrate failures. Press space to continue.",
+        )?;
         match wait(data.clone(), &cam, window) {
             Ok(_) => {}
             Err(e) => {
-                panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
+                panic!(
+                    "There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}",
+                    failed_calibration(led_pos),
+                    e
+                );
             }
         }
         let (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures) = match scan_area(
@@ -424,13 +443,21 @@ pub fn scan(
                 (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures)
             }
             Err(e) => {
-                panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
+                panic!(
+                    "There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}",
+                    failed_calibration(led_pos),
+                    e
+                );
             }
         };
         if !config.camera.multi_camera {
             info!("{cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations");
         } else {
-            info!("First camera: {cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.", cam_2_success.unwrap(), cam_2_failures.unwrap());
+            info!(
+                "First camera: {cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.",
+                cam_2_success.unwrap(),
+                cam_2_failures.unwrap()
+            );
         }
         if failures > 0 {
             info!("Entering manual calibration mode!");
@@ -461,7 +488,11 @@ pub fn scan(
         match wait(data.clone(), &cam, window) {
             Ok(_) => {}
             Err(e) => {
-                panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
+                panic!(
+                    "There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}",
+                    failed_calibration(led_pos),
+                    e
+                );
             }
         }
 
@@ -483,26 +514,43 @@ pub fn scan(
                 (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures)
             }
             Err(e) => {
-                panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
+                panic!(
+                    "There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}",
+                    failed_calibration(led_pos),
+                    e
+                );
             }
         };
 
         if !config.camera.multi_camera {
             info!("{success} succesful calibrations, {failures} failed calibrations");
         } else {
-            info!("First camera: {success} succesful calibrations, {failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.", success_cam_2.unwrap(), failures_cam_2.unwrap());
+            info!(
+                "First camera: {success} succesful calibrations, {failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.",
+                success_cam_2.unwrap(),
+                failures_cam_2.unwrap()
+            );
         }
 
         if failures > 0 {
             {
                 data.lock().unwrap().invert = true;
             }
-            info!("Please rotate the container 180 degrees to recalibrate failures. Press space to continue.");
-            highgui::set_window_title(window, "Please rotate the container 180 degrees to recalibrate failures. Press space to continue.")?;
+            info!(
+                "Please rotate the container 180 degrees to recalibrate failures. Press space to continue."
+            );
+            highgui::set_window_title(
+                window,
+                "Please rotate the container 180 degrees to recalibrate failures. Press space to continue.",
+            )?;
             match wait(data.clone(), &cam, window) {
                 Ok(_) => {}
                 Err(e) => {
-                    panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
+                    panic!(
+                        "There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}",
+                        failed_calibration(led_pos),
+                        e
+                    );
                 }
             }
             let (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures) = match scan_area(
@@ -517,7 +565,11 @@ pub fn scan(
                     (cam_1_success, cam_1_failures, cam_2_success, cam_2_failures)
                 }
                 Err(e) => {
-                    panic!("There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}", failed_calibration(led_pos), e);
+                    panic!(
+                        "There was an error trying to scan the XY portion. The data that has been gathered so far has been saved to {}. The error was: {}",
+                        failed_calibration(led_pos),
+                        e
+                    );
                 }
             };
             if !config.camera.multi_camera {
@@ -525,7 +577,11 @@ pub fn scan(
                     "{cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations"
                 );
             } else {
-                info!("First camera: {cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.", cam_2_success.unwrap(), cam_2_failures.unwrap());
+                info!(
+                    "First camera: {cam_1_success} succesful calibrations, {cam_1_failures} failed calibrations. \nSecond camera: {} succesful calibrations, {} failed calibrations.",
+                    cam_2_success.unwrap(),
+                    cam_2_failures.unwrap()
+                );
             }
             if failures > 0 {
                 info!("Entering manual calibration mode!");
@@ -556,11 +612,11 @@ pub fn scan(
 
     post_process(&mut led_pos, manager_guard.lock().unwrap().config.num_led);
 
-    if let Some(adjust) = config.advanced.transform.adjust_after_scan {
-        if adjust {
-            info!("Performing position adjustment");
-            position_adjustment(&mut led_pos, &config);
-        }
+    if let Some(adjust) = config.advanced.transform.adjust_after_scan
+        && adjust
+    {
+        info!("Performing position adjustment");
+        position_adjustment(&mut led_pos, &config);
     }
 
     if !streamlined {
@@ -574,33 +630,41 @@ pub fn scan(
 
             match name {
                 Ok(mut name) => {
-                    if name.is_empty(){
+                    if name.is_empty() {
                         name = format!("{}-ledpos.json", date.format("%Y-%m-%d-%H:%M:%S"));
                     }
-                    let json = serde_json::to_string_pretty(&led_pos).expect("Unable to serialize metadata!");
+                    let json = serde_json::to_string_pretty(&led_pos)
+                        .expect("Unable to serialize metadata!");
                     let mut file = match File::create(Path::new(&name)) {
                         Ok(file) => file,
                         Err(e) => {
-                            error!(
-                                "Unable to write temp-pos to {name}"
+                            error!("Unable to write temp-pos to {name}");
+                            println!(
+                                "Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}",
+                                failed_calibration(led_pos.clone()),
+                                e
                             );
-                            println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}", failed_calibration(led_pos.clone()), e);
                             process::exit(1);
                         }
                     };
 
                     match file.write_all(json.as_bytes()) {
-                        Ok(_) => {},
+                        Ok(_) => {}
                         Err(e) => {
-                            error!(
-                                "Unable to write temp-pos to {name}"
+                            error!("Unable to write temp-pos to {name}");
+                            println!(
+                                "Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}",
+                                failed_calibration(led_pos.clone()),
+                                e
                             );
-                            println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}", failed_calibration(led_pos.clone()), e);
                         }
                     }
                     break;
                 }
-                Err(_) => println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}.", failed_calibration(led_pos.clone())),
+                Err(_) => println!(
+                    "Something went wrong trying to save the LED positions. What has been collected has been written to {}.",
+                    failed_calibration(led_pos.clone())
+                ),
             };
         }
     } else {
@@ -611,7 +675,11 @@ pub fn scan(
             Ok(file) => file,
             Err(e) => {
                 error!("Unable to write temp-pos to {name}");
-                println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}", failed_calibration(led_pos.clone()), e);
+                println!(
+                    "Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}",
+                    failed_calibration(led_pos.clone()),
+                    e
+                );
                 process::exit(1);
             }
         };
@@ -620,7 +688,11 @@ pub fn scan(
             Ok(_) => {}
             Err(e) => {
                 error!("Unable to write temp-pos to {name}");
-                println!("Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}", failed_calibration(led_pos.clone()), e);
+                println!(
+                    "Something went wrong trying to save the LED positions. What has been collected has been written to {}. Error: {}",
+                    failed_calibration(led_pos.clone()),
+                    e
+                );
             }
         }
 
@@ -1084,8 +1156,8 @@ pub fn select_brightest(
 
     debug!("select_brightest finished");
 
-    let result = Ok((*x1.lock().unwrap(), *y1.lock().unwrap())); // Also needed to let the value live long enough
-    result
+    // Also needed to let the value live long enough
+    Ok((*x1.lock().unwrap(), *y1.lock().unwrap()))
 }
 
 pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPos, Box<dyn Error>> {
@@ -1275,12 +1347,7 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
             x2_end_result,
             y2_start_result,
             y2_end_result,
-        ) = (
-            Some(loop_out.0),
-            Some(loop_out.1),
-            Some(loop_out.2),
-            Some(loop_out.3),
-        );
+        ) = (Some(loop_out.0), Some(loop_out.1), loop_out.2, loop_out.3);
     }
 
     let pos = CropPos {
@@ -1289,9 +1356,9 @@ pub fn crop(config: &Config, manager: &Arc<Mutex<ManagerData>>) -> Result<CropPo
         x1_end: x_end_result,
         y1_end: y_end_result.unwrap(),
         x2_start: x2_start_result,
-        y2_start: y2_start_result.unwrap(),
+        y2_start: y2_start_result,
         x2_end: x2_end_result,
-        y2_end: y2_end_result.unwrap(),
+        y2_end: y2_end_result,
         cam_1_brightest: None,
         cam_1_darkest: None,
         cam_2_brightest: None,
@@ -1744,6 +1811,8 @@ pub fn filter(mut frame: &mut Mat, filter_color: &u32, manager: &Arc<Mutex<Manag
     core::add_weighted(&frame.clone(), 0.1, &mask_color, 0.9, 0.0, &mut frame, -1).unwrap();
 }
 
+// this isn't an public function
+#[allow(clippy::too_many_arguments)]
 fn scan_area_cycle(
     manager: &Arc<Mutex<ManagerData>>,
     config: &Config,
@@ -1952,11 +2021,11 @@ fn scan_area_cycle(
         manager.lock().unwrap().vision.frame_cam_1 = frame.clone();
     }
 
-    if let Some(no_video) = config.advanced.camera.no_video {
-        if !no_video {
-            highgui::set_window_title(window, &("LED index: ".to_owned() + &i.to_string()))?;
-            highgui::imshow(window, &frame)?;
-        }
+    if let Some(no_video) = config.advanced.camera.no_video
+        && !no_video
+    {
+        highgui::set_window_title(window, &("LED index: ".to_owned() + &i.to_string()))?;
+        highgui::imshow(window, &frame)?;
     }
 
     highgui::wait_key(1)?;
@@ -2137,7 +2206,7 @@ pub fn manual_calibrate(
                 "pos not from depth, from led_pos[led_index].1 which is {:?}",
                 led_pos[led_index].1
             );
-            pos = Point::new(led_pos[led_index].1 .0, led_pos[led_index].1 .1)
+            pos = Point::new(led_pos[led_index].1.0, led_pos[led_index].1.1)
         } else {
             debug!("pos not from depth, from callback");
             led_pos[led_index].0 = "MANUAL-XY".to_string();
@@ -2149,10 +2218,11 @@ pub fn manual_calibrate(
         debug!("setting cricle at {pos:?}");
         imgproc::circle(&mut frame, pos, 20, color, 2, LINE_8, 0)?;
 
-        if let Some(no_video) = config.advanced.camera.no_video {
-            if frame.size()?.width > 0 && !no_video {
-                highgui::imshow(window, &frame)?;
-            }
+        if let Some(no_video) = config.advanced.camera.no_video
+            && frame.size()?.width > 0
+            && !no_video
+        {
+            highgui::imshow(window, &frame)?;
         }
 
         loop {
@@ -2209,40 +2279,40 @@ pub fn post_process(led_pos: &mut PosEntry, led_count: u32) {
 
     for i in 0..led_count {
         // Get max and min values in led_pos
-        x_max = max(led_pos[i as usize].1 .0, x_max);
-        x_min = min(led_pos[i as usize].1 .0, x_min);
+        x_max = max(led_pos[i as usize].1.0, x_max);
+        x_min = min(led_pos[i as usize].1.0, x_min);
 
-        y_max = max(led_pos[i as usize].1 .1, y_max);
-        y_min = min(led_pos[i as usize].1 .1, y_min);
+        y_max = max(led_pos[i as usize].1.1, y_max);
+        y_min = min(led_pos[i as usize].1.1, y_min);
 
-        z_min = min(led_pos[i as usize].2 .0, z_min);
-        z_max = max(led_pos[i as usize].2 .0, z_max);
+        z_min = min(led_pos[i as usize].2.0, z_min);
+        z_max = max(led_pos[i as usize].2.0, z_max);
     }
 
     for i in 0..led_count {
         // Normalize values
-        led_pos[i as usize].1 .0 -= x_min;
-        led_pos[i as usize].1 .1 -= y_min;
-        led_pos[i as usize].2 .0 -= z_min;
+        led_pos[i as usize].1.0 -= x_min;
+        led_pos[i as usize].1.1 -= y_min;
+        led_pos[i as usize].2.0 -= z_min;
     }
 
     for i in 0..led_count {
         let y_mid = y_max / 2;
-        let current_y = led_pos[i as usize].1 .1;
+        let current_y = led_pos[i as usize].1.1;
 
         let z_mid = z_max / 2;
-        let current_z = led_pos[i as usize].2 .0;
+        let current_z = led_pos[i as usize].2.0;
 
-        led_pos[i as usize].1 .1 = match current_y {
+        led_pos[i as usize].1.1 = match current_y {
             y if y > y_mid => y_mid - (y - y_mid),
             y if y < y_mid => y_mid + (y_mid - y),
-            _ => led_pos[i as usize].1 .1, // when current_y == y_mid, no change
+            _ => led_pos[i as usize].1.1, // when current_y == y_mid, no change
         };
 
         if current_z > z_mid {
-            led_pos[i as usize].2 .0 = z_mid - (current_z - z_mid);
+            led_pos[i as usize].2.0 = z_mid - (current_z - z_mid);
         } else if current_z < z_mid {
-            led_pos[i as usize].2 .0 = z_mid + (z_mid - current_z);
+            led_pos[i as usize].2.0 = z_mid + (z_mid - current_z);
         }
     }
 }
@@ -2258,14 +2328,14 @@ pub fn position_adjustment(led_pos: &mut PosEntry, config: &Config) {
     let mut z_min = i32::MAX;
 
     for position in led_pos.iter() {
-        x_max = max(position.1 .0, x_max);
-        x_min = min(position.1 .0, x_min);
+        x_max = max(position.1.0, x_max);
+        x_min = min(position.1.0, x_min);
 
-        y_max = max(position.1 .1, y_max);
-        y_min = min(position.1 .1, y_min);
+        y_max = max(position.1.1, y_max);
+        y_min = min(position.1.1, y_min);
 
-        z_min = min(position.2 .0, z_min);
-        z_max = max(position.2 .0, z_max);
+        z_min = min(position.2.0, z_min);
+        z_max = max(position.2.0, z_max);
     }
 
     // Apply stretch/shrink
@@ -2277,9 +2347,9 @@ pub fn position_adjustment(led_pos: &mut PosEntry, config: &Config) {
     if x_adjust.is_some() || y_adjust.is_some() || z_adjust.is_some() {
         for position in led_pos.iter_mut() {
             for (coordinate, adjust_opt, center) in [
-                (&mut position.1 .0, x_adjust, x_max / 2),
-                (&mut position.1 .1, y_adjust, y_max / 2),
-                (&mut position.2 .0, z_adjust, z_max / 2),
+                (&mut position.1.0, x_adjust, x_max / 2),
+                (&mut position.1.1, y_adjust, y_max / 2),
+                (&mut position.2.0, z_adjust, z_max / 2),
             ] {
                 if let Some(adjust_amount) = adjust_opt {
                     let dist_from_center = (*coordinate - center).abs();
@@ -2308,18 +2378,18 @@ pub fn position_adjustment(led_pos: &mut PosEntry, config: &Config) {
         for position in led_pos.iter_mut() {
             if let Some(z_transform_amount) = z_transform {
                 // Calculates reduction based on distance from front
-                let mut reduction_factor = ((position.2 .0 as f32 / z_max as f32)
+                let mut reduction_factor = ((position.2.0 as f32 / z_max as f32)
                     * z_transform_amount as f32)
                     .round() as i32;
 
                 // Reduces reduction based on distance from center
                 let x_mid = (x_max as f32 / 2.0).round() as i32;
-                reduction_factor *= (position.1 .0 - x_mid).abs() / x_mid;
+                reduction_factor *= (position.1.0 - x_mid).abs() / x_mid;
 
-                if position.1 .0 > x_max / 2 {
-                    position.1 .0 = (position.1 .0 - reduction_factor).max(x_max / 2);
-                } else if position.1 .0 < x_max / 2 {
-                    position.1 .0 = (position.1 .0 + reduction_factor).min(x_max / 2);
+                if position.1.0 > x_max / 2 {
+                    position.1.0 = (position.1.0 - reduction_factor).max(x_max / 2);
+                } else if position.1.0 < x_max / 2 {
+                    position.1.0 = (position.1.0 + reduction_factor).min(x_max / 2);
                 }
             }
 
