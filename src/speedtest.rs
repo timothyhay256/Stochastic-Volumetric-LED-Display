@@ -6,10 +6,10 @@ use std::{
 use log::{debug, info};
 use rand::Rng;
 
-use crate::{led_manager, ManagerData};
+use crate::{ManagerData, led_manager};
 
 pub fn speedtest(manager: &Arc<Mutex<ManagerData>>, num_led: u32, writes: u32) {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     info!("Clearing string");
 
     for n in 0..num_led {
@@ -22,10 +22,10 @@ pub fn speedtest(manager: &Arc<Mutex<ManagerData>>, num_led: u32, writes: u32) {
     for _n in 0..=writes {
         led_manager::set_color(
             manager,
-            rng.gen_range(0..(num_led as u16)),
-            rng.gen_range(0..255),
-            rng.gen_range(0..255),
-            rng.gen_range(0..255),
+            rng.random_range(0..(num_led as u16)),
+            rng.random_range(0..255),
+            rng.random_range(0..255),
+            rng.random_range(0..255),
         );
     }
 

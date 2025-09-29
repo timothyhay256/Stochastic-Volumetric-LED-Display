@@ -9,27 +9,27 @@ license = "GPL-3.0-or-later"
 categories = ["computer-vision"]
 
 [dependencies]
-chrono = "0.4.39"
-env_logger = "0.11.6"
+chrono = "0.4.42"
+env_logger = "0.11.8"
 gumdrop = "0.8.1"
-indicatif = "0.17.9"
-log = "0.4.22"
-opencv = { version = "0.95.1", default-features = false, features = [
+indicatif = "0.18.0"
+log = "0.4.28"
+opencv = { version = "0.96.0", default-features = false, features = [
     "highgui",
     "videoio",
     "imgproc",
 ], optional = true }
-rand = "0.8.5"
-serde = { version = "1.0.216", features = ["derive"] }
-serde_json = "1.0.134"
-serialport = "4.6.1"
-toml = "0.8.19"
-inquire = "0.7.5"
+rand = "0.9.2"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+serialport = "4.7.3"
+toml = "0.9.7"
+inquire = "0.9.1"
 crossbeam-channel = "0.5.15"
-image = "0.25.6"
-regex = "1.11.1"
-anyhow = "1.0.98"
-ctrlc = "3.4.7"
+image = "0.25.8"
+regex = "1.11.3"
+anyhow = "1.0.100"
+ctrlc = "3.5.0"
 
 [features]
 default = ["scan"]
